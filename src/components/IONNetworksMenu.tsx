@@ -4,7 +4,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTheme } from "next-themes";
-import networksData from "@/data/networksMenuData.json";
+import { getNetworksAsync } from "@/lib/ionMenuAdapter";
+import { useEffect } from "react";
 import { formatTextWithHighlights } from "@/utils/formatText";
 
 interface NetworkItem {
@@ -30,22 +31,40 @@ const IONNetworksMenu = () => {
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
   // Flatten nested structure for easier rendering
-  const flattenNetwork = (item: NetworkItem, level: number = 0, parentId: string = ""): FlatItem[] => {
-    const id = parentId ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}` : item.title.toLowerCase().replace(/\s+/g, "-");
-    const result: FlatItem[] = [{ id, title: item.title, url: item.url, level }];
-    
+  const flattenNetwork = (
+    item: NetworkItem,
+    level: number = 0,
+    parentId: string = ""
+  ): FlatItem[] => {
+    const id = parentId
+      ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}`
+      : item.title.toLowerCase().replace(/\s+/g, "-");
+    const result: FlatItem[] = [
+      { id, title: item.title, url: item.url, level },
+    ];
+
     if (item.children && item.children.length > 0) {
       item.children.forEach((child) => {
         result.push(...flattenNetwork(child, level + 1, id));
       });
     }
-    
+
     return result;
   };
 
+  const [networksRoot, setNetworksRoot] = useState<NetworkItem[]>([]);
+  useEffect(() => {
+    getNetworksAsync().then((items) =>
+      setNetworksRoot(items as unknown as NetworkItem[])
+    );
+  }, []);
+
   const currentNetwork = useMemo(
-    () => networksData.networks.find((n) => n.title.toLowerCase().replace(/\s+/g, "-") === selectedNetwork),
-    [selectedNetwork]
+    () =>
+      networksRoot.find(
+        (n) => n.title.toLowerCase().replace(/\s+/g, "-") === selectedNetwork
+      ),
+    [selectedNetwork, networksRoot]
   );
 
   const currentNetworkFlattened = useMemo(() => {
@@ -60,8 +79,10 @@ const IONNetworksMenu = () => {
     const results: FlatItem[] = [];
 
     const searchInNetwork = (item: NetworkItem, parentId: string = "") => {
-      const id = parentId ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}` : item.title.toLowerCase().replace(/\s+/g, "-");
-      
+      const id = parentId
+        ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}`
+        : item.title.toLowerCase().replace(/\s+/g, "-");
+
       if (item.title.toLowerCase().includes(query)) {
         results.push({ id, title: item.title, url: item.url, level: 0 });
       }
@@ -71,12 +92,13 @@ const IONNetworksMenu = () => {
       }
     };
 
-    networksData.networks.forEach((network) => searchInNetwork(network));
+    networksRoot.forEach((network) => searchInNetwork(network));
     return results;
   }, [searchQuery]);
 
   const handleNetworkClick = (item: FlatItem | NetworkItem) => {
-    const id = 'id' in item ? item.id : item.title.toLowerCase().replace(/\s+/g, "-");
+    const id =
+      "id" in item ? item.id : item.title.toLowerCase().replace(/\s+/g, "-");
     setSelectedNetwork(id);
     setSearchQuery("");
     if (isMobile) {
@@ -91,12 +113,14 @@ const IONNetworksMenu = () => {
     }
   };
 
-  const bebasStyles = useBebasFont ? 'font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider' : '';
-  const menuItemPadding = useBebasFont ? 'py-2.5' : 'py-3';
+  const bebasStyles = useBebasFont
+    ? "font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider"
+    : "";
+  const menuItemPadding = useBebasFont ? "py-2.5" : "py-3";
 
   const highlightION = (text: string) => {
-    if (text.includes('ION')) {
-      const parts = text.split('ION');
+    if (text.includes("ION")) {
+      const parts = text.split("ION");
       return (
         <>
           {parts[0]}
@@ -116,7 +140,7 @@ const IONNetworksMenu = () => {
     const itemsWithoutChildren: NetworkItem[] = [];
     const itemsWithChildren: NetworkItem[] = [];
 
-    level1Items.forEach(item => {
+    level1Items.forEach((item) => {
       if (item.children && item.children.length > 0) {
         itemsWithChildren.push(item);
       } else {
@@ -131,7 +155,11 @@ const IONNetworksMenu = () => {
           <div className="flex flex-col gap-[0px]">
             {itemsWithoutChildren.map((item) => {
               const content = (
-                <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'text-sm' : ''}`}>
+                <span
+                  className={`text-sm font-medium text-card-foreground group-hover:text-primary ${
+                    !useBebasFont ? "text-sm" : ""
+                  }`}
+                >
                   {formatTextWithHighlights(item.title)}
                 </span>
               );
@@ -166,16 +194,22 @@ const IONNetworksMenu = () => {
         {itemsWithChildren.map((parentItem) => (
           <div key={parentItem.title} className="flex flex-col gap-[0px]">
             {/* Parent header */}
-            <div className={`rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} ${bebasStyles}`}>
+            <div
+              className={`rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} ${bebasStyles}`}
+            >
               <span className="text-sm font-medium text-muted-foreground">
                 {formatTextWithHighlights(parentItem.title)}
               </span>
             </div>
-            
+
             {/* Children */}
             {parentItem.children.map((child) => {
               const content = (
-                <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'text-sm' : ''}`}>
+                <span
+                  className={`text-sm font-medium text-card-foreground group-hover:text-primary ${
+                    !useBebasFont ? "text-sm" : ""
+                  }`}
+                >
                   {formatTextWithHighlights(child.title)}
                 </span>
               );
@@ -240,7 +274,11 @@ const IONNetworksMenu = () => {
             </h2>
           </div>
 
-          <div className={`${isMobile ? 'hidden' : 'flex-1 max-w-md relative mx-4 md:mx-[30px]'}`}>
+          <div
+            className={`${
+              isMobile ? "hidden" : "flex-1 max-w-md relative mx-4 md:mx-[30px]"
+            }`}
+          >
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -259,7 +297,7 @@ const IONNetworksMenu = () => {
               onClick={() => setUseBebasFont(!useBebasFont)}
               className="h-8 w-8"
             >
-              <span className={useBebasFont ? 'font-bebas' : ''}>Aa</span>
+              <span className={useBebasFont ? "font-bebas" : ""}>Aa</span>
             </Button>
             <Button
               variant="ghost"
@@ -298,33 +336,41 @@ const IONNetworksMenu = () => {
             <div className="space-y-[1px]">
               {filteredItems.length > 0 ? (
                 filteredItems.map((item) => {
-                  const isTopLevel = networksData.networks.some(
-                    (n) => n.title.toLowerCase().replace(/\s+/g, "-") === item.id
+                  const isTopLevel = networksRoot.some(
+                    (n) =>
+                      n.title.toLowerCase().replace(/\s+/g, "-") === item.id
                   );
 
                   // Find if this item has children in the original data
                   const findItemHasChildren = (id: string): boolean => {
-                    const parts = id.split('-');
+                    const parts = id.split("-");
                     let current: NetworkItem | undefined;
-                    
-                    for (const network of networksData.networks) {
-                      if (network.title.toLowerCase().replace(/\s+/g, '-') === parts[0]) {
+
+                    for (const network of networksRoot) {
+                      if (
+                        network.title.toLowerCase().replace(/\s+/g, "-") ===
+                        parts[0]
+                      ) {
                         current = network;
                         break;
                       }
                     }
-                    
+
                     if (!current) return false;
-                    
+
                     for (let i = 1; i < parts.length; i++) {
-                      const found = current.children?.find(child => 
-                        child.title.toLowerCase().replace(/\s+/g, '-') === parts[i]
+                      const found = current.children?.find(
+                        (child) =>
+                          child.title.toLowerCase().replace(/\s+/g, "-") ===
+                          parts[i]
                       );
                       if (!found) return false;
                       current = found;
                     }
-                    
-                    return current?.children ? current.children.length > 0 : false;
+
+                    return current?.children
+                      ? current.children.length > 0
+                      : false;
                   };
 
                   const hasChildren = findItemHasChildren(item.id);
@@ -342,7 +388,9 @@ const IONNetworksMenu = () => {
                         <span className="text-sm font-medium text-card-foreground">
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        {hasChildren && (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </button>
                     );
                   }
@@ -359,7 +407,9 @@ const IONNetworksMenu = () => {
                         <span className="text-sm text-card-foreground">
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        {hasChildren && (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </a>
                     );
                   }
@@ -382,15 +432,14 @@ const IONNetworksMenu = () => {
               )}
             </div>
           ) : currentNetwork ? (
-            <div className="space-y-4">
-              {renderNetworkItems()}
-            </div>
+            <div className="space-y-4">{renderNetworkItems()}</div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[0px]">
-              {networksData.networks.map((network) => {
-                const hasChildren = network.children && network.children.length > 0;
+              {networksRoot.map((network) => {
+                const hasChildren =
+                  network.children && network.children.length > 0;
                 return (
-                   <button
+                  <button
                     key={network.title}
                     onClick={() => handleNetworkClick(network)}
                     className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
@@ -398,7 +447,9 @@ const IONNetworksMenu = () => {
                     <span className="text-sm font-medium text-card-foreground group-hover:text-primary">
                       {formatTextWithHighlights(network.title)}
                     </span>
-                    {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />}
+                    {hasChildren && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+                    )}
                   </button>
                 );
               })}

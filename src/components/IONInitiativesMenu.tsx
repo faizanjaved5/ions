@@ -4,7 +4,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTheme } from "next-themes";
-import initiativesData from "@/data/initiativesMenuData.json";
+import { getInitiativesAsync } from "@/lib/ionMenuAdapter";
+import { useEffect } from "react";
 import { formatTextWithHighlights } from "@/utils/formatText";
 
 interface InitiativeItem {
@@ -21,7 +22,9 @@ interface FlatItem {
 }
 
 const IONInitiativesMenu = () => {
-  const [selectedInitiative, setSelectedInitiative] = useState<string | null>(null);
+  const [selectedInitiative, setSelectedInitiative] = useState<string | null>(
+    null
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [useBebasFont, setUseBebasFont] = useState(false);
@@ -30,22 +33,40 @@ const IONInitiativesMenu = () => {
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
   // Flatten nested structure for easier rendering
-  const flattenInitiative = (item: InitiativeItem, level: number = 0, parentId: string = ""): FlatItem[] => {
-    const id = parentId ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}` : item.title.toLowerCase().replace(/\s+/g, "-");
-    const result: FlatItem[] = [{ id, title: item.title, url: item.url, level }];
-    
+  const flattenInitiative = (
+    item: InitiativeItem,
+    level: number = 0,
+    parentId: string = ""
+  ): FlatItem[] => {
+    const id = parentId
+      ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}`
+      : item.title.toLowerCase().replace(/\s+/g, "-");
+    const result: FlatItem[] = [
+      { id, title: item.title, url: item.url, level },
+    ];
+
     if (item.children && item.children.length > 0) {
       item.children.forEach((child) => {
         result.push(...flattenInitiative(child, level + 1, id));
       });
     }
-    
+
     return result;
   };
 
+  const [initiativesRoot, setInitiativesRoot] = useState<InitiativeItem[]>([]);
+  useEffect(() => {
+    getInitiativesAsync().then((items) =>
+      setInitiativesRoot(items as unknown as InitiativeItem[])
+    );
+  }, []);
+
   const currentInitiative = useMemo(
-    () => initiativesData.initiatives.find((i) => i.title.toLowerCase().replace(/\s+/g, "-") === selectedInitiative),
-    [selectedInitiative]
+    () =>
+      initiativesRoot.find(
+        (i) => i.title.toLowerCase().replace(/\s+/g, "-") === selectedInitiative
+      ),
+    [selectedInitiative, initiativesRoot]
   );
 
   const currentInitiativeFlattened = useMemo(() => {
@@ -59,9 +80,14 @@ const IONInitiativesMenu = () => {
     const query = searchQuery.toLowerCase();
     const results: FlatItem[] = [];
 
-    const searchInInitiative = (item: InitiativeItem, parentId: string = "") => {
-      const id = parentId ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}` : item.title.toLowerCase().replace(/\s+/g, "-");
-      
+    const searchInInitiative = (
+      item: InitiativeItem,
+      parentId: string = ""
+    ) => {
+      const id = parentId
+        ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}`
+        : item.title.toLowerCase().replace(/\s+/g, "-");
+
       if (item.title.toLowerCase().includes(query)) {
         results.push({ id, title: item.title, url: item.url, level: 0 });
       }
@@ -71,12 +97,13 @@ const IONInitiativesMenu = () => {
       }
     };
 
-    initiativesData.initiatives.forEach((initiative) => searchInInitiative(initiative));
+    initiativesRoot.forEach((initiative) => searchInInitiative(initiative));
     return results;
   }, [searchQuery]);
 
   const handleInitiativeClick = (item: FlatItem | InitiativeItem) => {
-    const id = 'id' in item ? item.id : item.title.toLowerCase().replace(/\s+/g, "-");
+    const id =
+      "id" in item ? item.id : item.title.toLowerCase().replace(/\s+/g, "-");
     setSelectedInitiative(id);
     setSearchQuery("");
     if (isMobile) {
@@ -91,12 +118,14 @@ const IONInitiativesMenu = () => {
     }
   };
 
-  const bebasStyles = useBebasFont ? 'font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider' : '';
-  const menuItemPadding = useBebasFont ? 'py-2.5' : 'py-3';
+  const bebasStyles = useBebasFont
+    ? "font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider"
+    : "";
+  const menuItemPadding = useBebasFont ? "py-2.5" : "py-3";
 
   const highlightION = (text: string) => {
-    if (text.includes('ION')) {
-      const parts = text.split('ION');
+    if (text.includes("ION")) {
+      const parts = text.split("ION");
       return (
         <>
           {parts[0]}
@@ -113,35 +142,43 @@ const IONInitiativesMenu = () => {
       {items.map((item) => {
         // Find the original initiative item to check if it has children
         const findOriginalItem = (id: string): InitiativeItem | undefined => {
-          const parts = id.split('-');
+          const parts = id.split("-");
           let current: InitiativeItem | undefined;
-          
-          for (const initiative of initiativesData.initiatives) {
-            if (initiative.title.toLowerCase().replace(/\s+/g, '-') === parts[0]) {
+
+          for (const initiative of initiativesRoot) {
+            if (
+              initiative.title.toLowerCase().replace(/\s+/g, "-") === parts[0]
+            ) {
               current = initiative;
               break;
             }
           }
-          
+
           if (!current) return undefined;
-          
+
           // Traverse the tree to find the item
           for (let i = 1; i < parts.length; i++) {
-            const found = current.children?.find(child => 
-              child.title.toLowerCase().replace(/\s+/g, '-') === parts[i]
+            const found = current.children?.find(
+              (child) =>
+                child.title.toLowerCase().replace(/\s+/g, "-") === parts[i]
             );
             if (!found) return undefined;
             current = found;
           }
-          
+
           return current;
         };
 
         const originalItem = findOriginalItem(item.id);
-        const hasChildren = originalItem?.children && originalItem.children.length > 0;
+        const hasChildren =
+          originalItem?.children && originalItem.children.length > 0;
 
         const content = (
-          <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'text-sm' : ''}`}>
+          <span
+            className={`text-sm font-medium text-card-foreground group-hover:text-primary ${
+              !useBebasFont ? "text-sm" : ""
+            }`}
+          >
             {formatTextWithHighlights(item.title)}
           </span>
         );
@@ -156,7 +193,9 @@ const IONInitiativesMenu = () => {
               className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
             >
               {content}
-              {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />}
+              {hasChildren && (
+                <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+              )}
             </a>
           );
         }
@@ -204,7 +243,11 @@ const IONInitiativesMenu = () => {
             </h2>
           </div>
 
-          <div className={`${isMobile ? 'hidden' : 'flex-1 max-w-md relative mx-4 md:mx-[30px]'}`}>
+          <div
+            className={`${
+              isMobile ? "hidden" : "flex-1 max-w-md relative mx-4 md:mx-[30px]"
+            }`}
+          >
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -223,7 +266,7 @@ const IONInitiativesMenu = () => {
               onClick={() => setUseBebasFont(!useBebasFont)}
               className="h-8 w-8"
             >
-              <span className={useBebasFont ? 'font-bebas' : ''}>Aa</span>
+              <span className={useBebasFont ? "font-bebas" : ""}>Aa</span>
             </Button>
             <Button
               variant="ghost"
@@ -262,33 +305,41 @@ const IONInitiativesMenu = () => {
             <div className="space-y-[1px]">
               {filteredItems.length > 0 ? (
                 filteredItems.map((item) => {
-                  const isTopLevel = initiativesData.initiatives.some(
-                    (i) => i.title.toLowerCase().replace(/\s+/g, "-") === item.id
+                  const isTopLevel = initiativesRoot.some(
+                    (i) =>
+                      i.title.toLowerCase().replace(/\s+/g, "-") === item.id
                   );
 
                   // Find if this item has children in the original data
                   const findItemHasChildren = (id: string): boolean => {
-                    const parts = id.split('-');
+                    const parts = id.split("-");
                     let current: InitiativeItem | undefined;
-                    
-                    for (const initiative of initiativesData.initiatives) {
-                      if (initiative.title.toLowerCase().replace(/\s+/g, '-') === parts[0]) {
+
+                    for (const initiative of initiativesRoot) {
+                      if (
+                        initiative.title.toLowerCase().replace(/\s+/g, "-") ===
+                        parts[0]
+                      ) {
                         current = initiative;
                         break;
                       }
                     }
-                    
+
                     if (!current) return false;
-                    
+
                     for (let i = 1; i < parts.length; i++) {
-                      const found = current.children?.find(child => 
-                        child.title.toLowerCase().replace(/\s+/g, '-') === parts[i]
+                      const found = current.children?.find(
+                        (child) =>
+                          child.title.toLowerCase().replace(/\s+/g, "-") ===
+                          parts[i]
                       );
                       if (!found) return false;
                       current = found;
                     }
-                    
-                    return current?.children ? current.children.length > 0 : false;
+
+                    return current?.children
+                      ? current.children.length > 0
+                      : false;
                   };
 
                   const hasChildren = findItemHasChildren(item.id);
@@ -306,7 +357,9 @@ const IONInitiativesMenu = () => {
                         <span className="text-sm font-medium text-card-foreground">
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        {hasChildren && (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </button>
                     );
                   }
@@ -323,7 +376,9 @@ const IONInitiativesMenu = () => {
                         <span className="text-sm text-card-foreground">
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                        {hasChildren && (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </a>
                     );
                   }
@@ -352,10 +407,11 @@ const IONInitiativesMenu = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[0px]">
-              {initiativesData.initiatives.map((initiative) => {
-                const hasChildren = initiative.children && initiative.children.length > 0;
+              {initiativesRoot.map((initiative) => {
+                const hasChildren =
+                  initiative.children && initiative.children.length > 0;
                 return (
-                   <button
+                  <button
                     key={initiative.title}
                     onClick={() => handleInitiativeClick(initiative)}
                     className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
@@ -363,7 +419,9 @@ const IONInitiativesMenu = () => {
                     <span className="text-sm font-medium text-card-foreground group-hover:text-primary">
                       {formatTextWithHighlights(initiative.title)}
                     </span>
-                    {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />}
+                    {hasChildren && (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+                    )}
                   </button>
                 );
               })}
