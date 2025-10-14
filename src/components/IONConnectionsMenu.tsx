@@ -4,8 +4,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTheme } from "next-themes";
-import { getConnectionsAsync } from "@/lib/ionMenuAdapter";
-import { useEffect } from "react";
+import connectionsData from "@/data/connectionsMenuData.json";
 import { formatTextWithHighlights } from "@/utils/formatText";
 
 interface ConnectionItem {
@@ -22,9 +21,7 @@ interface FlatItem {
 }
 
 const IONConnectionsMenu = () => {
-  const [selectedConnection, setSelectedConnection] = useState<string | null>(
-    null
-  );
+  const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [useBebasFont, setUseBebasFont] = useState(false);
@@ -33,40 +30,23 @@ const IONConnectionsMenu = () => {
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
   // Flatten nested structure for easier rendering
-  const flattenConnection = (
-    item: ConnectionItem,
-    level: number = 0,
-    parentId: string = ""
-  ): FlatItem[] => {
-    const id = parentId
-      ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}`
-      : item.title.toLowerCase().replace(/\s+/g, "-");
-    const result: FlatItem[] = [
-      { id, title: item.title, url: item.url, level },
-    ];
-
+  const flattenConnection = (item: ConnectionItem, level: number = 0, parentId: string = ""): FlatItem[] => {
+    const id = parentId ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}` : item.title.toLowerCase().replace(/\s+/g, "-");
+    const result: FlatItem[] = [{ id, title: item.title, url: item.url, level }];
+    
     if (item.children && item.children.length > 0) {
       item.children.forEach((child) => {
         result.push(...flattenConnection(child, level + 1, id));
       });
     }
-
+    
     return result;
   };
 
-  const [connectionsRoot, setConnectionsRoot] = useState<ConnectionItem[]>([]);
-  useEffect(() => {
-    getConnectionsAsync().then((items) =>
-      setConnectionsRoot(items as unknown as ConnectionItem[])
-    );
-  }, []);
-
-  const currentConnection = useMemo(() => {
-    // top-level connection lookup by slug from new data
-    return connectionsRoot.find(
-      (c) => c.title.toLowerCase().replace(/\s+/g, "-") === selectedConnection
-    );
-  }, [selectedConnection, connectionsRoot]);
+  const currentConnection = useMemo(
+    () => connectionsData.connections.find((c) => c.title.toLowerCase().replace(/\s+/g, "-") === selectedConnection),
+    [selectedConnection]
+  );
 
   const currentConnectionFlattened = useMemo(() => {
     if (!currentConnection) return [];
@@ -79,14 +59,9 @@ const IONConnectionsMenu = () => {
     const query = searchQuery.toLowerCase();
     const results: FlatItem[] = [];
 
-    const searchInConnection = (
-      item: ConnectionItem,
-      parentId: string = ""
-    ) => {
-      const id = parentId
-        ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}`
-        : item.title.toLowerCase().replace(/\s+/g, "-");
-
+    const searchInConnection = (item: ConnectionItem, parentId: string = "") => {
+      const id = parentId ? `${parentId}-${item.title.toLowerCase().replace(/\s+/g, "-")}` : item.title.toLowerCase().replace(/\s+/g, "-");
+      
       if (item.title.toLowerCase().includes(query)) {
         results.push({ id, title: item.title, url: item.url, level: 0 });
       }
@@ -96,13 +71,12 @@ const IONConnectionsMenu = () => {
       }
     };
 
-    connectionsRoot.forEach((connection) => searchInConnection(connection));
+    connectionsData.connections.forEach((connection) => searchInConnection(connection));
     return results;
   }, [searchQuery]);
 
   const handleConnectionClick = (item: FlatItem | ConnectionItem) => {
-    const id =
-      "id" in item ? item.id : item.title.toLowerCase().replace(/\s+/g, "-");
+    const id = 'id' in item ? item.id : item.title.toLowerCase().replace(/\s+/g, "-");
     setSelectedConnection(id);
     setSearchQuery("");
     if (isMobile) {
@@ -117,14 +91,12 @@ const IONConnectionsMenu = () => {
     }
   };
 
-  const bebasStyles = useBebasFont
-    ? "font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider"
-    : "";
-  const menuItemPadding = useBebasFont ? "py-2.5" : "py-3";
+  const bebasStyles = useBebasFont ? 'font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider' : '';
+  const menuItemPadding = useBebasFont ? 'py-2.5' : 'py-3';
 
   const highlightION = (text: string) => {
-    if (text.includes("ION")) {
-      const parts = text.split("ION");
+    if (text.includes('ION')) {
+      const parts = text.split('ION');
       return (
         <>
           {parts[0]}
@@ -141,43 +113,35 @@ const IONConnectionsMenu = () => {
       {items.map((item) => {
         // Find the original connection item to check if it has children
         const findOriginalItem = (id: string): ConnectionItem | undefined => {
-          const parts = id.split("-");
+          const parts = id.split('-');
           let current: ConnectionItem | undefined;
-
-          for (const connection of connectionsRoot) {
-            if (
-              connection.title.toLowerCase().replace(/\s+/g, "-") === parts[0]
-            ) {
+          
+          for (const connection of connectionsData.connections) {
+            if (connection.title.toLowerCase().replace(/\s+/g, '-') === parts[0]) {
               current = connection;
               break;
             }
           }
-
+          
           if (!current) return undefined;
-
+          
           // Traverse the tree to find the item
           for (let i = 1; i < parts.length; i++) {
-            const found = current.children?.find(
-              (child) =>
-                child.title.toLowerCase().replace(/\s+/g, "-") === parts[i]
+            const found = current.children?.find(child => 
+              child.title.toLowerCase().replace(/\s+/g, '-') === parts[i]
             );
             if (!found) return undefined;
             current = found;
           }
-
+          
           return current;
         };
 
         const originalItem = findOriginalItem(item.id);
-        const hasChildren =
-          originalItem?.children && originalItem.children.length > 0;
+        const hasChildren = originalItem?.children && originalItem.children.length > 0;
 
         const content = (
-          <span
-            className={`text-sm font-medium text-card-foreground group-hover:text-primary ${
-              !useBebasFont ? "text-sm" : ""
-            }`}
-          >
+          <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'text-sm uppercase' : ''}`}>
             {formatTextWithHighlights(item.title)}
           </span>
         );
@@ -192,9 +156,7 @@ const IONConnectionsMenu = () => {
               className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
             >
               {content}
-              {hasChildren && (
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
-              )}
+              {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />}
             </a>
           );
         }
@@ -237,11 +199,7 @@ const IONConnectionsMenu = () => {
             </h2>
           </div>
 
-          <div
-            className={`${
-              isMobile ? "hidden" : "flex-1 max-w-md relative mx-4 md:mx-[30px]"
-            }`}
-          >
+          <div className={`${isMobile ? 'hidden' : 'flex-1 max-w-md relative mx-4 md:mx-[30px]'}`}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -260,7 +218,7 @@ const IONConnectionsMenu = () => {
               onClick={() => setUseBebasFont(!useBebasFont)}
               className="h-8 w-8"
             >
-              <span className={useBebasFont ? "font-bebas" : ""}>Aa</span>
+              <span className={useBebasFont ? 'font-bebas' : ''}>Aa</span>
             </Button>
             <Button
               variant="ghost"
@@ -299,41 +257,33 @@ const IONConnectionsMenu = () => {
             <div className="space-y-[1px]">
               {filteredItems.length > 0 ? (
                 filteredItems.map((item) => {
-                  const isTopLevel = connectionsRoot.some(
-                    (c) =>
-                      c.title.toLowerCase().replace(/\s+/g, "-") === item.id
+                  const isTopLevel = connectionsData.connections.some(
+                    (c) => c.title.toLowerCase().replace(/\s+/g, "-") === item.id
                   );
 
                   // Find if this item has children in the original data
                   const findItemHasChildren = (id: string): boolean => {
-                    const parts = id.split("-");
+                    const parts = id.split('-');
                     let current: ConnectionItem | undefined;
-
-                    for (const connection of connectionsRoot) {
-                      if (
-                        connection.title.toLowerCase().replace(/\s+/g, "-") ===
-                        parts[0]
-                      ) {
+                    
+                    for (const connection of connectionsData.connections) {
+                      if (connection.title.toLowerCase().replace(/\s+/g, '-') === parts[0]) {
                         current = connection;
                         break;
                       }
                     }
-
+                    
                     if (!current) return false;
-
+                    
                     for (let i = 1; i < parts.length; i++) {
-                      const found = current.children?.find(
-                        (child) =>
-                          child.title.toLowerCase().replace(/\s+/g, "-") ===
-                          parts[i]
+                      const found = current.children?.find(child => 
+                        child.title.toLowerCase().replace(/\s+/g, '-') === parts[i]
                       );
                       if (!found) return false;
                       current = found;
                     }
-
-                    return current?.children
-                      ? current.children.length > 0
-                      : false;
+                    
+                    return current?.children ? current.children.length > 0 : false;
                   };
 
                   const hasChildren = findItemHasChildren(item.id);
@@ -348,12 +298,10 @@ const IONConnectionsMenu = () => {
                         }}
                         className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
                       >
-                        <span className="text-sm font-medium text-card-foreground">
+                        <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       </button>
                     );
                   }
@@ -367,12 +315,10 @@ const IONConnectionsMenu = () => {
                         rel="noopener noreferrer"
                         className={`flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
                       >
-                        <span className="text-sm text-card-foreground">
+                        <span className={`text-sm text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       </a>
                     );
                   }
@@ -382,7 +328,7 @@ const IONConnectionsMenu = () => {
                       key={item.id}
                       className={`flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} ${bebasStyles} opacity-60`}
                     >
-                      <span className="text-sm text-card-foreground">
+                      <span className={`text-sm text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
                         {formatTextWithHighlights(item.title)}
                       </span>
                     </div>
@@ -406,21 +352,18 @@ const IONConnectionsMenu = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[0px]">
-              {connectionsRoot.map((connection) => {
-                const hasChildren =
-                  connection.children && connection.children.length > 0;
+              {connectionsData.connections.map((connection) => {
+                const hasChildren = connection.children && connection.children.length > 0;
                 return (
-                  <button
+                   <button
                     key={connection.title}
                     onClick={() => handleConnectionClick(connection)}
                     className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
                   >
-                    <span className="text-sm font-medium text-card-foreground group-hover:text-primary">
+                    <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'uppercase' : ''}`}>
                       {formatTextWithHighlights(connection.title)}
                     </span>
-                    {hasChildren && (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
-                    )}
+                    {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />}
                   </button>
                 );
               })}

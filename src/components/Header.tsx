@@ -38,7 +38,7 @@ const Header = () => {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-[#3a3f47] backdrop-blur">
-        <div className="mx-auto flex h-20 max-w-[1920px] items-center justify-between px-4 gap-4">
+        <div className="mx-auto flex h-20 max-w-[1920px] items-center px-4 gap-4">
           {/* Logo */}
           <div className="flex-shrink-0">
             <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="cursor-pointer">
@@ -46,11 +46,11 @@ const Header = () => {
             </button>
           </div>
 
-          {/* Desktop Navigation - Centered (xl and up) */}
-          <nav className="hidden xl:flex items-center gap-3 absolute left-1/2 -translate-x-1/2">
+          {/* Desktop Navigation XL - 6 items (xl and up) */}
+          <nav className="hidden xl:flex items-center gap-2 flex-1 justify-center">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Local
                 </Button>
               </PopoverTrigger>
@@ -71,7 +71,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Networks
                 </Button>
               </PopoverTrigger>
@@ -92,7 +92,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span>ITIATIVES
                 </Button>
               </PopoverTrigger>
@@ -113,7 +113,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Mall
                 </Button>
               </PopoverTrigger>
@@ -134,7 +134,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white">
                   CONNECT<span className="text-primary group-hover:text-white">.ION</span>S
                 </Button>
               </PopoverTrigger>
@@ -153,16 +153,17 @@ const Header = () => {
               </PopoverContent>
             </Popover>
 
-             <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase text-gray-400 hover:text-white">
+             <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white">
               PressPass<span className="text-primary group-hover:text-white">.ION</span>
             </Button>
           </nav>
 
+
           {/* Large Tablet Navigation - 5 items (lg to xl) */}
-          <nav className="hidden lg:xl:hidden lg:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+          <nav className="hidden lg:xl:hidden lg:flex items-center gap-2 flex-1 justify-center">
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Local
                 </Button>
               </PopoverTrigger>
@@ -183,7 +184,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Networks
                 </Button>
               </PopoverTrigger>
@@ -204,7 +205,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span>ITIATIVES
                 </Button>
               </PopoverTrigger>
@@ -225,7 +226,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Mall
                 </Button>
               </PopoverTrigger>
@@ -246,7 +247,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white">
                   CONNECT<span className="text-primary group-hover:text-white">.ION</span>S
                 </Button>
               </PopoverTrigger>
@@ -267,10 +268,10 @@ const Header = () => {
           </nav>
 
           {/* Tablet Navigation - 4 items (md to lg) */}
-          <nav className="hidden md:lg:hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+          <nav className="hidden md:lg:hidden md:flex items-center gap-2 flex-1 justify-center">
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Local
                 </Button>
               </PopoverTrigger>
@@ -291,7 +292,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Networks
                 </Button>
               </PopoverTrigger>
@@ -312,7 +313,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span>ITIATIVES
                 </Button>
               </PopoverTrigger>
@@ -333,7 +334,7 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-lg uppercase tracking-wider text-gray-400 hover:text-white">
+                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
                   <span className="text-primary group-hover:text-white">ION</span> Mall
                 </Button>
               </PopoverTrigger>
@@ -354,7 +355,7 @@ const Header = () => {
           </nav>
 
           {/* Right Side Actions */}
-          <div className="flex items-center gap-1 md:gap-2">
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             {/* Search - Icon on mobile/tablet, full button on desktop xl+ */}
             <Button
               variant="ghost"
@@ -369,9 +370,9 @@ const Header = () => {
             <Button
               variant="ghost"
               onClick={() => setSearchOpen(true)}
-              className="hidden xl:flex items-center gap-2 font-bebas uppercase tracking-wider text-gray-400 hover:text-white"
+              className="hidden xl:flex items-center gap-2 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
             >
-              <Search className="h-4 w-4" />
+              <Search className="h-5 w-5" />
               Search ION
             </Button>
 
@@ -387,9 +388,9 @@ const Header = () => {
             </Button>
             <Button
               variant="default"
-              className="hidden xl:flex items-center gap-2 font-bebas uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90"
+              className="hidden xl:flex items-center gap-2 font-bebas text-xl uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <Upload className="h-4 w-4" />
+              <Upload className="h-5 w-5" />
               Upload
             </Button>
 
@@ -397,7 +398,7 @@ const Header = () => {
             <Button
               variant="outline"
               size="sm"
-              className="group gap-0 font-bebas uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white"
+              className="group gap-0 font-bebas text-lg uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white"
             >
               Sign<span className="text-primary group-hover:text-white">ION</span>
             </Button>
@@ -469,7 +470,7 @@ const Header = () => {
                   <div className="flex flex-col gap-1">
                     <Button
                       variant="ghost"
-                      className="group gap-0 justify-start font-bebas text-lg uppercase w-full"
+                      className="group gap-0 justify-start font-bebas text-xl uppercase w-full"
                       onClick={() => {
                         setIonLocalOpen(true);
                         setMobileMenuOpen(false);
@@ -480,7 +481,7 @@ const Header = () => {
 
                     <Button
                       variant="ghost"
-                      className="group gap-0 justify-start font-bebas text-lg uppercase w-full"
+                      className="group gap-0 justify-start font-bebas text-xl uppercase w-full"
                       onClick={() => {
                         setIonNetworksOpen(true);
                         setMobileMenuOpen(false);
@@ -491,7 +492,7 @@ const Header = () => {
 
                     <Button
                       variant="ghost"
-                      className="group gap-0 justify-start font-bebas text-lg uppercase w-full"
+                      className="group gap-0 justify-start font-bebas text-xl uppercase w-full"
                       onClick={() => {
                         setIonInitiativesOpen(true);
                         setMobileMenuOpen(false);
@@ -502,7 +503,7 @@ const Header = () => {
 
                     <Button
                       variant="ghost"
-                      className="group gap-0 justify-start font-bebas text-lg uppercase w-full"
+                      className="group gap-0 justify-start font-bebas text-xl uppercase w-full"
                       onClick={() => {
                         setIonMallOpen(true);
                         setMobileMenuOpen(false);
@@ -513,7 +514,7 @@ const Header = () => {
 
                     <Button
                       variant="ghost"
-                      className="group gap-0 justify-start font-bebas text-lg uppercase w-full"
+                      className="group gap-0 justify-start font-bebas text-xl uppercase w-full"
                       onClick={() => {
                         setConnectionsOpen(true);
                         setMobileMenuOpen(false);
