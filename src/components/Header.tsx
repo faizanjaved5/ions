@@ -751,7 +751,13 @@ const Header = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[1100px] max-h-[85vh]">
+        <DialogContent
+          className={`max-h-[85vh] transition-[max-width] duration-300 ease-in-out ${
+            searching || searchResults.length > 0
+              ? "sm:max-w-[1100px]"
+              : "sm:max-w-[600px]"
+          }`}
+        >
           <DialogHeader>
             <DialogTitle className="font-bebas text-2xl uppercase tracking-wider">
               Search <span className="text-primary">ION</span>
@@ -817,56 +823,64 @@ const Header = () => {
                 </div>
               </div>
             )}
-            <ScrollArea className="h-[60vh] pr-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Card className="overflow-hidden bg-muted/30 hover:bg-muted/20 transition-colors">
-                      <div className="relative aspect-video w-full overflow-hidden">
-                        {item.thumbnail ? (
-                          <img
-                            src={item.thumbnail}
-                            alt={item.title}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="h-full w-full bg-muted" />
-                        )}
-                        {item.type && (
-                          <span className="absolute right-2 top-2 rounded bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
-                            {item.type}
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <div className="text-sm font-medium leading-snug line-clamp-2">
-                          {item.title}
+            <div
+              className={`transition-[max-height,opacity] duration-300 ease-in-out overflow-hidden ${
+                searching || searchResults.length > 0
+                  ? "opacity-100 max-h-[60vh]"
+                  : "opacity-0 max-h-0"
+              }`}
+            >
+              <ScrollArea className="h-[60vh] pr-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {searchResults.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Card className="overflow-hidden bg-muted/30 hover:bg-muted/20 transition-colors">
+                        <div className="relative aspect-video w-full overflow-hidden">
+                          {item.thumbnail ? (
+                            <img
+                              src={item.thumbnail}
+                              alt={item.title}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-muted" />
+                          )}
+                          {item.type && (
+                            <span className="absolute right-2 top-2 rounded bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                              {item.type}
+                            </span>
+                          )}
                         </div>
-                        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                          <span className="truncate max-w-[60%]">
-                            {item.source_domain || ""}
-                          </span>
-                          <span className="whitespace-nowrap">
-                            {item.relative_date || ""}
-                          </span>
+                        <div className="p-4">
+                          <div className="text-sm font-medium leading-snug line-clamp-2">
+                            {item.title}
+                          </div>
+                          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                            <span className="truncate max-w-[60%]">
+                              {item.source_domain || ""}
+                            </span>
+                            <span className="whitespace-nowrap">
+                              {item.relative_date || ""}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    </Card>
-                  </a>
-                ))}
-                {searching && (
-                  <div className="col-span-full flex items-center justify-center py-8 text-muted-foreground">
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />{" "}
-                    Searching...
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
+                      </Card>
+                    </a>
+                  ))}
+                  {searching && (
+                    <div className="col-span-full flex items-center justify-center py-8 text-muted-foreground">
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />{" "}
+                      Searching...
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
