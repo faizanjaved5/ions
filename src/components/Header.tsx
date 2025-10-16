@@ -66,16 +66,31 @@ const Header = () => {
     return trimmed;
   };
 
+  const dedupeResults = (items: SearchResultItem[]): SearchResultItem[] => {
+    const seen = new Set<string>();
+    return items.filter((it) => {
+      const key = it.id || it.link || JSON.stringify(it);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const runSearch = async () => {
     const term = searchQuery.trim();
     if (!term) return;
     setSearching(true);
     setSearchError(null);
+    // Clear previous results for a clean UI while loading
+    setSearchResults([]);
+    setSearchTotal(null);
     try {
       const url = `https://iblog.bz/search/?q=${encodeURIComponent(
         term
       )}&ajax=1`;
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const results: SearchResultItem[] = Array.isArray(data?.results)
@@ -84,9 +99,9 @@ const Header = () => {
             link: normalizeUrl(r.link),
           }))
         : [];
-      setSearchResults(results);
+      setSearchResults(dedupeResults(results));
       setSearchTotal(typeof data?.total === "number" ? data.total : null);
-    } catch (err) {
+    } catch (_err: unknown) {
       setSearchError("Failed to fetch results. Please try again.");
       setSearchResults([]);
       setSearchTotal(null);
@@ -832,9 +847,9 @@ const Header = () => {
             >
               <ScrollArea className="h-[60vh] pr-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {searchResults.map((item) => (
+                  {searchResults.map((item, index) => (
                     <a
-                      key={item.id}
+                      key={`${item.id || item.link || index}-${index}`}
                       href={item.link}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -846,6 +861,11 @@ const Header = () => {
                               src={item.thumbnail}
                               alt={item.title}
                               className="h-full w-full object-cover"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                img.onerror = null;
+                                img.src = "/placeholder.svg";
+                              }}
                             />
                           ) : (
                             <div className="h-full w-full bg-muted" />
