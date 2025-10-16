@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:navbar": "vite build -c vite.navbar.config.ts && tailwindcss -c tailwind.config.ts -i ./src/index.css -o ./dist-navbar/ion-navbar.css --minify",
     "lint": "eslint .",
     "preview": "vite preview"
   },
