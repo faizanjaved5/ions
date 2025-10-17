@@ -1,0 +1,195 @@
+# ============================================
+# FORCE REST API REQUESTS TO WORDPRESS
+# ============================================
+# This ensures /wp-json/ calls always hit WordPress index.php
+# before any other routing, caching, or channel rules.
+RewriteEngine On
+RewriteCond %{REQUEST_URI} ^/wp-json/ [NC]
+RewriteRule ^ index.php [L]
+
+
+# ============================================
+# BEGIN NON_LSCACHE (LiteSpeed Browser Cache)
+# ============================================
+## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
+### marker BROWSER CACHE start ###
+<IfModule mod_expires.c>
+	ExpiresActive on
+	ExpiresByType application/pdf A31557600
+	ExpiresByType image/x-icon A31557600
+	ExpiresByType image/vnd.microsoft.icon A31557600
+	ExpiresByType image/svg+xml A31557600
+	
+	ExpiresByType image/jpg A31557600
+	ExpiresByType image/jpeg A31557600
+	ExpiresByType image/png A31557600
+	ExpiresByType image/gif A31557600
+	ExpiresByType image/webp A31557600
+	ExpiresByType image/avif A31557600
+	
+	ExpiresByType video/ogg A31557600
+	ExpiresByType audio/ogg A31557600
+	ExpiresByType video/mp4 A31557600
+	ExpiresByType video/webm A31557600
+	
+	ExpiresByType text/css A31557600
+	ExpiresByType text/javascript A31557600
+	ExpiresByType application/javascript A31557600
+	ExpiresByType application/x-javascript A31557600
+	
+	ExpiresByType application/x-font-ttf A31557600
+	ExpiresByType application/x-font-woff A31557600
+	ExpiresByType application/font-woff A31557600
+	ExpiresByType application/font-woff2 A31557600
+	ExpiresByType application/vnd.ms-fontobject A31557600
+	ExpiresByType font/ttf A31557600
+	ExpiresByType font/otf A31557600
+	ExpiresByType font/woff A31557600
+	ExpiresByType font/woff2 A31557600
+</IfModule>
+### marker BROWSER CACHE end ###
+## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
+# ============================================
+# END NON_LSCACHE
+# ============================================
+
+
+# ============================================
+# BEGIN LSCACHE (LiteSpeed Page Cache)
+# ============================================
+## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
+<IfModule LiteSpeed>
+	RewriteEngine on
+	CacheLookup on
+	RewriteRule .* - [E=Cache-Control:no-autoflush]
+	RewriteRule litespeed/debug/.*\.log$ - [F,L]
+	RewriteRule \.litespeed_conf\.dat - [F,L]
+	
+### marker ASYNC start ###
+	RewriteCond %{REQUEST_URI} /wp-admin/admin-ajax\.php
+	RewriteCond %{QUERY_STRING} action=async_litespeed
+	RewriteRule .* - [E=noabort:1]
+### marker ASYNC end ###
+	
+### marker MOBILE start ###
+	RewriteCond %{HTTP_USER_AGENT} Mobile|Android|Silk/|Kindle|BlackBerry|Opera\ Mini|Opera\ Mobi [NC]
+	RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+ismobile]
+### marker MOBILE end ###
+	
+### marker WEBP start ###
+	RewriteCond %{HTTP_ACCEPT} image/webp [OR]
+	RewriteCond %{HTTP_USER_AGENT} iPhone.*Version/(1[4-9]|[2-9][0-9]|[1-9][0-9]{2,}).*Safari [OR]
+	RewriteCond %{HTTP_USER_AGENT} Firefox/([6-9][0-9]|[1-9][0-9]{2,})
+	RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+webp]
+### marker WEBP end ###
+	
+### marker DROPQS start ###
+	CacheKeyModify -qs:fbclid
+	CacheKeyModify -qs:gclid
+	CacheKeyModify -qs:utm*
+	CacheKeyModify -qs:_ga
+### marker DROPQS end ###
+</IfModule>
+
+# ✅ Disable LiteSpeed cache for REST API calls
+<IfModule LiteSpeed>
+    RewriteCond %{REQUEST_URI} ^/wp-json/ [NC]
+    RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>
+## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
+# ============================================
+# END LSCACHE
+# ============================================
+
+
+# ============================================
+# BEGIN IONLocalNetwork Channel Routing
+# ============================================
+RewriteEngine On
+
+# Skip if the request is for an existing file or directory
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Skip known WP and static routes including favicon.ico
+RewriteCond %{REQUEST_URI} ^/(favicon\.ico|wp-|wp-json|wp-admin|wp-content|wp-includes|wp-login\.php|robots\.txt|sitemap[^/]*\..+|about|contact|blog) [NC]
+RewriteRule ^ - [L]
+
+# Allow disabling with file or env var
+RewriteCond %{ENV:ION_VIRTUAL_DISABLED} =1 [OR]
+RewriteCond %{DOCUMENT_ROOT}/iondynamic.txt -f
+RewriteRule ^([a-z0-9\-]+)/?(.*)?$ - [S=1]
+
+# Route ion-content pages directly to WordPress
+RewriteRule ^ion-content/.*$ index.php [L]
+
+# NEW RULE: Route exact /ion path to iondynamic.php
+RewriteRule ^ion/?$ /iondynamic.php?slug=ion [QSA,L,NC]
+
+# Route dynamic channel pages to handler (only if NOT ion-content)
+RewriteRule ^ion-([a-z0-9\-+]+)/?(.*)?$ /iondynamic.php?slug=ion-$1&subpath=$2 [QSA,L,NC]
+# ============================================
+# END IONLocalNetwork Channel Routing
+# ============================================
+
+
+# BEGIN ION Shortlink Routing
+# Handle /v/ shortlinks - route to shortlink resolver
+RewriteRule ^v/([a-zA-Z0-9]+)(?:-.*)?/?$ /v/index.php?link=$1 [QSA,L]
+
+# Skip /v/ directory from other processing if file/dir exists
+RewriteCond %{REQUEST_URI} ^/v/
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+# END ION Shortlink Routing
+
+
+### ION: @username profile routes  -------------------------------------------
+# Matches /@alex  -> routes through central router so we can log/track
+RewriteCond %{REQUEST_URI} ^/@[A-Za-z0-9._-]+/?$ [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^@([A-Za-z0-9._-]+)/?$ iondynamic.php?route=profile&handle=$1 [QSA,L]
+### --------------------------------------------------------------------------
+
+
+# ============================================
+# BEGIN WordPress Core
+# ============================================
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+
+# Let WordPress handle ion-content URLs
+RewriteRule ^ion-content/.*$ index.php [L]
+
+# Standard WP index.php handler
+RewriteRule ^index\.php$ - [L]
+
+# Static file checks
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Pass known WordPress files directly
+RewriteRule ^([_0-9a-zA-Z-]+/)?(wp-(content|admin|includes).*) $2 [L]
+RewriteRule ^([_0-9a-zA-Z-]+/)?(.*\.php)$ $2 [L]
+
+# Default: route everything else to WordPress
+RewriteRule . index.php [L]
+# ============================================
+# END WordPress Core
+# ============================================
+
+
+# ============================================
+# BEGIN Cookie & CORS Fix for REST API Auth
+# ============================================
+<IfModule mod_headers.c>
+	# Ensure cookies are sent with cross-site requests (needed for Elementor editor)
+	Header always edit Set-Cookie (.*) "$1; SameSite=None; Secure"
+</IfModule>
+# ============================================
+# END Cookie & CORS Fix
+# ============================================

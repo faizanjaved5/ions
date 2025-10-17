@@ -1,0 +1,29 @@
+name = "ion-drive-to-r2-worker"
+main = "drive-to-r2-worker.js"
+compatibility_date = "2024-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Production environment
+[env.production]
+name = "ion-drive-to-r2-worker"
+
+# Development environment  
+[env.development]
+name = "ion-drive-to-r2-worker-dev"
+
+# Worker settings
+[build]
+command = ""
+
+# Increase memory limit for large file processing
+[limits]
+memory = 1024  # 1GB memory limit
+
+# Optional: Custom route (replace with your domain)
+# [[routes]]
+# pattern = "ions.com/worker/drive-to-r2"
+# zone_name = "ions.com"
+
+# Environment variables (optional - credentials passed via request body for security)
+# [vars]
+# ENVIRONMENT = "production"

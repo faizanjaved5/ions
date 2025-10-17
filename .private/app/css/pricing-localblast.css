@@ -1,0 +1,653 @@
+/**
+ * ION Local Blast Pricing Display Styles
+ * Specific styling for pricing display in channel selection
+ */
+
+/* Tier color variables (matching city cards) */
+:root {
+  --tier-1-bg: 120 60% 45%;      /* Green - Affordable */
+  --tier-2-bg: 200 70% 50%;      /* Blue - Standard */
+  --tier-3-bg: 45 85% 55%;       /* Orange - Popular */
+  --tier-4-bg: 280 60% 55%;      /* Purple - Premium */
+  --tier-5-bg: 36 35% 45%;       /* Gold - Luxury */
+  --bundle-bg: 260 80% 45%;      /* Deep Purple - Bundle */
+  --other-bg: 210 20% 40%;       /* Gray - Other/Custom */
+  --error-bg: 0 30% 45%;         /* Dull Red - Error State */
+}
+
+/* Channel Card Pricing Enhancements */
+.channel-card {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.channel-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Pricing Container */
+.channel-pricing-container {
+    margin-top: 15px;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 12px;
+}
+
+/* Show Pricing Button */
+.show-pricing-btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    width: 100%;
+    justify-content: center;
+}
+
+.show-pricing-btn:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+    transform: translateY(-1px);
+}
+
+.show-pricing-btn:active {
+    transform: translateY(0);
+}
+
+.pricing-icon {
+    font-size: 14px;
+}
+
+.pricing-text {
+    font-size: 12px;
+}
+
+/* Channel Card Overlay Positioning */
+.channel-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.card-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* Pricing Overlay - Similar to directory.php but adapted for channel cards */
+.channel-pricing-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(229, 231, 235, 0.8);
+    border-radius: 0 0 8px 8px;
+    transform: translateY(100%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 5;
+    opacity: 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.channel-card:hover .channel-pricing-overlay {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* Pricing Content for Channel Cards */
+.channel-pricing-overlay .pricing-content {
+    padding: 12px;
+}
+
+.channel-pricing-overlay .pricing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 6px;
+    position: relative;
+}
+
+.channel-pricing-overlay .pricing-header h4 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    flex: 1;
+    text-align: left;
+}
+
+.channel-pricing-overlay .pricing-tier {
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 8px;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+/* Close button for channel pricing */
+.channel-pricing-overlay .pricing-close {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    width: 18px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.channel-pricing-overlay .pricing-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+/* Pricing Options Grid for Channel Cards */
+.channel-pricing-overlay .pricing-options {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.channel-pricing-overlay .pricing-option {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+}
+
+.channel-pricing-overlay .pricing-option:hover {
+    background: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+.channel-pricing-overlay .pricing-option.selected {
+    background: #3b82f6;
+    color: white;
+    border-color: #2563eb;
+}
+
+.channel-pricing-overlay .option-duration {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: #6b7280;
+    margin-bottom: 2px;
+}
+
+.channel-pricing-overlay .pricing-option.selected .option-duration {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.channel-pricing-overlay .option-price {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #059669;
+}
+
+.channel-pricing-overlay .pricing-option.selected .option-price {
+    color: white;
+}
+
+/* Best Value Badge for Channel Cards */
+.channel-pricing-overlay .pricing-option.best-value::after {
+    content: "BEST";
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ef4444;
+    color: white;
+    font-size: 8px;
+    font-weight: bold;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+}
+
+/* Tier-specific header colors for channel cards */
+.channel-pricing-overlay.tier-1 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-1-bg)), hsl(var(--tier-1-bg) / 0.8));
+}
+
+.channel-pricing-overlay.tier-2 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-2-bg)), hsl(var(--tier-2-bg) / 0.8));
+}
+
+.channel-pricing-overlay.tier-3 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-3-bg)), hsl(var(--tier-3-bg) / 0.8));
+}
+
+.channel-pricing-overlay.tier-4 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-4-bg)), hsl(var(--tier-4-bg) / 0.8));
+}
+
+.channel-pricing-overlay.tier-5 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-5-bg)), hsl(var(--tier-5-bg) / 0.8));
+}
+
+.channel-pricing-overlay.bundle .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--bundle-bg)), hsl(var(--bundle-bg) / 0.8));
+}
+
+.channel-pricing-overlay.other .pricing-header,
+.channel-pricing-overlay.custom .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--other-bg)), hsl(var(--other-bg) / 0.8));
+}
+
+/* Error State for Channel Cards */
+.channel-pricing-overlay.error .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--error-bg)), hsl(var(--error-bg) / 0.8));
+}
+
+.channel-pricing-overlay .pricing-error {
+    color: #6b7280;
+    text-align: center;
+    padding: 12px;
+    font-size: 12px;
+    background: #f3f4f6;
+    border-radius: 6px;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 400px;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 400px;
+    }
+    to {
+        opacity: 0;
+        transform: translateY(10px);
+        max-height: 0;
+    }
+}
+
+/* Pricing Content */
+.pricing-content {
+    padding: 0;
+}
+
+.pricing-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.pricing-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    flex: 1;
+    text-align: left;
+}
+
+.pricing-tier {
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    white-space: nowrap;
+    margin-left: 8px;
+}
+
+/* Close button for pricing */
+.pricing-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    width: 20px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.pricing-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+/* Tier-specific header colors for ionlocalblast */
+.tier-1 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-1-bg)), hsl(var(--tier-1-bg) / 0.8));
+}
+
+.tier-2 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-2-bg)), hsl(var(--tier-2-bg) / 0.8));
+}
+
+.tier-3 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-3-bg)), hsl(var(--tier-3-bg) / 0.8));
+}
+
+.tier-4 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-4-bg)), hsl(var(--tier-4-bg) / 0.8));
+}
+
+.tier-5 .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--tier-5-bg)), hsl(var(--tier-5-bg) / 0.8));
+}
+
+.bundle .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--bundle-bg)), hsl(var(--bundle-bg) / 0.8));
+}
+
+.other .pricing-header,
+.custom .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--other-bg)), hsl(var(--other-bg) / 0.8));
+}
+
+.error .pricing-header {
+    background: linear-gradient(135deg, hsl(var(--error-bg)), hsl(var(--error-bg) / 0.8));
+}
+
+/* Pricing Options */
+.pricing-options {
+    padding: 12px;
+}
+
+.pricing-option {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.pricing-option:hover {
+    border-color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.pricing-option.selected {
+    border-color: #3b82f6;
+    background: #dbeafe;
+    box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.pricing-option.best-value {
+    border-color: #ef4444;
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
+.pricing-option.best-value:hover {
+    background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+    color: white;
+}
+
+.option-duration {
+    font-size: 12px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.option-price {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.pricing-option.best-value .option-duration,
+.pricing-option.best-value .option-price {
+    color: #dc2626;
+}
+
+.pricing-option.best-value:hover .option-duration,
+.pricing-option.best-value:hover .option-price {
+    color: white;
+}
+
+.option-badge {
+    position: absolute;
+    right: -8px;
+    top: -6px;
+    background: #ef4444;
+    color: white;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Pricing Footer */
+.pricing-footer {
+    padding: 8px 16px;
+    text-align: center;
+    background: #f1f5f9;
+    border-top: 1px solid #e2e8f0;
+}
+
+.pricing-footer small {
+    color: #64748b;
+    font-size: 11px;
+}
+
+/* Pricing Actions */
+.pricing-actions {
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.add-to-cart-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s ease;
+}
+
+.add-to-cart-btn:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-1px);
+}
+
+.add-to-cart-btn:disabled {
+    background: #6b7280;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Loading and Error States */
+.pricing-loading {
+    padding: 20px;
+    text-align: center;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.pricing-error {
+    padding: 16px;
+    text-align: center;
+    color: #dc2626;
+    font-size: 12px;
+    background: #fef2f2;
+    border-top: 1px solid #fecaca;
+}
+
+/* Cart Summary Styling */
+.cart-summary {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    min-width: 250px;
+}
+
+.cart-summary h3 {
+    margin: 0 0 12px 0;
+    font-size: 16px;
+    color: #1f2937;
+}
+
+.cart-summary p {
+    margin: 4px 0;
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.cart-summary .btn {
+    margin-top: 12px;
+    width: 100%;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .channel-pricing-display {
+        font-size: 12px;
+    }
+    
+    .pricing-header h4 {
+        font-size: 13px;
+    }
+    
+    .option-duration,
+    .option-price {
+        font-size: 11px;
+    }
+    
+    .cart-summary {
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .pricing-option {
+        padding: 6px 8px;
+    }
+    
+    .pricing-actions {
+        padding: 8px 12px;
+    }
+    
+    .add-to-cart-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .channel-pricing-display {
+        background: #1f2937;
+        border-color: #374151;
+    }
+    
+    .pricing-option {
+        background: #374151;
+        border-color: #4b5563;
+        color: #f9fafb;
+    }
+    
+    .pricing-option:hover {
+        background: #4b5563;
+        border-color: #60a5fa;
+    }
+    
+    .pricing-option.selected {
+        background: #1e40af;
+        border-color: #60a5fa;
+    }
+    
+    .option-duration {
+        color: #e5e7eb;
+    }
+    
+    .option-price {
+        color: #f9fafb;
+    }
+    
+    .pricing-footer {
+        background: #374151;
+        border-color: #4b5563;
+    }
+    
+    .pricing-actions {
+        background: #1f2937;
+        border-color: #374151;
+    }
+    
+    .cart-summary {
+        background: #1f2937;
+        border-color: #374151;
+        color: #f9fafb;
+    }
+    
+    .cart-summary h3 {
+        color: #f9fafb;
+    }
+    
+    .cart-summary p {
+        color: #d1d5db;
+    }
+}
