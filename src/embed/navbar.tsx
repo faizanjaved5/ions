@@ -2,6 +2,7 @@ import { createRoot, Root } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/Header";
 import "@/index.css";
+import { PortalProvider } from "@/components/ui/portal-provider";
 
 type MountTarget = string | HTMLElement | undefined;
 type MountOptions = {
@@ -52,7 +53,9 @@ export function mount(
         enableSystem={false}
         storageKey="ion-theme"
       >
-        <Header />
+        <PortalProvider container={shadow}>
+          <Header />
+        </PortalProvider>
       </ThemeProvider>
     );
     mounted.set(host, root);
