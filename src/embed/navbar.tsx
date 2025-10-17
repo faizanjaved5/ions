@@ -1,10 +1,13 @@
 import { createRoot, Root } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
 import Header from "@/components/Header";
-// Note: Do NOT import index.css here. We generate a standalone CSS file via Tailwind CLI
-// and load it from PHP to avoid duplicating styles and to keep JS bundle lean.
+import "@/index.css";
 
 type MountTarget = string | HTMLElement | undefined;
+type MountOptions = {
+  useShadowDom?: boolean;
+  cssHref?: string;
+};
 
 const mounted = new WeakMap<HTMLElement, Root>();
 
@@ -23,9 +26,39 @@ function resolveTarget(target?: MountTarget): HTMLElement {
   return container;
 }
 
-export function mount(target?: MountTarget): HTMLElement {
+export function mount(
+  target?: MountTarget,
+  options?: MountOptions
+): HTMLElement {
   const el = resolveTarget(target);
   if (mounted.has(el)) return el;
+
+  if (options?.useShadowDom) {
+    const host = el;
+    const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
+    if (options.cssHref) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = options.cssHref;
+      shadow.appendChild(link);
+    }
+    const shadowContainer = document.createElement("div");
+    shadow.appendChild(shadowContainer);
+    const root = createRoot(shadowContainer);
+    root.render(
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        enableSystem={false}
+        storageKey="ion-theme"
+      >
+        <Header />
+      </ThemeProvider>
+    );
+    mounted.set(host, root);
+    return host;
+  }
+
   const root = createRoot(el);
   root.render(
     <ThemeProvider
