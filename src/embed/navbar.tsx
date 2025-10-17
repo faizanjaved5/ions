@@ -37,28 +37,43 @@ export function mount(
   if (options?.useShadowDom) {
     const host = el;
     const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
+    const shadowContainer = document.createElement("div");
+    shadow.appendChild(shadowContainer);
+
+    const startRender = () => {
+      const root = createRoot(shadowContainer);
+      root.render(
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          storageKey="ion-theme"
+        >
+          <PortalProvider container={shadow}>
+            <Header />
+          </PortalProvider>
+        </ThemeProvider>
+      );
+      mounted.set(host, root);
+    };
+
     if (options.cssHref) {
       const link = document.createElement("link");
       link.rel = "stylesheet";
       link.href = options.cssHref;
       shadow.appendChild(link);
+      let done = false;
+      const resolve = () => {
+        if (done) return;
+        done = true;
+        startRender();
+      };
+      link.addEventListener("load", resolve, { once: true });
+      link.addEventListener("error", resolve, { once: true });
+      setTimeout(resolve, 200);
+    } else {
+      startRender();
     }
-    const shadowContainer = document.createElement("div");
-    shadow.appendChild(shadowContainer);
-    const root = createRoot(shadowContainer);
-    root.render(
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="dark"
-        enableSystem={false}
-        storageKey="ion-theme"
-      >
-        <PortalProvider container={shadow}>
-          <Header />
-        </PortalProvider>
-      </ThemeProvider>
-    );
-    mounted.set(host, root);
     return host;
   }
 

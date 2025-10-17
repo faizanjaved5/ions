@@ -12,6 +12,7 @@ $__ion_base = isset($ION_NAVBAR_BASE_URL) ? rtrim($ION_NAVBAR_BASE_URL, "/") . "
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="<?php echo htmlspecialchars($__ion_base, ENT_QUOTES); ?>ion-navbar.css">
 
 <!-- ION Navbar Embed: styles injected by JS (no CSS file) -->
 
