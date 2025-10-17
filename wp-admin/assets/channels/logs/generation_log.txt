@@ -1,6 +1,0 @@
-Font file found: /home/u150458267/domains/iblog.bz/public_html/assets/channels/fonts/BebasNeue-Regular.ttf
-SUCCESS: output/c/ion-chandler.png generated.
-SUCCESS: output/a/ion-atlanta.png generated.
-SUCCESS: output/n/ion-new-york.png generated.
-SUCCESS: output/x/ion-xyz.png generated.
-DONE: Processed 4 items.

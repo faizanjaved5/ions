@@ -1,1 +1,0 @@
-Data folder - JSON files will be copied here

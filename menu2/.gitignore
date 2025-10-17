@@ -1,7 +1,0 @@
-/vendor/
-/.env
-/.idea/
-/.vscode/
-/.DS_Store
-docs/*
-.cursor/*
