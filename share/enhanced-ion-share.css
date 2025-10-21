@@ -1,0 +1,371 @@
+/* Enhanced ION Share Styles */
+/* Save this as /share/enhanced-ion-share.css */
+
+.enhanced-share-button {
+    transition: all 0.2s ease;
+}
+
+.enhanced-share-button:hover {
+    transform: translateY(-1px);
+}
+
+.enhanced-share-modal {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+    pointer-events: none; /* Prevent interaction when hidden */
+}
+
+.enhanced-share-modal.show {
+    opacity: 1;
+    pointer-events: auto; /* Allow interaction when shown */
+}
+
+.enhanced-share-modal-content {
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    border: 1px solid #333;
+    transform: scale(0.95);
+    transition: transform 0.3s ease-out;
+}
+
+.enhanced-share-modal.show .enhanced-share-modal-content {
+    transform: scale(1);
+}
+
+.enhanced-share-header {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+}
+
+.share-tab-btn {
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.share-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.share-tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #3b82f6;
+    transition: all 0.2s ease;
+}
+
+.share-platforms-grid {
+    gap: 12px;
+}
+
+.share-platform-btn {
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+}
+
+.share-platform-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+    background: #333 !important;
+}
+
+.share-platform-btn:active {
+    transform: translateY(0);
+}
+
+/* Embed specific styles */
+.embed-code-section textarea {
+    font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    letter-spacing: 0.5px;
+    background: #0a0a0a;
+    border: 2px solid #333;
+    color: #a5a5a5;
+    transition: border-color 0.2s ease;
+}
+
+.embed-code-section textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.embed-code-section textarea::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.embed-code-section textarea::-webkit-scrollbar-track {
+    background: #1a1a1a;
+    border-radius: 4px;
+}
+
+.embed-code-section textarea::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.embed-code-section textarea::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Preview styles */
+.embed-code-section .embed-preview {
+    border: 2px dashed #444;
+    border-radius: 8px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.embed-preview-content {
+    position: relative;
+    z-index: 2;
+}
+
+.embed-preview::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(0,0,0,0.05) 10px,
+        rgba(0,0,0,0.05) 20px
+    );
+    z-index: 1;
+}
+
+/* Copy button states */
+.copy-button {
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.copy-button:hover {
+    background: #2563eb !important;
+    transform: translateY(-1px);
+}
+
+.copy-button:active {
+    transform: translateY(0);
+}
+
+.copy-button.copying {
+    background: #10b981 !important;
+    transform: scale(0.95);
+}
+
+/* Status badges in action buttons */
+.status-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-badge.clickable:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.status-approved { background: #10b981; color: white; }
+.status-pending { background: #eab308; color: white; }
+.status-paused { background: #f59e0b; color: white; border: 1px solid #d97706; }
+.status-rejected { background: #ef4444; color: white; }
+
+/* Action button improvements */
+.action-btn {
+    transition: all 0.15s ease;
+    border-radius: 6px;
+    position: relative;
+}
+
+.action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn:active {
+    transform: translateY(0);
+}
+
+/* Loading states */
+.loading-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: currentColor;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Modal animations */
+@keyframes enhanced-modal-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes enhanced-modal-slide-up {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -40%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Toast notifications */
+.enhanced-share-toast {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .enhanced-share-modal-content {
+        width: 95% !important;
+        max-height: 90vh !important;
+        margin: 0 !important;
+    }
+    
+    .share-platforms-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    
+    .share-platform-btn {
+        padding: 10px 8px !important;
+        font-size: 12px !important;
+        text-align: center !important;
+    }
+    
+    .share-platform-btn span {
+        display: block !important;
+        margin-top: 4px !important;
+    }
+    
+    .enhanced-share-header h3 {
+        font-size: 16px !important;
+    }
+    
+    .share-tab-btn {
+        padding: 10px 12px !important;
+        font-size: 13px !important;
+    }
+    
+    .embed-code-section textarea {
+        height: 100px !important;
+        font-size: 10px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .video-actions {
+        gap: 6px !important;
+    }
+    
+    .action-btn {
+        padding: 3px 5px !important;
+        font-size: 10px !important;
+    }
+    
+    .action-btn svg {
+        width: 10px !important;
+        height: 10px !important;
+    }
+}
+
+/* Dark mode enhancements */
+.enhanced-share-modal-content {
+    background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+    color: #ffffff;
+}
+
+.enhanced-share-modal input,
+.enhanced-share-modal select,
+.enhanced-share-modal textarea {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #ffffff;
+}
+
+.enhanced-share-modal input:focus,
+.enhanced-share-modal select:focus,
+.enhanced-share-modal textarea:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Accessibility improvements */
+.enhanced-share-modal button:focus,
+.action-btn:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.enhanced-share-modal [role="tab"][aria-selected="true"] {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .enhanced-share-modal-content {
+        border: 3px solid #ffffff;
+    }
+    
+    .share-platform-btn {
+        border: 2px solid currentColor;
+    }
+    
+    .action-btn {
+        border: 1px solid currentColor;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .enhanced-share-modal,
+    .enhanced-share-modal-content,
+    .action-btn,
+    .share-platform-btn,
+    .share-tab-btn {
+        animation: none !important;
+        transition: none !important;
+    }
+    
+    .action-btn:hover,
+    .share-platform-btn:hover {
+        transform: none !important;
+    }
+}

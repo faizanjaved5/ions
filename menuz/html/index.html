@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ION - The Network of Champions</title>
+    <meta name="description" content="ION Menu">
+    <meta name="author" content="Sperse">
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+    
+    <meta property="og:title" content="ION - The Network of Champions" />
+    <meta property="og:description" content="Connect with champions, explore ION Networks, Initiatives, Shops, and discover the ultimate network for athletes and sports enthusiasts." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/ion-logo-gold.png" />
+    
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="assets/ion-logo-gold.png" />
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: 'hsl(var(--border))',
+                        input: 'hsl(var(--input))',
+                        ring: 'hsl(var(--ring))',
+                        background: 'hsl(var(--background))',
+                        foreground: 'hsl(var(--foreground))',
+                        primary: {
+                            DEFAULT: 'hsl(var(--primary))',
+                            foreground: 'hsl(var(--primary-foreground))'
+                        },
+                        secondary: {
+                            DEFAULT: 'hsl(var(--secondary))',
+                            foreground: 'hsl(var(--secondary-foreground))'
+                        },
+                        muted: {
+                            DEFAULT: 'hsl(var(--muted))',
+                            foreground: 'hsl(var(--muted-foreground))'
+                        },
+                        accent: {
+                            DEFAULT: 'hsl(var(--accent))',
+                            foreground: 'hsl(var(--accent-foreground))'
+                        },
+                        card: {
+                            DEFAULT: 'hsl(var(--card))',
+                            foreground: 'hsl(var(--card-foreground))'
+                        },
+                        popover: {
+                            DEFAULT: 'hsl(var(--popover))',
+                            foreground: 'hsl(var(--popover-foreground))'
+                        },
+                    },
+                    fontFamily: {
+                        bebas: ['Bebas Neue', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-background text-foreground">
+    <!-- SVG Sprite -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" id="svg-sprites"></svg>
+    
+    <!-- Header -->
+    <header class="sticky top-0 z-50 w-full border-b backdrop-blur" style="background-color: #3a3f47;">
+        <div class="mx-auto flex h-20 max-w-[1920px] items-center justify-between px-4 gap-4">
+            <!-- Logo -->
+            <div class="flex-shrink-0">
+                <button onclick="window.scrollTo({ top: 0, behavior: 'smooth' })" class="cursor-pointer">
+                    <img src="assets/ion-logo-gold.png" alt="ION Logo" class="h-14 w-auto md:h-20 mt-[5px]">
+                </button>
+            </div>
+
+            <!-- Desktop Navigation (xl and up) -->
+            <nav class="hidden xl:flex items-center gap-3 absolute left-1/2 -translate-x-1/2" id="desktop-nav">
+                <!-- Navigation buttons will be dynamically added -->
+            </nav>
+
+            <!-- Right Side Actions -->
+            <div class="flex items-center gap-1 md:gap-2">
+                <button id="search-btn-desktop" class="hidden xl:flex items-center gap-2 px-3 py-2 font-bebas uppercase tracking-wider text-gray-400 hover:text-white rounded-md hover:bg-gray-700/50 transition-colors">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    Search ION
+                </button>
+                <button id="search-btn-mobile" class="xl:hidden h-9 w-9 flex items-center justify-center text-gray-400 hover:text-white rounded-md hover:bg-gray-700/50 transition-colors">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </button>
+
+                <button class="hidden xl:flex items-center gap-2 px-3 py-2 font-bebas uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    Upload
+                </button>
+                <button class="xl:hidden h-9 w-9 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                </button>
+
+                <button class="px-3 py-1.5 text-sm font-bebas uppercase tracking-wider border border-primary text-primary hover:bg-primary hover:text-white rounded-md transition-colors">
+                    Sign<span class="group-hover:text-white">ION</span>
+                </button>
+
+                <button id="theme-toggle" class="hidden xl:flex h-9 w-9 items-center justify-center text-gray-400 hover:text-white rounded-md hover:bg-gray-700/50 transition-colors">
+                    <svg id="sun-icon" class="h-4 w-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <svg id="moon-icon" class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+                </button>
+
+                <button id="mobile-menu-btn" class="xl:hidden h-9 w-9 flex items-center justify-center text-gray-400 hover:text-white rounded-md hover:bg-gray-700/50 transition-colors">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 flex items-center justify-center min-h-[calc(100vh-80px)]">
+        <div class="text-center">
+            <h1 class="font-bebas text-5xl uppercase tracking-wider">
+                <span class="text-primary">ION</span>
+                <span class="text-foreground"> The Network of Champions</span>
+            </h1>
+        </div>
+    </main>
+
+    <!-- Dialogs/Modals Container -->
+    <div id="modals-container"></div>
+
+    <!-- Mobile Menu Sheet -->
+    <div id="mobile-sheet" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-black/50" onclick="closeMobileMenu()"></div>
+        <div class="fixed right-0 top-0 bottom-0 w-[300px] bg-card border-l border-border overflow-y-auto transform transition-transform duration-300" id="mobile-sheet-content">
+            <!-- Mobile menu content will be added by JS -->
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+/* Design System Variables */
+:root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 29 36% 46%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 29 36% 46%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 90%;
+    --input: 0 0% 96%;
+    --ring: 29 36% 46%;
+    --radius: 0.25rem;
+    --menu-bg: 0 0% 98%;
+    --menu-item-hover: 29 36% 95%;
+    --menu-item-active: 29 40% 92%;
+    --menu-border: 0 0% 90%;
+    --scrollbar-track: 0 0% 98%;
+    --scrollbar-thumb: 29 36% 46%;
+}
+
+.dark {
+    --background: 216 20% 15%;
+    --foreground: 210 20% 85%;
+    --card: 218 22% 18%;
+    --card-foreground: 210 20% 85%;
+    --popover: 218 22% 18%;
+    --popover-foreground: 210 20% 85%;
+    --primary: 29 36% 46%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 18% 25%;
+    --secondary-foreground: 210 20% 85%;
+    --muted: 220 18% 22%;
+    --muted-foreground: 215 15% 60%;
+    --accent: 29 36% 46%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 18% 25%;
+    --input: 220 18% 22%;
+    --ring: 29 36% 46%;
+    --menu-bg: 218 22% 16%;
+    --menu-item-hover: 29 25% 22%;
+    --menu-item-active: 29 30% 26%;
+    --menu-border: 220 18% 22%;
+    --scrollbar-track: 218 22% 16%;
+    --scrollbar-thumb: 29 36% 46%;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: hsla(var(--scrollbar-thumb) / 0.4) hsl(var(--scrollbar-track));
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: hsl(var(--scrollbar-track));
+}
+
+*::-webkit-scrollbar-thumb {
+    background: hsla(var(--scrollbar-thumb) / 0.4);
+    border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: hsla(var(--scrollbar-thumb) / 0.7);
+}
+
+sup {
+    font-size: 0.5em;
+    font-weight: 300;
+    opacity: 0.4;
+    vertical-align: super;
+    line-height: 0;
+}
+
+.dark sup {
+    opacity: 0.35;
+}
+
+/* Modal/Dialog Styles */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.modal-content {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Popover Styles */
+.popover {
+    position: fixed;
+    z-index: 60;
+    background: hsl(var(--popover));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.popover.hidden {
+    display: none;
+}
+
+/* Animation classes */
+.fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* Custom scrollable area */
+.scroll-area {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Store card hover effects */
+.store-card-img-wrapper {
+    transition: all 0.2s ease;
+}
+
+.store-card:hover .store-card-img-wrapper {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.store-card-img {
+    transition: transform 0.2s ease;
+}
+
+.store-card:hover .store-card-img {
+    transform: scale(1.05);
+}
+
+/* Tabs styles */
+.tab-trigger {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 0.375rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+}
+
+.tab-trigger.active {
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Loading spinner */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Utility classes */
+.transition-all {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+.duration-200 {
+    transition-duration: 200ms;
+}
+
+.transform {
+    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.hover\:scale-105:hover {
+    --tw-scale-x: 1.05;
+    --tw-scale-y: 1.05;
+}
+
+.hover\:scale-110:hover {
+    --tw-scale-x: 1.1;
+    --tw-scale-y: 1.1;
+}
+
+.group:hover .group-hover\:scale-105 {
+    --tw-scale-x: 1.05;
+    --tw-scale-y: 1.05;
+}
+
+.group:hover .group-hover\:scale-110 {
+    --tw-scale-x: 1.1;
+    --tw-scale-y: 1.1;
+}
+
+/* SVG icon styles */
+.svg-icon {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}

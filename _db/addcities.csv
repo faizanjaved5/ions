@@ -1,0 +1,644 @@
+﻿place_name,ion_name,state_name,country_code,country_name,population,slug_name
+Albania,ION Albania,,AL,Albania,"2,800,000",albania
+Durrës,ION Durrës,,AL,Albania,,durres
+Vlorë,ION Vlorë,,AL,Albania,,vlore
+Shkodër,ION Shkodër,,AL,Albania,,shkoder
+Tirana,ION Tirana,,AL,Albania,,tirana
+Fier,ION Fier,,AL,Albania,,fier
+Andorra,ION Andorra,,AD,Andorra,"80,000",andorra
+Sant Julià de Lòria,ION Sant Julià de Lòria,,AD,Andorra,,sant-julia-de-loria
+Andorra la Vella,ION Andorra la Vella,,AD,Andorra,,andorra-la-vella
+Escaldes-Engordany,ION Escaldes-Engordany,,AD,Andorra,,escaldes-engordany
+Encamp,ION Encamp,,AD,Andorra,,encamp
+La Massana,ION La Massana,,AD,Andorra,,la-massana
+Antigua And Barbuda,ION Antigua And Barbuda,,AG,Antigua And Barbuda,"94,000",antigua-barbuda
+St. John's,ION St. John's,,AG,Antigua And Barbuda,,st-johns
+All Saints,ION All Saints,,AG,Antigua And Barbuda,,all-saints
+Liberta,ION Liberta,,AG,Antigua And Barbuda,,liberta
+Bolans,ION Bolans,,AG,Antigua And Barbuda,,bolans
+Potters Village,ION Potters Village,,AG,Antigua And Barbuda,,potters-village
+Argentina,ION Argentina,,AR,Argentina,"45,900,000",argentina
+Córdoba,ION Córdoba,,AR,Argentina,,cordoba
+Buenos Aires,ION Buenos Aires,,AR,Argentina,,buenos-aires
+Rosario,ION Rosario,,AR,Argentina,,rosario
+Mendoza,ION Mendoza,,AR,Argentina,,mendoza
+La Plata,ION La Plata,,AR,Argentina,,la-plata
+Australia,ION Australia,,AU,Australia,"27,100,000",australia
+Sydney,ION Sydney,New South Wales,AU,Australia,,sydney
+Melbourne,ION Melbourne,Victoria,AU,Australia,,melbourne
+Brisbane,ION Brisbane,Queensland,AU,Australia,,brisbane
+Perth,ION Perth,Western Australia,AU,Australia,,perth
+Adelaide,ION Adelaide,South Australia,AU,Australia,,adelaide
+Austria,ION Austria,,AT,Austria,"9,100,000",austria
+Vienna,ION Vienna,,AT,Austria,,vienna
+Graz,ION Graz,,AT,Austria,,graz
+Linz,ION Linz,,AT,Austria,,linz
+Salzburg,ION Salzburg,,AT,Austria,,salzburg
+Innsbruck,ION Innsbruck,,AT,Austria,,innsbruck
+Bahamas,ION Bahamas,,BS,Bahamas,"410,000",bahamas
+Nassau,ION Nassau,,BS,Bahamas,,nassau
+Freeport,ION Freeport,,BS,Bahamas,,freeport
+Lucaya,ION Lucaya,,BS,Bahamas,,lucaya
+West End,ION West End,,BS,Bahamas,,west-end
+Coopers Town,ION Coopers Town,,BS,Bahamas,,coopers-town
+Bangladesh,ION Bangladesh,,BD,Bangladesh,"173,000,000",bangladesh
+Dhaka,ION Dhaka,,BD,Bangladesh,,dhaka
+Chittagong,ION Chittagong,,BD,Bangladesh,,chittagong
+Khulna,ION Khulna,,BD,Bangladesh,,khulna
+Rajshahi,ION Rajshahi,,BD,Bangladesh,,rajshahi
+Sylhet,ION Sylhet,,BD,Bangladesh,,sylhet
+Barbados,ION Barbados,,BB,Barbados,"281,000",barbados
+Bridgetown,ION Bridgetown,,BB,Barbados,,bridgetown
+Speightstown,ION Speightstown,,BB,Barbados,,speightstown
+Oistins,ION Oistins,,BB,Barbados,,oistins
+Bathsheba,ION Bathsheba,,BB,Barbados,,bathsheba
+Holetown,ION Holetown,,BB,Barbados,,holetown
+Belgium,ION Belgium,,BE,Belgium,"11,800,000",belgium
+Liège,ION Liège,,BE,Belgium,,liege
+Brussels,ION Brussels,,BE,Belgium,,brussels
+Antwerp,ION Antwerp,,BE,Belgium,,antwerp
+Ghent,ION Ghent,,BE,Belgium,,ghent
+Charleroi,ION Charleroi,,BE,Belgium,,charleroi
+Belize,ION Belize,,BZ,Belize,"420,000",belize
+Belize City,ION Belize City,,BZ,Belize,,belize-city
+Belmopan,ION Belmopan,,BZ,Belize,,belmopan
+San Ignacio,ION San Ignacio,,BZ,Belize,,san-ignacio
+Orange Walk Town,ION Orange Walk Town,,BZ,Belize,,orange-walk-town
+San Pedro,ION San Pedro,,BZ,Belize,,san-pedro
+Bolivia,ION Bolivia,,BO,Bolivia,"12,300,000",bolivia
+Santa Cruz de la Sierra,ION Santa Cruz de la Sierra,,BO,Bolivia,,santa-cruz-de-la-sierra
+El Alto,ION El Alto,,BO,Bolivia,,el-alto
+La Paz,ION La Paz,,BO,Bolivia,,la-paz
+Cochabamba,ION Cochabamba,,BO,Bolivia,,cochabamba
+Sucre,ION Sucre,,BO,Bolivia,,sucre
+Bosnia And Herzegovina,ION Bosnia And Herzegovina,,BA,Bosnia And Herzegovina,"3,200,000",bosnia-herzegovina
+Sarajevo,ION Sarajevo,,BA,Bosnia And Herzegovina,,sarajevo
+Banja Luka,ION Banja Luka,,BA,Bosnia And Herzegovina,,banja-luka
+Tuzla,ION Tuzla,,BA,Bosnia And Herzegovina,,tuzla
+Zenica,ION Zenica,,BA,Bosnia And Herzegovina,,zenica
+Mostar,ION Mostar,,BA,Bosnia And Herzegovina,,mostar
+Brazil,ION Brazil,,BR,Brazil,"203,000,000",brazil
+São Paulo,ION São Paulo,,BR,Brazil,,sao-paulo
+Brasília,ION Brasília,,BR,Brazil,,brasilia
+Rio de Janeiro,ION Rio de Janeiro,,BR,Brazil,,rio-de-janeiro
+Salvador,ION Salvador,,BR,Brazil,,salvador
+Fortaleza,ION Fortaleza,,BR,Brazil,,fortaleza
+Bulgaria,ION Bulgaria,,BG,Bulgaria,"6,400,000",bulgaria
+Sofia,ION Sofia,,BG,Bulgaria,,sofia
+Plovdiv,ION Plovdiv,,BG,Bulgaria,,plovdiv
+Varna,ION Varna,,BG,Bulgaria,,varna
+Burgas,ION Burgas,,BG,Bulgaria,,burgas
+Ruse,ION Ruse,,BG,Bulgaria,,ruse
+Chile,ION Chile,,CL,Chile,"19,600,000",chile
+Valparaíso,ION Valparaíso,,CL,Chile,,valparaiso
+Concepción,ION Concepción,,CL,Chile,,concepcion
+Viña del Mar,ION Viña del Mar,,CL,Chile,,vina-del-mar
+Santiago,ION Santiago,,CL,Chile,,santiago
+Antofagasta,ION Antofagasta,,CL,Chile,,antofagasta
+China,ION China,,CN,China,"1,409,000,000",china
+Beijing,ION Beijing,,CN,China,,beijing
+Shanghai,ION Shanghai,,CN,China,,shanghai
+Guangzhou,ION Guangzhou,,CN,China,,guangzhou
+Shenzhen,ION Shenzhen,,CN,China,,shenzhen
+Chengdu,ION Chengdu,,CN,China,,chengdu
+Colombia,ION Colombia,,CO,Colombia,"52,000,000",colombia
+Bogotá,ION Bogotá,,CO,Colombia,,bogota
+Medellín,ION Medellín,,CO,Colombia,,medellin
+Cali,ION Cali,,CO,Colombia,,cali
+Barranquilla,ION Barranquilla,,CO,Colombia,,barranquilla
+Cartagena,ION Cartagena,,CO,Colombia,,cartagena
+Costa Rica,ION Costa Rica,,CR,Costa Rica,"5,200,000",costa-rica
+San José,ION San José,,CR,Costa Rica,,san-jose
+Alajuela,ION Alajuela,,CR,Costa Rica,,alajuela
+Cartago,ION Cartago,,CR,Costa Rica,,cartago
+Heredia,ION Heredia,,CR,Costa Rica,,heredia
+Puntarenas,ION Puntarenas,,CR,Costa Rica,,puntarenas
+Croatia,ION Croatia,,HR,Croatia,"3,850,000",croatia
+Zagreb,ION Zagreb,,HR,Croatia,,zagreb
+Split,ION Split,,HR,Croatia,,split
+Rijeka,ION Rijeka,,HR,Croatia,,rijeka
+Osijek,ION Osijek,,HR,Croatia,,osijek
+Zadar,ION Zadar,,HR,Croatia,,zadar
+Cuba,ION Cuba,,CU,Cuba,"11,000,000",cuba
+Camagüey,ION Camagüey,,CU,Cuba,,camaguey
+Holguín,ION Holguín,,CU,Cuba,,holguin
+Guantánamo,ION Guantánamo,,CU,Cuba,,guantanamo
+Havana,ION Havana,,CU,Cuba,,havana
+Santiago de Cuba,ION Santiago de Cuba,,CU,Cuba,,santiago-de-cuba
+Czech Republic,ION Czech Republic,,CZ,Czech Republic,"10,900,000",czech-republic
+Prague,ION Prague,,CZ,Czech Republic,,prague
+Brno,ION Brno,,CZ,Czech Republic,,brno
+Ostrava,ION Ostrava,,CZ,Czech Republic,,ostrava
+Pilsen,ION Pilsen,,CZ,Czech Republic,,pilsen
+Liberec,ION Liberec,,CZ,Czech Republic,,liberec
+Denmark,ION Denmark,,DK,Denmark,"5,970,000",denmark
+Copenhagen,ION Copenhagen,,DK,Denmark,,copenhagen
+Aarhus,ION Aarhus,,DK,Denmark,,aarhus
+Odense,ION Odense,,DK,Denmark,,odense
+Aalborg,ION Aalborg,,DK,Denmark,,aalborg
+Esbjerg,ION Esbjerg,,DK,Denmark,,esbjerg
+Dominica,ION Dominica,,DM,Dominica,"73,000",dominica
+Roseau,ION Roseau,,DM,Dominica,,roseau
+Portsmouth,ION Portsmouth,,DM,Dominica,,portsmouth
+Marigot,ION Marigot,,DM,Dominica,,marigot
+Berekua,ION Berekua,,DM,Dominica,,berekua
+Wesley,ION Wesley,,DM,Dominica,,wesley
+Dominican Republic,ION Dominican Republic,,DO,Dominican Republic,"11,400,000",dominican-republic
+Santo Domingo,ION Santo Domingo,,DO,Dominican Republic,,santo-domingo-dr
+San Pedro de Macorís,ION San Pedro de Macorís,,DO,Dominican Republic,,san-pedro-de-macoris
+Higüey,ION Higüey,,DO,Dominican Republic,,higuey
+Santiago de los Caballeros,ION Santiago de los Caballeros,,DO,Dominican Republic,,santiago-de-los-caballeros
+La Romana,ION La Romana,,DO,Dominican Republic,,la-romana
+Ecuador,ION Ecuador,,EC,Ecuador,"18,300,000",ecuador
+Santo Domingo,ION Santo Domingo,,EC,Ecuador,,santo-domingo
+Guayaquil,ION Guayaquil,,EC,Ecuador,,guayaquil
+Quito,ION Quito,,EC,Ecuador,,quito
+Cuenca,ION Cuenca,,EC,Ecuador,,cuenca
+Machala,ION Machala,,EC,Ecuador,,machala
+Egypt,ION Egypt,,EG,Egypt,"112,000,000",egypt
+Cairo,ION Cairo,,EG,Egypt,,cairo
+Alexandria,ION Alexandria,,EG,Egypt,,alexandria
+Giza,ION Giza,,EG,Egypt,,giza
+Shubra El Kheima,ION Shubra El Kheima,,EG,Egypt,,shubra-el-kheima
+Port Said,ION Port Said,,EG,Egypt,,port-said
+El Salvador,ION El Salvador,,SV,El Salvador,"6,400,000",el-salvador
+San Salvador,ION San Salvador,,SV,El Salvador,,san-salvador
+Santa Ana,ION Santa Ana,,SV,El Salvador,,santa-ana
+San Miguel,ION San Miguel,,SV,El Salvador,,san-miguel
+Soyapango,ION Soyapango,,SV,El Salvador,,soyapango
+Mejicanos,ION Mejicanos,,SV,El Salvador,,mejicanos
+England,ION England,,GB,England,"56,000,000",england
+London,ION London,,GB,England,,london
+Birmingham,ION Birmingham,,GB,England,,birmingham
+Manchester,ION Manchester,,GB,England,,manchester
+Liverpool,ION Liverpool,,GB,England,,liverpool
+Leeds,ION Leeds,,GB,England,,leeds
+Estonia,ION Estonia,,EE,Estonia,"1,360,000",estonia
+Pärnu,ION Pärnu,,EE,Estonia,,parnu
+Kohtla-Järve,ION Kohtla-Järve,,EE,Estonia,,kohtla-jarve
+Tallinn,ION Tallinn,,EE,Estonia,,tallinn
+Tartu,ION Tartu,,EE,Estonia,,tartu
+Narva,ION Narva,,EE,Estonia,,narva
+Fiji,ION Fiji,,FJ,Fiji,"940,000",fiji
+Suva,ION Suva,,FJ,Fiji,,suva
+Lautoka,ION Lautoka,,FJ,Fiji,,lautoka
+Nadi,ION Nadi,,FJ,Fiji,,nadi
+Labasa,ION Labasa,,FJ,Fiji,,labasa
+Ba,ION Ba,,FJ,Fiji,,ba
+Finland,ION Finland,,FI,Finland,"5,600,000",finland
+Helsinki,ION Helsinki,,FI,Finland,,helsinki
+Espoo,ION Espoo,,FI,Finland,,espoo
+Tampere,ION Tampere,,FI,Finland,,tampere
+Vantaa,ION Vantaa,,FI,Finland,,vantaa
+Oulu,ION Oulu,,FI,Finland,,oulu
+France,ION France,,FR,France,"68,000,000",france
+Paris,ION Paris,,FR,France,,paris
+Marseille,ION Marseille,,FR,France,,marseille
+Lyon,ION Lyon,,FR,France,,lyon
+Toulouse,ION Toulouse,,FR,France,,toulouse
+Nice,ION Nice,,FR,France,,nice
+Germany,ION Germany,,DE,Germany,"84,000,000",germany
+Berlin,ION Berlin,,DE,Germany,,berlin
+Hamburg,ION Hamburg,,DE,Germany,,hamburg
+Munich,ION Munich,,DE,Germany,,munich
+Cologne,ION Cologne,,DE,Germany,,cologne
+Frankfurt,ION Frankfurt,,DE,Germany,,frankfurt
+Greece,ION Greece,,GR,Greece,"10,300,000",greece
+Athens,ION Athens,,GR,Greece,,athens
+Thessaloniki,ION Thessaloniki,,GR,Greece,,thessaloniki
+Patras,ION Patras,,GR,Greece,,patras
+Heraklion,ION Heraklion,,GR,Greece,,heraklion
+Larissa,ION Larissa,,GR,Greece,,larissa
+Grenada,ION Grenada,,GD,Grenada,"127,000",grenada
+St. George's,ION St. George's,,GD,Grenada,,st-georges
+Gouyave,ION Gouyave,,GD,Grenada,,gouyave
+Grenville,ION Grenville,,GD,Grenada,,grenville
+Victoria,ION Victoria,,GD,Grenada,,victoria
+Hillsborough,ION Hillsborough,,GD,Grenada,,hillsborough
+Guatemala,ION Guatemala,,GT,Guatemala,"18,000,000",guatemala
+Guatemala City,ION Guatemala City,,GT,Guatemala,,guatemala-city
+Mixco,ION Mixco,,GT,Guatemala,,mixco
+Villa Nueva,ION Villa Nueva,,GT,Guatemala,,villa-nueva
+Quetzaltenango,ION Quetzaltenango,,GT,Guatemala,,quetzaltenango
+Escuintla,ION Escuintla,,GT,Guatemala,,escuintla
+Guyana,ION Guyana,,GY,Guyana,"810,000",guyana
+Georgetown,ION Georgetown,,GY,Guyana,,georgetown-guyana
+Linden,ION Linden,,GY,Guyana,,linden
+New Amsterdam,ION New Amsterdam,,GY,Guyana,,new-amsterdam
+Anna Regina,ION Anna Regina,,GY,Guyana,,anna-regina
+Bartica,ION Bartica,,GY,Guyana,,bartica
+Haiti,ION Haiti,,HT,Haiti,"11,700,000",haiti
+Cap-Haïtien,ION Cap-Haïtien,,HT,Haiti,,cap-haitien
+Pétion-Ville,ION Pétion-Ville,,HT,Haiti,,petion-ville
+Port-au-Prince,ION Port-au-Prince,,HT,Haiti,,port-au-prince
+Carrefour,ION Carrefour,,HT,Haiti,,carrefour
+Delmas,ION Delmas,,HT,Haiti,,delmas
+Honduras,ION Honduras,,HN,Honduras,"10,700,000",honduras
+Tegucigalpa,ION Tegucigalpa,,HN,Honduras,,tegucigalpa
+San Pedro Sula,ION San Pedro Sula,,HN,Honduras,,san-pedro-sula
+Choloma,ION Choloma,,HN,Honduras,,choloma
+La Ceiba,ION La Ceiba,,HN,Honduras,,la-ceiba
+El Progreso,ION El Progreso,,HN,Honduras,,el-progreso
+Hungary,ION Hungary,,HU,Hungary,"9,600,000",hungary
+Pécs,ION Pécs,,HU,Hungary,,pecs
+Budapest,ION Budapest,,HU,Hungary,,budapest
+Debrecen,ION Debrecen,,HU,Hungary,,debrecen
+Szeged,ION Szeged,,HU,Hungary,,szeged
+Miskolc,ION Miskolc,,HU,Hungary,,miskolc
+Iceland,ION Iceland,,IS,Iceland,"390,000",iceland
+Reykjanesbær,ION Reykjanesbær,,IS,Iceland,,reykjanesbr
+Reykjavik,ION Reykjavik,,IS,Iceland,,reykjavik
+Kopavogur,ION Kopavogur,,IS,Iceland,,kopavogur
+Hafnarfjordur,ION Hafnarfjordur,,IS,Iceland,,hafnarfjordur
+Akureyri,ION Akureyri,,IS,Iceland,,akureyri
+India,ION India,,IN,India,"1,429,000,000",india
+Mumbai,ION Mumbai,Maharashtra,IN,India,,mumbai
+Delhi,ION Delhi,Delhi,IN,India,,delhi
+Bengaluru,ION Bengaluru,Karnataka,IN,India,,bengaluru
+Chennai,ION Chennai,Tamil Nadu,IN,India,,chennai
+Kolkata,ION Kolkata,West Bengal,IN,India,,kolkata
+Indonesia,ION Indonesia,,ID,Indonesia,"282,000,000",indonesia
+Jakarta,ION Jakarta,Java,ID,Indonesia,,jakarta
+Surabaya,ION Surabaya,Java,ID,Indonesia,,surabaya
+Bandung,ION Bandung,Java,ID,Indonesia,,bandung
+Medan,ION Medan,Sumatra,ID,Indonesia,,medan
+Bekasi,ION Bekasi,Java,ID,Indonesia,,bekasi
+Iran,ION Iran,,IR,Iran,"86,000,000",iran
+Tehran,ION Tehran,,IR,Iran,,tehran
+Mashhad,ION Mashhad,,IR,Iran,,mashhad
+Isfahan,ION Isfahan,,IR,Iran,,isfahan
+Karaj,ION Karaj,,IR,Iran,,karaj
+Shiraz,ION Shiraz,,IR,Iran,,shiraz
+Iraq,ION Iraq,,IQ,Iraq,"45,000,000",iraq
+Baghdad,ION Baghdad,,IQ,Iraq,,baghdad
+Basra,ION Basra,,IQ,Iraq,,basra
+Mosul,ION Mosul,,IQ,Iraq,,mosul
+Erbil,ION Erbil,,IQ,Iraq,,erbil
+Sulaymaniyah,ION Sulaymaniyah,,IQ,Iraq,,sulaymaniyah
+Ireland,ION Ireland,,IE,Ireland,"5,300,000",ireland
+Dublin,ION Dublin,,IE,Ireland,,dublin
+Cork,ION Cork,,IE,Ireland,,cork
+Limerick,ION Limerick,,IE,Ireland,,limerick
+Galway,ION Galway,,IE,Ireland,,galway
+Waterford,ION Waterford,,IE,Ireland,,waterford
+Israel,ION Israel,,IL,Israel,"9,800,000",israel
+Jerusalem,ION Jerusalem,,IL,Israel,,jerusalem
+Tel Aviv,ION Tel Aviv,,IL,Israel,,tel-aviv
+Haifa,ION Haifa,,IL,Israel,,haifa
+Rishon LeZion,ION Rishon LeZion,,IL,Israel,,rishon-lezion
+Petah Tikva,ION Petah Tikva,,IL,Israel,,petah-tikva
+Italy,ION Italy,,IT,Italy,"58,900,000",italy
+Rome,ION Rome,,IT,Italy,,rome
+Milan,ION Milan,,IT,Italy,,milan
+Naples,ION Naples,,IT,Italy,,naples
+Turin,ION Turin,,IT,Italy,,turin
+Palermo,ION Palermo,,IT,Italy,,palermo
+Jamaica,ION Jamaica,,JM,Jamaica,"2,830,000",jamaica
+Kingston,ION Kingston,,JM,Jamaica,,kingston
+Spanish Town,ION Spanish Town,,JM,Jamaica,,spanish-town
+Portmore,ION Portmore,,JM,Jamaica,,portmore
+Montego Bay,ION Montego Bay,,JM,Jamaica,,montego-bay
+Mandeville,ION Mandeville,,JM,Jamaica,,mandeville
+Japan,ION Japan,,JP,Japan,"123,600,000",japan
+Tokyo,ION Tokyo,,JP,Japan,,tokyo
+Yokohama,ION Yokohama,,JP,Japan,,yokohama
+Osaka,ION Osaka,,JP,Japan,,osaka
+Nagoya,ION Nagoya,,JP,Japan,,nagoya
+Sapporo,ION Sapporo,,JP,Japan,,sapporo
+Kenya,ION Kenya,,KE,Kenya,"55,000,000",kenya
+Nairobi,ION Nairobi,,KE,Kenya,,nairobi
+Mombasa,ION Mombasa,,KE,Kenya,,mombasa
+Kisumu,ION Kisumu,,KE,Kenya,,kisumu
+Nakuru,ION Nakuru,,KE,Kenya,,nakuru
+Eldoret,ION Eldoret,,KE,Kenya,,eldoret
+Kiribati,ION Kiribati,,KI,Kiribati,"135,000",kiribati
+Tarawa,ION Tarawa,,KI,Kiribati,,tarawa
+Betio,ION Betio,,KI,Kiribati,,betio
+Bikenibeu,ION Bikenibeu,,KI,Kiribati,,bikenibeu
+Teaoraereke,ION Teaoraereke,,KI,Kiribati,,teaoraereke
+Bairiki,ION Bairiki,,KI,Kiribati,,bairiki
+Kuwait,ION Kuwait,,KW,Kuwait,"4,600,000",kuwait
+Kuwait City,ION Kuwait City,,KW,Kuwait,,kuwait-city
+Al Ahmadi,ION Al Ahmadi,,KW,Kuwait,,al-ahmadi
+Hawalli,ION Hawalli,,KW,Kuwait,,hawalli
+Sabah Al Salem,ION Sabah Al Salem,,KW,Kuwait,,sabah-al-salem
+Salmiya,ION Salmiya,,KW,Kuwait,,salmiya
+Latvia,ION Latvia,,LV,Latvia,"1,830,000",latvia
+Riga,ION Riga,,LV,Latvia,,riga
+Daugavpils,ION Daugavpils,,LV,Latvia,,daugavpils
+Liepaja,ION Liepaja,,LV,Latvia,,liepaja
+Jelgava,ION Jelgava,,LV,Latvia,,jelgava
+Jurmala,ION Jurmala,,LV,Latvia,,jurmala
+Lebanon,ION Lebanon,,LB,Lebanon,"5,300,000",lebanon
+Beirut,ION Beirut,,LB,Lebanon,,beirut
+Tripoli,ION Tripoli,,LB,Lebanon,,tripoli
+Sidon,ION Sidon,,LB,Lebanon,,sidon
+Tyre,ION Tyre,,LB,Lebanon,,tyre
+Jounieh,ION Jounieh,,LB,Lebanon,,jounieh
+Lithuania,ION Lithuania,,LT,Lithuania,"2,850,000",lithuania
+ÿiauliai,ION ÿiauliai,,LT,Lithuania,,yiauliai
+Panevėžys,ION Panevėžys,,LT,Lithuania,,panevezys
+Vilnius,ION Vilnius,,LT,Lithuania,,vilnius
+Kaunas,ION Kaunas,,LT,Lithuania,,kaunas
+Klaipeda,ION Klaipeda,,LT,Lithuania,,klaipeda
+Luxembourg,ION Luxembourg,,LU,Luxembourg,"660,000",luxembourg
+Luxembourg City,ION Luxembourg City,,LU,Luxembourg,,luxembourg-city
+Esch-sur-Alzette,ION Esch-sur-Alzette,,LU,Luxembourg,,esch-sur-alzette
+Differdange,ION Differdange,,LU,Luxembourg,,differdange
+Dudelange,ION Dudelange,,LU,Luxembourg,,dudelange
+Ettelbruck,ION Ettelbruck,,LU,Luxembourg,,ettelbruck
+Malaysia,ION Malaysia,,MY,Malaysia,"34,000,000",malaysia
+Kuala Lumpur,ION Kuala Lumpur,,MY,Malaysia,,kuala-lumpur
+George Town,ION George Town,Penang,MY,Malaysia,,george-town
+Ipoh,ION Ipoh,Perak,MY,Malaysia,,ipoh
+Shah Alam,ION Shah Alam,Selangor,MY,Malaysia,,shah-alam
+Johor Bahru,ION Johor Bahru,Johor,MY,Malaysia,,johor-bahru
+Malta,ION Malta,,MT,Malta,"540,000",malta
+Valletta,ION Valletta,,MT,Malta,,valletta
+Birkirkara,ION Birkirkara,,MT,Malta,,birkirkara
+Mosta,ION Mosta,,MT,Malta,,mosta
+Sliema,ION Sliema,,MT,Malta,,sliema
+Qormi,ION Qormi,,MT,Malta,,qormi
+Marshall Islands,ION Marshall Islands,,MH,Marshall Islands,"60,000",marshall-islands
+Majuro,ION Majuro,,MH,Marshall Islands,,majuro
+Ebeye,ION Ebeye,,MH,Marshall Islands,,ebeye
+Laura,ION Laura,,MH,Marshall Islands,,laura
+Ajeltake,ION Ajeltake,,MH,Marshall Islands,,ajeltake
+Rita,ION Rita,,MH,Marshall Islands,,rita
+Micronesia,ION Micronesia,,FM,Micronesia,"115,000",micronesia
+Palikir,ION Palikir,,FM,Micronesia,,palikir
+Weno,ION Weno,,FM,Micronesia,,weno
+Tofol,ION Tofol,,FM,Micronesia,,tofol
+Kolonia,ION Kolonia,,FM,Micronesia,,kolonia
+Nan Madol,ION Nan Madol,,FM,Micronesia,,nan-madol
+Montenegro,ION Montenegro,,ME,Montenegro,"620,000",montenegro
+Nik­i?,ION Nik­i?,,ME,Montenegro,,niki
+Podgorica,ION Podgorica,,ME,Montenegro,,podgorica
+Herceg Novi,ION Herceg Novi,,ME,Montenegro,,herceg-novi
+Pljevlja,ION Pljevlja,,ME,Montenegro,,pljevlja
+Bijelo Polje,ION Bijelo Polje,,ME,Montenegro,,bijelo-polje
+Morocco,ION Morocco,,MA,Morocco,"37,500,000",morocco
+Casablanca,ION Casablanca,,MA,Morocco,,casablanca
+Rabat,ION Rabat,,MA,Morocco,,rabat
+Fes,ION Fes,,MA,Morocco,,fes
+Marrakesh,ION Marrakesh,,MA,Morocco,,marrakesh
+Tangier,ION Tangier,,MA,Morocco,,tangier
+Nauru,ION Nauru,,NR,Nauru,"12,000",nauru
+Yaren,ION Yaren,,NR,Nauru,,yaren
+Aiwo,ION Aiwo,,NR,Nauru,,aiwo
+Boe,ION Boe,,NR,Nauru,,boe
+Denigomodu,ION Denigomodu,,NR,Nauru,,denigomodu
+Nibok,ION Nibok,,NR,Nauru,,nibok
+Netherlands,ION Netherlands,,NL,Netherlands,"17,900,000",netherlands
+Amsterdam,ION Amsterdam,,NL,Netherlands,,amsterdam
+Rotterdam,ION Rotterdam,,NL,Netherlands,,rotterdam
+The Hague,ION The Hague,,NL,Netherlands,,the-hague
+Utrecht,ION Utrecht,,NL,Netherlands,,utrecht
+Eindhoven,ION Eindhoven,,NL,Netherlands,,eindhoven
+New Zealand,ION New Zealand,,NZ,New Zealand,"5,300,000",new-zealand
+Auckland,ION Auckland,,NZ,New Zealand,,auckland
+Wellington,ION Wellington,,NZ,New Zealand,,wellington
+Christchurch,ION Christchurch,,NZ,New Zealand,,christchurch
+Hamilton,ION Hamilton,,NZ,New Zealand,,hamilton
+Tauranga,ION Tauranga,,NZ,New Zealand,,tauranga
+Nicaragua,ION Nicaragua,,NI,Nicaragua,"6,900,000",nicaragua
+León,ION León,,NI,Nicaragua,,leon
+Managua,ION Managua,,NI,Nicaragua,,managua
+Masaya,ION Masaya,,NI,Nicaragua,,masaya
+Chinandega,ION Chinandega,,NI,Nicaragua,,chinandega
+Matagalpa,ION Matagalpa,,NI,Nicaragua,,matagalpa
+Nigeria,ION Nigeria,,NG,Nigeria,"229,000,000",nigeria
+Lagos,ION Lagos,,NG,Nigeria,,lagos
+Abuja,ION Abuja,,NG,Nigeria,,abuja
+Kano,ION Kano,,NG,Nigeria,,kano
+Ibadan,ION Ibadan,,NG,Nigeria,,ibadan
+Port Harcourt,ION Port Harcourt,,NG,Nigeria,,port-harcourt
+Norway,ION Norway,,NO,Norway,"5,600,000",norway
+Oslo,ION Oslo,,NO,Norway,,oslo
+Bergen,ION Bergen,,NO,Norway,,bergen
+Stavanger,ION Stavanger,,NO,Norway,,stavanger
+Trondheim,ION Trondheim,,NO,Norway,,trondheim
+Drammen,ION Drammen,,NO,Norway,,drammen
+Pakistan,ION Pakistan,,PK,Pakistan,"243,000,000",pakistan
+Karachi,ION Karachi,Sindh,PK,Pakistan,,karachi
+Lahore,ION Lahore,Punjab,PK,Pakistan,,lahore
+Faisalabad,ION Faisalabad,Punjab,PK,Pakistan,,faisalabad
+Rawalpindi,ION Rawalpindi,Punjab,PK,Pakistan,,rawalpindi
+Islamabad,ION Islamabad,Islamabad Capital Territory,PK,Pakistan,,islamabad
+Palau,ION Palau,,PW,Palau,"18,000",palau
+Ngerulmud,ION Ngerulmud,,PW,Palau,,ngerulmud
+Koror,ION Koror,,PW,Palau,,koror
+Meyuns,ION Meyuns,,PW,Palau,,meyuns
+Ngaraard,ION Ngaraard,,PW,Palau,,ngaraard
+Ngardmau,ION Ngardmau,,PW,Palau,,ngardmau
+Panama,ION Panama,,PA,Panama,"4,500,000",panama
+Colón,ION Colón,,PA,Panama,,colon
+Panama City,ION Panama City,,PA,Panama,,panama-city
+San Miguelito,ION San Miguelito,,PA,Panama,,san-miguelito
+David,ION David,,PA,Panama,,david
+La Chorrera,ION La Chorrera,,PA,Panama,,la-chorrera
+Papua New Guinea,ION Papua New Guinea,,PG,Papua New Guinea,"10,300,000",papua-new-guinea
+Port Moresby,ION Port Moresby,,PG,Papua New Guinea,,port-moresby
+Lae,ION Lae,,PG,Papua New Guinea,,lae
+Arawa,ION Arawa,,PG,Papua New Guinea,,arawa
+Mount Hagen,ION Mount Hagen,,PG,Papua New Guinea,,mount-hagen
+Popondetta,ION Popondetta,,PG,Papua New Guinea,,popondetta
+Paraguay,ION Paraguay,,PY,Paraguay,"7,500,000",paraguay
+Asunción,ION Asunción,,PY,Paraguay,,asuncion
+Encarnación,ION Encarnación,,PY,Paraguay,,encarnacion
+Ciudad del Este,ION Ciudad del Este,,PY,Paraguay,,ciudad-del-este
+San Lorenzo,ION San Lorenzo,,PY,Paraguay,,san-lorenzo
+Luque,ION Luque,,PY,Paraguay,,luque
+Peru,ION Peru,,PE,Peru,"34,700,000",peru
+Lima,ION Lima,,PE,Peru,,lima
+Arequipa,ION Arequipa,,PE,Peru,,arequipa
+Trujillo,ION Trujillo,,PE,Peru,,trujillo
+Chiclayo,ION Chiclayo,,PE,Peru,,chiclayo
+Piura,ION Piura,,PE,Peru,,piura
+Philippines,ION Philippines,,PH,Philippines,"118,000,000",philippines
+Manila,ION Manila,,PH,Philippines,,manila
+Quezon City,ION Quezon City,,PH,Philippines,,quezon-city
+Davao City,ION Davao City,,PH,Philippines,,davao-city
+Cebu City,ION Cebu City,,PH,Philippines,,cebu-city
+Zamboanga City,ION Zamboanga City,,PH,Philippines,,zamboanga-city
+Poland,ION Poland,,PL,Poland,"37,600,000",poland
+Wrocław,ION Wrocław,,PL,Poland,,wrocaw
+Gdańsk,ION Gdańsk,,PL,Poland,,gdansk
+Poznań,ION Poznań,,PL,Poland,,poznan
+Warsaw,ION Warsaw,,PL,Poland,,warsaw
+Krakow,ION Krakow,,PL,Poland,,krakow
+Portugal,ION Portugal,,PT,Portugal,"10,400,000",portugal
+Lisbon,ION Lisbon,,PT,Portugal,,lisbon
+Porto,ION Porto,,PT,Portugal,,porto
+Vila Nova de Gaia,ION Vila Nova de Gaia,,PT,Portugal,,vila-nova-de-gaia
+Amadora,ION Amadora,,PT,Portugal,,amadora
+Braga,ION Braga,,PT,Portugal,,braga
+Qatar,ION Qatar,,QA,Qatar,"2,700,000",qatar
+Doha,ION Doha,,QA,Qatar,,doha
+Al Rayyan,ION Al Rayyan,,QA,Qatar,,al-rayyan
+Umm Salal Muhammad,ION Umm Salal Muhammad,,QA,Qatar,,umm-salal-muhammad
+Al Wakrah,ION Al Wakrah,,QA,Qatar,,al-wakrah
+Al Khor,ION Al Khor,,QA,Qatar,,al-khor
+Romania,ION Romania,,RO,Romania,"19,500,000",romania
+Timișoara,ION Timișoara,,RO,Romania,,timisoara
+Iași,ION Iași,,RO,Romania,,iasi
+Bucharest,ION Bucharest,,RO,Romania,,bucharest
+Cluj-Napoca,ION Cluj-Napoca,,RO,Romania,,cluj-napoca
+Constan??a,ION Constan??a,,RO,Romania,,constan-a
+Russia,ION Russia,,RU,Russia,"146,000,000",russia
+Moscow,ION Moscow,,RU,Russia,,moscow
+Saint Petersburg,ION Saint Petersburg,,RU,Russia,,saint-petersburg
+Novosibirsk,ION Novosibirsk,,RU,Russia,,novosibirsk
+Yekaterinburg,ION Yekaterinburg,,RU,Russia,,yekaterinburg
+Kazan,ION Kazan,,RU,Russia,,kazan
+Saint Kitts And Nevis,ION Saint Kitts And Nevis,,KN,Saint Kitts And Nevis,"54,000",saint-kitts-nevis
+Basseterre,ION Basseterre,,KN,Saint Kitts And Nevis,,basseterre
+Sandy Point Town,ION Sandy Point Town,,KN,Saint Kitts And Nevis,,sandy-point-town
+Cayon,ION Cayon,,KN,Saint Kitts And Nevis,,cayon
+Charlestown,ION Charlestown,,KN,Saint Kitts And Nevis,,charlestown
+Gingerland,ION Gingerland,,KN,Saint Kitts And Nevis,,gingerland
+Saint Lucia,ION Saint Lucia,,LC,Saint Lucia,"180,000",saint-lucia
+Soufrière,ION Soufrière,,LC,Saint Lucia,,soufriere
+Castries,ION Castries,,LC,Saint Lucia,,castries
+Gros Islet,ION Gros Islet,,LC,Saint Lucia,,gros-islet
+Vieux Fort,ION Vieux Fort,,LC,Saint Lucia,,vieux-fort
+Micoud,ION Micoud,,LC,Saint Lucia,,micoud
+Saint Vincent And The Grenadines,ION Saint Vincent And The Grenadines,,VC,Saint Vincent And The Grenadines,"103,000",st-vincent-the-grenadines
+Georgetown,ION Georgetown,,VC,Saint Vincent And The Grenadines,,georgetown
+Kingstown,ION Kingstown,,VC,Saint Vincent And The Grenadines,,kingstown
+Barrouallie,ION Barrouallie,,VC,Saint Vincent And The Grenadines,,barrouallie
+Chateaubelair,ION Chateaubelair,,VC,Saint Vincent And The Grenadines,,chateaubelair
+Biabou,ION Biabou,,VC,Saint Vincent And The Grenadines,,biabou
+Samoa,ION Samoa,,WS,Samoa,"225,000",samoa
+Apia,ION Apia,,WS,Samoa,,apia
+Vaitele,ION Vaitele,,WS,Samoa,,vaitele
+Faleula,ION Faleula,,WS,Samoa,,faleula
+Siusega,ION Siusega,,WS,Samoa,,siusega
+Leulumoega,ION Leulumoega,,WS,Samoa,,leulumoega
+Saudi Arabia,ION Saudi Arabia,,SA,Saudi Arabia,"36,500,000",saudi-arabia
+Riyadh,ION Riyadh,,SA,Saudi Arabia,,riyadh
+Jeddah,ION Jeddah,,SA,Saudi Arabia,,jeddah
+Mecca,ION Mecca,,SA,Saudi Arabia,,mecca
+Medina,ION Medina,,SA,Saudi Arabia,,medina
+Dammam,ION Dammam,,SA,Saudi Arabia,,dammam
+Scotland,ION Scotland,,GB-SCT,Scotland,"5,500,000",scotland
+Edinburgh,ION Edinburgh,,GB-SCT,Scotland,,edinburgh
+Glasgow,ION Glasgow,,GB-SCT,Scotland,,glasgow
+Aberdeen,ION Aberdeen,,GB-SCT,Scotland,,aberdeen
+Dundee,ION Dundee,,GB-SCT,Scotland,,dundee
+Inverness,ION Inverness,,GB-SCT,Scotland,,inverness
+Serbia,ION Serbia,,RS,Serbia,"6,700,000",serbia
+Ni­,ION Ni­,,RS,Serbia,,ni
+Belgrade,ION Belgrade,,RS,Serbia,,belgrade
+Novi Sad,ION Novi Sad,,RS,Serbia,,novi-sad
+Kragujevac,ION Kragujevac,,RS,Serbia,,kragujevac
+Subotica,ION Subotica,,RS,Serbia,,subotica
+Singapore,ION Singapore,,SG,Singapore,"5,900,000",singapore
+Slovakia,ION Slovakia,,SK,Slovakia,"5,400,000",slovakia
+Ko­ice,ION Ko­ice,,SK,Slovakia,,koice
+Pre­ov,ION Pre­ov,,SK,Slovakia,,preov
+«ilina,ION «ilina,,SK,Slovakia,,ilina
+Bratislava,ION Bratislava,,SK,Slovakia,,bratislava
+Nitra,ION Nitra,,SK,Slovakia,,nitra
+Slovenia,ION Slovenia,,SI,Slovenia,"2,120,000",slovenia
+Ljubljana,ION Ljubljana,,SI,Slovenia,,ljubljana
+Maribor,ION Maribor,,SI,Slovenia,,maribor
+Celje,ION Celje,,SI,Slovenia,,celje
+Kranj,ION Kranj,,SI,Slovenia,,kranj
+Velenje,ION Velenje,,SI,Slovenia,,velenje
+Solomon Islands,ION Solomon Islands,,SB,Solomon Islands,"740,000",solomon-islands
+Honiara,ION Honiara,,SB,Solomon Islands,,honiara
+Auki,ION Auki,,SB,Solomon Islands,,auki
+Gizo,ION Gizo,,SB,Solomon Islands,,gizo
+Kirakira,ION Kirakira,,SB,Solomon Islands,,kirakira
+Tulagi,ION Tulagi,,SB,Solomon Islands,,tulagi
+South Africa,ION South Africa,,ZA,South Africa,"61,000,000",south-africa
+Johannesburg,ION Johannesburg,,ZA,South Africa,,johannesburg
+Cape Town,ION Cape Town,,ZA,South Africa,,cape-town
+Durban,ION Durban,,ZA,South Africa,,durban
+Pretoria,ION Pretoria,,ZA,South Africa,,pretoria
+Port Elizabeth,ION Port Elizabeth,,ZA|,South Africa,,port-elizabeth
+South Korea,ION South Korea,,KR,South Korea,"51,700,000",south-korea
+Seoul,ION Seoul,,KR,South Korea,,seoul
+Busan,ION Busan,,KR,South Korea,,busan
+Incheon,ION Incheon,,KR,South Korea,,incheon
+Daegu,ION Daegu,,KR,South Korea,,daegu
+Daejeon,ION Daejeon,,KR,South Korea,,daejeon
+Spain,ION Spain,,ES,Spain,"48,600,000",spain
+Valencia,ION Valencia,,ES,Spain,,valencia
+Madrid,ION Madrid,,ES,Spain,,madrid
+Barcelona,ION Barcelona,,ES,Spain,,barcelona
+Seville,ION Seville,,ES,Spain,,seville
+Zaragoza,ION Zaragoza,,ES,Spain,,zaragoza
+Suriname,ION Suriname,,SR,Suriname,"630,000",suriname
+Paramaribo,ION Paramaribo,,SR,Suriname,,paramaribo
+Lelydorp,ION Lelydorp,,SR,Suriname,,lelydorp
+Nieuw Nickerie,ION Nieuw Nickerie,,SR,Suriname,,nieuw-nickerie
+Moengo,ION Moengo,,SR,Suriname,,moengo
+Albina,ION Albina,,SR,Suriname,,albina
+Sweden,ION Sweden,,SE,Sweden,"10,600,000",sweden
+Malmö,ION Malmö,,SE,Sweden,,malmo
+Västerås,ION Västerås,,SE,Sweden,,vasteras
+Stockholm,ION Stockholm,,SE,Sweden,,stockholm
+Gothenburg,ION Gothenburg,,SE,Sweden,,gothenburg
+Uppsala,ION Uppsala,,SE,Sweden,,uppsala
+Switzerland,ION Switzerland,,CH,Switzerland,"8,900,000",switzerland
+Zurich,ION Zurich,,CH,Switzerland,,zurich
+Geneva,ION Geneva,,CH,Switzerland,,geneva
+Basel,ION Basel,,CH,Switzerland,,basel
+Bern,ION Bern,,CH,Switzerland,,bern
+Lausanne,ION Lausanne,,CH,Switzerland,,lausanne
+Thailand,ION Thailand,,TH,Thailand,"71,800,000",thailand
+Bangkok,ION Bangkok,,TH,Thailand,,bangkok
+Nonthaburi,ION Nonthaburi,,TH,Thailand,,nonthaburi
+Nakhon Ratchasima,ION Nakhon Ratchasima,,TH,Thailand,,nakhon-ratchasima
+Chiang Mai,ION Chiang Mai,,TH,Thailand,,chiang-mai
+Hat Yai,ION Hat Yai,,TH,Thailand,,hat-yai
+Tonga,ION Tonga,,TO,Tonga,"108,000",tonga
+Nukuʻalofa,ION Nukuʻalofa,,TO,Tonga,,nuku-alofa
+Neiafu,ION Neiafu,,TO,Tonga,,neiafu
+Haveluloto,ION Haveluloto,,TO,Tonga,,haveluloto
+Vaini,ION Vaini,,TO,Tonga,,vaini
+Pangai,ION Pangai,,TO,Tonga,,pangai
+Trinidad And Tobago,ION Trinidad And Tobago,,TT,Trinidad And Tobago,"1,530,000",trinidad-tobago
+Chaguanas,ION Chaguanas,,TT,Trinidad And Tobago,,chaguanas
+San Fernando,ION San Fernando,,TT,Trinidad And Tobago,,san-fernando
+Port of Spain,ION Port of Spain,,TT,Trinidad And Tobago,,port-of-spain
+Arima,ION Arima,,TT,Trinidad And Tobago,,arima
+Point Fortin,ION Point Fortin,,TT,Trinidad And Tobago,,point-fortin
+Turkey,ION Turkey,,TR,Turkey,"85,000,000",turkey
+Istanbul,ION Istanbul,,TR,Turkey,,istanbul
+Ankara,ION Ankara,,TR,Turkey,,ankara
+Izmir,ION Izmir,,TR,Turkey,,izmir
+Bursa,ION Bursa,,TR,Turkey,,bursa
+Antalya,ION Antalya,,TR,Turkey,,antalya
+Tuvalu,ION Tuvalu,,TV,Tuvalu,"11,000",tuvalu
+Funafuti,ION Funafuti,,TV,Tuvalu,,funafuti
+Fongafale,ION Fongafale,,TV,Tuvalu,,fongafale
+Savave,ION Savave,,TV,Tuvalu,,savave
+Asau,ION Asau,,TV,Tuvalu,,asau
+Tepuka,ION Tepuka,,TV,Tuvalu,,tepuka
+Ukraine,ION Ukraine,,UA,Ukraine,"37,900,000",ukraine
+Kyiv,ION Kyiv,,UA,Ukraine,,kyiv
+Kharkiv,ION Kharkiv,,UA,Ukraine,,kharkiv
+Odesa,ION Odesa,,UA,Ukraine,,odesa
+Dnipro,ION Dnipro,,UA,Ukraine,,dnipro
+Lviv,ION Lviv,,UA,Ukraine,,lviv
+United Arab Emirates,ION United Arab Emirates,,AE,United Arab Emirates,"10,200,000",united-arab-emirates
+Dubai,ION Dubai,,AE,United Arab Emirates,,dubai
+Abu Dhabi,ION Abu Dhabi,,AE,United Arab Emirates,,abu-dhabi
+Sharjah,ION Sharjah,,AE,United Arab Emirates,,sharjah
+Al Ain,ION Al Ain,,AE,United Arab Emirates,,al-ain
+Ajman,ION Ajman,,AE,United Arab Emirates,,ajman
+Uruguay,ION Uruguay,,UY,Uruguay,"3,500,000",uruguay
+Paysandú,ION Paysandú,,UY,Uruguay,,paysandu
+Montevideo,ION Montevideo,,UY,Uruguay,,montevideo
+Salto,ION Salto,,UY,Uruguay,,salto
+Las Piedras,ION Las Piedras,,UY,Uruguay,,las-piedras
+Rivera,ION Rivera,,UY,Uruguay,,rivera
+Venezuela,ION Venezuela,,VE,Venezuela,"28,000,000",venezuela
+Valencia,ION Valencia,,VE,Venezuela,,valencia-venezuela
+Caracas,ION Caracas,,VE,Venezuela,,caracas
+Maracaibo,ION Maracaibo,,VE,Venezuela,,maracaibo
+Barquisimeto,ION Barquisimeto,,VE,Venezuela,,barquisimeto
+Maracay,ION Maracay,,VE,Venezuela,,maracay

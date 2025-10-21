@@ -1,0 +1,54 @@
+# Sample Channel Data for Bundle Creation
+# Format: channel_slug,optional_description
+# Lines starting with # are comments and will be ignored
+
+ion-new-york,New York City
+ion-los-angeles,Los Angeles
+ion-chicago,Chicago
+ion-houston,Houston
+ion-phoenix,Phoenix
+ion-philadelphia,Philadelphia
+ion-san-antonio,San Antonio
+ion-san-diego,San Diego
+ion-dallas,Dallas
+ion-san-jose,San Jose
+ion-austin,Austin
+ion-jacksonville,Jacksonville
+ion-fort-worth,Fort Worth
+ion-columbus,Columbus
+ion-charlotte,Charlotte
+ion-san-francisco,San Francisco
+ion-indianapolis,Indianapolis
+ion-seattle,Seattle
+ion-denver,Denver
+ion-washington,Washington DC
+ion-boston,Boston
+ion-el-paso,El Paso
+ion-nashville,Nashville
+ion-detroit,Detroit
+ion-oklahoma-city,Oklahoma City
+ion-portland,Portland
+ion-las-vegas,Las Vegas
+ion-memphis,Memphis
+ion-louisville,Louisville
+ion-baltimore,Baltimore
+ion-milwaukee,Milwaukee
+ion-albuquerque,Albuquerque
+ion-tucson,Tucson
+ion-fresno,Fresno
+ion-mesa,Mesa
+ion-sacramento,Sacramento
+ion-atlanta,Atlanta
+ion-kansas-city,Kansas City
+ion-colorado-springs,Colorado Springs
+ion-omaha,Omaha
+ion-raleigh,Raleigh
+ion-miami,Miami
+ion-long-beach,Long Beach
+ion-virginia-beach,Virginia Beach
+ion-oakland,Oakland
+ion-minneapolis,Minneapolis
+ion-tulsa,Tulsa
+ion-arlington,Arlington
+ion-tampa,Tampa
+ion-new-orleans,New Orleans

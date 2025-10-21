@@ -1,0 +1,21 @@
+
+
+# Logs
+wp-content/debug.log
+**/*.log
+
+# Node modules and vendor (common)
+node_modules/
+vendor/
+
+# OS files
+Thumbs.db
+.DS_Store
+.env
+
+checkout/classes/DirectStripeIntegration.php
+wp-admin/checkout/classes/DirectStripeIntegration.php
+wp-includes/checkout/classes/DirectStripeIntegration.php
+*.zip
+
+config/config.php

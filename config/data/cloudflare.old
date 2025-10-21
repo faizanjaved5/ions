@@ -1,0 +1,916 @@
+<?php
+// Web-safe version of the Cloudflare Import Script
+set_time_limit(0);
+ini_set('memory_limit', '2048M');
+ignore_user_abort(true);
+// Configuration
+// $apiToken   = '49ElopZAj2X0KVIyEwT4GfjzVNlaskA96O83AI_j';// Cloudflare API token (must have "Zone:Create" permission)
+// $apiToken   = 'aLSSXoYl57Jf-5hQ9uO1QtttqXq67nzHhr3yD1Rz';// Cloudflare API token (must have "Zone:Create" permission)
+// $apiToken   = 'aDivNOJnIwlZWGfyIP24Bk5BDLeI81xzYlrcnqGX';// Cloudflare API token (must have "Zone:Create" permission)
+$apiToken   = 'Wwz2ZEWyH_ZzXY1PcbFU_5J1nbnD9zh033c31Kox';// Cloudflare API token (must have "Zone:Create" permission)
+$csvPath    = 'IONdomains.csv';  // Path to your CSV file with one domain per line
+$statusFile = 'IONstatus.txt';
+$logFile    = 'IONcloudflare.log';
+$aRecordIP  = '82.29.158.191'; // Replace with the A record IP you want to assign for Hostinger 
+$mxRecords = [
+    ['value' => 'mx1.hostinger.com', 'priority' => 5],
+    ['value' => 'mx2.hostinger.com', 'priority' => 10]
+];
+$batchSize = 250; // Batch size for browser/CLI --batch mode
+
+// Output buffering for live updates
+while (ob_get_level()) ob_end_flush();
+ob_implicit_flush(true);
+header('X-Accel-Buffering: no');
+header('Content-Type: text/html; charset=utf-8');
+
+// Logging
+function printLog($msg, $type = 'info') {
+    global $logFile;
+    $timestamp = date('Y-m-d H:i:s');
+    $logLine = "[$timestamp] $msg\n";
+    file_put_contents($logFile, $logLine, FILE_APPEND);
+    echo "<div class='log $type'>" . htmlspecialchars($msg) . "</div>";
+    echo str_repeat(" ", 2048);
+    echo "<script>console.log('log update');</script>";
+    @ob_flush(); @flush();
+}
+
+// Cloudflare API Request
+function cloudflareRequest($url, $payload = null, $method = 'POST', $retries = 5) {
+    global $apiToken;
+    $attempt = 0;
+    while ($attempt++ < $retries) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        $headers = [];
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $header_line) use (&$headers) {
+            $headers[] = trim($header_line);
+            return strlen($header_line);
+        });
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer $apiToken",
+            "Content-Type: application/json"
+        ]);
+        if ($payload) curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        $res = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $json = json_decode($res, true);
+        
+        $ratelimit_remaining = null;
+        $ratelimit_reset = null;
+        foreach ($headers as $header) {
+            if (stripos($header, 'x-ratelimit-remaining:') === 0) {
+                $ratelimit_remaining = (int) trim(substr($header, strlen('x-ratelimit-remaining:')));
+            } elseif (stripos($header, 'x-ratelimit-reset:') === 0) {
+                $ratelimit_reset = (int) trim(substr($header, strlen('x-ratelimit-reset:')));
+            }
+        }
+        
+        if ($code !== 429) {
+            return [$code, $json, $ratelimit_remaining, $ratelimit_reset];
+        }
+        sleep(2); // backoff for rate limiting
+    }
+    return [$code, null, null, null];
+}
+
+// Export all Cloudflare zones to CSV
+function exportAllCloudflareZonesToCSV() {
+    global $logFile;
+    $exportFile = 'IONDomainsExport.csv';
+    $fp = fopen($exportFile, 'w');
+    fputcsv($fp, ['Domain', 'Status', 'Name Servers', 'Created On']);
+    $page = 1;
+    do {
+        list($code, $res) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones?per_page=50&page=$page", null, 'GET');
+        if ($code === 200 && isset($res['result'])) {
+            foreach ($res['result'] as $zone) {
+                $domain  = $zone['name']         ?? '';
+                $status  = $zone['status']       ?? '';
+                $ns      = implode('; ', $zone['name_servers'] ?? []);
+                $created = $zone['created_on']   ?? '';
+                fputcsv($fp, [$domain, $status, $ns, $created]);
+            }
+            $totalPages = $res['result_info']['total_pages'] ?? 1;
+            $page++;
+            sleep(1);
+        } else {
+            $msg = isset($res['errors'][0]['message']) ? $res['errors'][0]['message'] : json_encode($res);
+            printLog("Export failed: $msg", 'error');
+            file_put_contents($logFile, "Export failed: $msg\n", FILE_APPEND);
+            break;
+        }
+    } while ($page <= $totalPages);
+    fclose($fp);
+}
+
+// New function: Export detailed Cloudflare domains to CSV
+function exportCloudflareDomainsDetails() {
+    global $logFile;
+    $exportFile = 'cloudflare_domains_details.csv';
+    $fp = fopen($exportFile, 'w');
+    fputcsv($fp, ['Domain', 'Name Servers', 'Status', '1 Day Unique Visitors', '7 Days Unique Visitors', '30 Days Unique Visitors', 'SSL Status', 'DNS Status', 'Redirect URL']);
+    $page = 1;
+    do {
+        list($code, $res) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones?per_page=50&page=$page", null, 'GET');
+        if ($code === 200 && isset($res['result'])) {
+            foreach ($res['result'] as $zone) {
+                $domain = $zone['name'] ?? '';
+                $name_servers = implode(', ', $zone['name_servers'] ?? []);
+                $status = $zone['status'] ?? '';
+                
+                $zone_id = $zone['id'];
+                
+                // Unique visitors (1/7/30 days)
+                $now = gmdate('Y-m-d\TH:i:s\Z');
+                $one_day_ago = gmdate('Y-m-d\TH:i:s\Z', strtotime('-1 day'));
+                $seven_days_ago = gmdate('Y-m-d\TH:i:s\Z', strtotime('-7 days'));
+                $thirty_days_ago = gmdate('Y-m-d\TH:i:s\Z', strtotime('-30 days'));
+                
+                list($aCode1, $aRes1) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zone_id/analytics/dashboard?since=$one_day_ago&until=$now", null, 'GET');
+                $visitors_1d = $aRes1['result']['totals']['uniques']['all'] ?? 'Error';
+                
+                list($aCode7, $aRes7) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zone_id/analytics/dashboard?since=$seven_days_ago&until=$now", null, 'GET');
+                $visitors_7d = $aRes7['result']['totals']['uniques']['all'] ?? 'Error';
+                
+                list($aCode30, $aRes30) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zone_id/analytics/dashboard?since=$thirty_days_ago&until=$now", null, 'GET');
+                $visitors_30d = $aRes30['result']['totals']['uniques']['all'] ?? 'Error';
+                
+                // SSL status
+                list($sslCode, $sslRes) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zone_id/ssl/universal/settings", null, 'GET');
+                $ssl_status = $sslRes['result']['enabled'] ? 'Enabled' : 'Disabled';
+                
+                // DNS status (record count)
+                list($dnsCode, $dnsRes) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records", null, 'GET');
+                $dns_status = count($dnsRes['result'] ?? []) > 0 ? 'Active' : 'No Records';
+                
+                // Redirect URL (from ruleset)
+                $redirect_url = 'None';
+                list($rsCode, $rsRes) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zone_id/rulesets/phases/http_request_dynamic_redirect/entrypoint", null, 'GET');
+                if ($rsCode === 200 && isset($rsRes['result']['id'])) {
+                    $ruleset_id = $rsRes['result']['id'];
+                    list($ruleCode, $ruleRes) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zone_id/rulesets/$ruleset_id", null, 'GET');
+                    if ($ruleCode === 200 && isset($ruleRes['result']['rules'][0]['action_parameters']['from_value']['target_url']['expression'])) {
+                        $redirect_url = $ruleRes['result']['rules'][0]['action_parameters']['from_value']['target_url']['expression'];
+                    }
+                }
+                
+                fputcsv($fp, [$domain, $name_servers, $status, $visitors_1d, $visitors_7d, $visitors_30d, $ssl_status, $dns_status, $redirect_url]);
+            }
+            $totalPages = $res['result_info']['total_pages'] ?? 1;
+            $page++;
+            sleep(1); // Rate limit buffer
+        } else {
+            $msg = isset($res['errors'][0]['message']) ? $res['errors'][0]['message'] : json_encode($res);
+            printLog("Detailed export failed: $msg", 'error');
+            file_put_contents($logFile, "Detailed export failed: $msg\n", FILE_APPEND);
+            break;
+        }
+    } while ($page <= $totalPages);
+    fclose($fp);
+}
+
+// Trigger Detailed Export
+if (isset($_GET['export_details']) && $_GET['export_details'] === '1') {
+    exportCloudflareDomainsDetails();
+    echo "<!DOCTYPE html><html><head><title>Cloudflare Detailed Export</title><style>
+        body { font-family: sans-serif; background: #f8f8f8; padding: 20px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 15px; }
+    </style></head><body>
+    <div class='success'>✅ Detailed export complete. <a href='cloudflare_domains_details.csv' download>Click here to download the CSV</a></div>
+    </body></html>";
+    exit;
+}
+
+// Trigger CSV Export
+if (isset($_GET['export']) && $_GET['export'] === '1') {
+    exportAllCloudflareZonesToCSV();
+    echo "<!DOCTYPE html><html><head><title>Cloudflare Export</title><style>
+        body { font-family: sans-serif; background: #f8f8f8; padding: 20px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 15px; }
+    </style></head><body>
+    <div class='success'>✅ Export complete. <a href='IONDomainsExport.csv' download>Click here to download the CSV</a></div>
+    </body></html>";
+    exit;
+}
+
+// Start or Stop
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action']) && in_array($_POST['action'], ['start', 'stop'])) {
+        file_put_contents($statusFile, $_POST['action'] === 'start' ? 'running' : 'stopped');
+        file_put_contents('cloudflare_selected_actions.json', json_encode($_POST['actions'] ?? []));
+        exit;
+    }
+}
+
+// Health check
+if (isset($_GET['ping'])) exit('pong');
+
+$isRunning = file_exists($statusFile) && trim(file_get_contents($statusFile)) === 'running';
+
+if (!$isRunning) {
+    $prevActions = json_decode(@file_get_contents('cloudflare_selected_actions.json'), true) ?? [];
+    echo "<!DOCTYPE html><html><head><title>Cloudflare Manager</title><style>
+        body { font-family: sans-serif; background: #f8f8f8; padding: 20px; }
+        .log { margin: 5px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        button { padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; color: white; cursor: pointer; }
+        #toggleBtn { background-color: green; }
+        #stopButton { background-color: red; }
+        input[type='checkbox'] { transform: scale(1.3); margin-right: 10px; }
+        label { display: block; margin: 15px 0; font-size: 18px; }
+    </style></head><body>";
+    // → New Export Button
+    echo "<p><a href='?export=1' style='text-decoration:none;'>
+        <button style='background-color:#0073e6; padding:10px 20px; font-size:16px; color:#fff; border:none; border-radius:5px;'>
+            📤 Download Cloudflare Domains CSV
+        </button>
+    </a></p>";
+    // → New Detailed Export Button
+    echo "<p><a href='?export_details=1' style='text-decoration:none;'>
+        <button style='background-color:#0073e6; padding:10px 20px; font-size:16px; color:#fff; border:none; border-radius:5px;'>
+            📤 Download Detailed Cloudflare Domains CSV
+        </button>
+    </a></p>";
+    echo "<h2>📂 Cloudflare Domain Manager</h2>";
+    echo "<form id='mainForm' method='POST'>
+        <label><input type='checkbox' name='actions[]' value='add_zones'" . (in_array('add_zones', $prevActions) ? ' checked' : '') . "> Add Zones to Cloudflare</label>
+        <label><input type='checkbox' name='actions[]' value='update_a'" . (in_array('update_a', $prevActions)   ? ' checked' : '') . "> Add / Update A Record (IP: {$aRecordIP})</label>
+        <label><input type='checkbox' name='actions[]' value='update_mx'" . (in_array('update_mx', $prevActions)   ? ' checked' : '') . "> Add / Update MX Records:</label>
+        <ul style='margin-left: 20px;'>";
+    foreach ($mxRecords as $mx) {
+        echo "<li><code>{$mx['value']} (Priority {$mx['priority']})</code></li>";
+    }
+    echo "</ul>
+        <label><input type='checkbox' name='actions[]' value='setup_redirect'" . (in_array('setup_redirect', $prevActions) ? ' checked' : '') . "> Setup Redirect based on CSV mapping</label>
+        <label><input type='checkbox' name='actions[]' value='automate_redirect'" . (in_array('automate_redirect', $prevActions) ? ' checked' : '') . "> Automate Domain Redirection</label>
+        <br><button id='toggleBtn'>🚀 Proceed</button>
+        <input type='hidden' name='action' value='start'>
+    </form><script>
+        function stopProcess() {
+            if (!confirm('Stop the current process?')) return;
+            fetch('', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=stop' })
+                .then(() => { document.getElementById('stopButton').disabled = true; document.getElementById('stopButton').textContent = 'Stopping...'; });
+        }
+        function keepAlive() {
+            setInterval(() => fetch('?ping=' + Date.now()), 30000);
+        }
+        document.getElementById('toggleBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            const form = document.getElementById('mainForm');
+            fetch('', { method: 'POST', body: new FormData(form) })
+                .then(() => location.reload());
+        });
+        keepAlive();
+    </script></body></html>";
+    exit;
+}
+
+// Processing view
+$selectedActions = json_decode(file_get_contents('cloudflare_selected_actions.json'), true) ?? [];
+echo "<!DOCTYPE html><html><head><title>Cloudflare Execution</title><style>
+    body { font-family: sans-serif; background: #f8f8f8; padding: 20px; position: relative; }
+    .log { padding: 10px; margin: 5px 0; border-radius: 5px; }
+    .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+    #toggleAll { position: absolute; top: 20px; right: 20px; background-color: #007bff; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 5px; }
+    details { margin-bottom: 20px; }
+    summary { font-weight: bold; cursor: pointer; }
+</style></head><body>
+<button id='stopButton' onclick='stopProcess()'>🛑 Stop</button>
+<button id='toggleAll' onclick='toggleAllDetails()'>Expand/Collapse All</button>
+<script>
+    function stopProcess() {
+        if (!confirm('Stop the current process?')) return;
+        fetch('', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=stop' })
+            .then(() => { document.getElementById('stopButton').disabled = true; document.getElementById('stopButton').textContent = 'Stopping...'; });
+    }
+    function toggleAllDetails() {
+        var details = document.querySelectorAll('details');
+        var allOpen = Array.from(details).every(d => d.open);
+        details.forEach(d => d.open = !allOpen);
+    }
+</script>";
+
+$lines = file($csvPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+$domains = [];
+foreach ($lines as $line) {
+    $parts = str_getcsv($line);
+    $domain = trim($parts[0]);
+    $redirect_url = '';
+    $status = '';
+    if (isset($parts[1])) {
+        $second = trim($parts[1]);
+        if (strpos($second, 'https://') === 0) {
+            $redirect_url = $second;
+            $status = isset($parts[2]) ? trim($parts[2]) : '';
+        } else {
+            $status = $second;
+        }
+    }
+    $domains[] = ['domain' => $domain, 'redirect_url' => $redirect_url, 'status' => $status];
+}
+
+$successCount = 0;
+$skippedCount = 0;
+$processedThisRun = 0;
+
+foreach ($domains as $i => &$entry) {
+    if (trim(@file_get_contents($statusFile)) !== 'running') break;
+    $domain = $entry['domain'];
+    static $alreadyProcessed = [];
+    if (in_array($domain, $alreadyProcessed)) {
+        printLog("[$i] ⚠️ Duplicate domain detected, skipping: $domain", 'info');
+        $skippedCount++;
+        continue;
+    }
+    $alreadyProcessed[] = $domain;
+
+    $status = strtolower($entry['status']);
+    if ($status === 'added') {
+        printLog("[$i] ✅ $domain already processed. Skipping.", 'success');
+        $skippedCount++;
+        continue;
+    }
+
+    // Start domain group
+    echo "<details><summary>[$i] Domain: <a href='https://$domain' target='_blank'>$domain</a></summary>";
+
+
+    // Step 1: Get or Add Zone
+    list($zCode, $zRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones?name=$domain", null, 'GET');
+    if ($remaining !== null && $remaining < 10) {
+        $sleepTime = max(0, $reset - time() + 1);
+        printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+        sleep($sleepTime);
+    }
+    $zoneID = $zRes['result'][0]['id'] ?? null;
+
+    
+    if (!$zoneID && in_array('add_zones', $selectedActions)) {
+        // Check number of pending zones before adding
+        list($pCode, $pRes, $pRemaining, $pReset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones?status=pending&per_page=1", null, 'GET');
+        $pendingCount = $pRes['result_info']['total_count'] ?? 0;
+        while ($pendingCount >= 40) { // Adjust threshold based on your account (e.g., 10 for free, 40 for paid)
+            printLog("[$i] Too many pending zones ($pendingCount). Sleeping 60 seconds and rechecking...", 'warning');
+            sleep(60);
+            list($pCode, $pRes, $pRemaining, $pReset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones?status=pending&per_page=1", null, 'GET');
+            $pendingCount = $pRes['result_info']['total_count'] ?? 0;
+        }
+
+        list($zCode, $zRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones", ['name' => $domain, 'jump_start' => true]);
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if (($zRes['success'] ?? false) && isset($zRes['result']['id'])) {
+            $zoneID = $zRes['result']['id'];
+            printLog("[$i] ✅ Zone added: $domain", 'success');
+
+            // Wait for zone to be available before continuing (Cloudflare may delay DNS updates)
+            $tries = 0;
+            while ($tries++ < 6) {
+                list($chkCode, $chkRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID", null, 'GET');
+                if ($remaining !== null && $remaining < 10) {
+                    $sleepTime = max(0, $reset - time() + 1);
+                    printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+                    sleep($sleepTime);
+                }
+                $chkStatus = $chkRes['result']['status'] ?? '';
+                if ($chkStatus === 'active' || $chkStatus === 'pending') break;
+                printLog("[$i] ⏳ Waiting for zone activation: $domain", 'info');
+                sleep(5);
+            }
+
+        } elseif ($zCode == 429) {
+            $errorCode = $zRes['errors'][0]['code'] ?? 0;
+            $errorMsg = $zRes['errors'][0]['message'] ?? 'Unknown';
+            printLog("[$i] ⚠️ Rate limited when adding zone: $domain (HTTP 429, Code $errorCode): $errorMsg", 'warning');
+            if ($errorCode == 1117 || stripos($errorMsg, 'rate limit for adding or deleting zones') !== false) {
+                printLog("[$i] Specific zone addition rate limit hit. Sleeping for 3600 seconds (1 hour)...", 'warning');
+                sleep(3600);
+            } else {
+                sleep(10);
+            }
+            $i--; // retry this domain on next iteration
+            continue;
+        } else {
+            $reason = isset($zRes['errors']) ? json_encode($zRes['errors']) : 'Unknown reason';
+            printLog("[$i] ❌ Failed to add zone: $domain (HTTP $zCode): $reason", 'error');
+            continue;
+        }
+    } elseif ($zoneID) {
+        printLog("[$i] ℹ️ Zone exists: $domain", 'info');
+    } else {
+        printLog("[$i] ❌ Zone not found and not added: $domain", 'error');
+        continue;
+    }
+
+    // Fetch name servers
+    if ($zoneID) {
+        list($nsCode, $nsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($nsCode === 200 && isset($nsRes['result']['name_servers'])) {
+            $nameServers = implode(', ', $nsRes['result']['name_servers']);
+            printLog("[$i] ℹ️ Name servers for $domain: $nameServers", 'info');
+        } else {
+            $reason = isset($nsRes['errors']) ? json_encode($nsRes['errors']) : 'Unknown reason';
+            printLog("[$i] ⚠️ Failed to fetch name servers for $domain (HTTP $nsCode): $reason", 'warning');
+        }
+    }
+
+    // Step 2: Add/Update A Record
+    if ($zoneID && in_array('update_a', $selectedActions)) {
+        list($dnsCode, $dnsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records?type=A&name=$domain", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        $payload = [
+            'type'    => 'A',
+            'name'    => $domain,
+            'content' => $aRecordIP,
+            'ttl'     => 3600,
+            'proxied' => false
+        ];
+        if (isset($dnsRes['result'][0])) {
+            $recordID = $dnsRes['result'][0]['id'];
+            list($aCode, $aRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records/$recordID", $payload, 'PUT');
+            $action = 'updated';
+        } else {
+            list($aCode, $aRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records", $payload);
+            $action = 'added';
+        }
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($aCode === 200 && ($aRes['success'] ?? false)) {
+            printLog("[$i] ✅ A record $action: $domain → $aRecordIP", 'success');
+        } else {
+            $reason = $aRes['errors'][0]['message'] ?? json_encode($aRes);
+            printLog("[$i] ⚠️ A record failed for $domain - $reason", 'warning');
+        }
+    }
+
+    // Step 3: Add/Update MX Records
+    if ($zoneID && in_array('update_mx', $selectedActions)) {
+        foreach ($mxRecords as $mx) {
+            list($dnsCode, $dnsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records?type=MX&name=$domain&content=" . urlencode($mx['value']), null, 'GET');
+            if ($remaining !== null && $remaining < 10) {
+                $sleepTime = max(0, $reset - time() + 1);
+                printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+                sleep($sleepTime);
+            }
+            $payload = [
+                'type'     => 'MX',
+                'name'     => $domain,
+                'content'  => $mx['value'],
+                'priority' => $mx['priority'],
+                'ttl'      => 3600
+            ];
+            if (isset($dnsRes['result'][0])) {
+                $recordID = $dnsRes['result'][0]['id'];
+                list($mxCode, $mxRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records/$recordID", $payload, 'PUT');
+                $action = 'updated';
+            } else {
+                list($mxCode, $mxRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records", $payload);
+                $action = 'added';
+            }
+            if ($remaining !== null && $remaining < 10) {
+                $sleepTime = max(0, $reset - time() + 1);
+                printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+                sleep($sleepTime);
+            }
+            if ($mxCode === 200 && ($mxRes['success'] ?? false)) {
+                printLog("[$i] ✅ MX record $action: {$mx['value']} (prio {$mx['priority']})", 'success');
+            } else {
+                $reason = $mxRes['errors'][0]['message'] ?? json_encode($mxRes);
+                printLog("[$i] ❌ MX record failed: " . $mx["value"] . " - $reason", 'error');
+            }
+        }
+    }
+
+    // Step 4: Setup Redirect if mapping present
+    if ($zoneID && in_array('setup_redirect', $selectedActions) && $entry['redirect_url'] !== '') {
+        // Enable Universal SSL
+        list($sslCode, $sslRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/ssl/universal/settings", ['enabled' => true], 'PATCH');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($sslCode === 200 && ($sslRes['success'] ?? false)) {
+            printLog("[$i] ✅ Universal SSL enabled for $domain", 'success');
+        } else {
+            $reason = $sslRes['errors'][0]['message'] ?? json_encode($sslRes);
+            printLog("[$i] ❌ Failed to enable Universal SSL for $domain - $reason", 'error');
+        }
+
+        // Set SSL mode to flexible (for HTTP origins)
+        list($modeCode, $modeRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/settings/ssl", ['value' => 'flexible'], 'PATCH');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($modeCode === 200 && ($modeRes['success'] ?? false)) {
+            printLog("[$i] ✅ SSL mode set to flexible for $domain", 'success');
+        } else {
+            $reason = $modeRes['errors'][0]['message'] ?? json_encode($modeRes);
+            printLog("[$i] ❌ Failed to set SSL mode for $domain - $reason", 'error');
+        }
+
+        // Set Minimum TLS to 1.2
+        list($minTlsCode, $minTlsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/settings/min_tls_version", ['value' => '1.2'], 'PATCH');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($minTlsCode === 200 && ($minTlsRes['success'] ?? false)) {
+            printLog("[$i] ✅ Minimum TLS set to 1.2 for $domain", 'success');
+        } else {
+            $reason = $minTlsRes['errors'][0]['message'] ?? json_encode($minTlsRes);
+            printLog("[$i] ❌ Failed to set Minimum TLS for $domain - $reason", 'error');
+        }
+
+        // Set always use HTTPS
+        list($httpsCode, $httpsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/settings/always_use_https", ['value' => 'on'], 'PATCH');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($httpsCode === 200 && ($httpsRes['success'] ?? false)) {
+            printLog("[$i] ✅ Always Use HTTPS enabled for $domain", 'success');
+        } else {
+            $reason = $httpsRes['errors'][0]['message'] ?? json_encode($httpsRes);
+            printLog("[$i] ❌ Failed to enable Always Use HTTPS for $domain - $reason", 'error');
+        }
+
+        // Delete conflicting apex records (A, AAAA, CNAME)
+        list($confCode, $confRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records?name=$domain&type=A,AAAA,CNAME", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($confCode === 200 && isset($confRes['result'])) {
+            foreach ($confRes['result'] as $record) {
+                $recordID = $record['id'];
+                list($delCode, $delRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records/$recordID", null, 'DELETE');
+                if ($remaining !== null && $remaining < 10) {
+                    $sleepTime = max(0, $reset - time() + 1);
+                    printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+                    sleep($sleepTime);
+                }
+                if ($delCode === 200 && ($delRes['success'] ?? false)) {
+                    printLog("[$i] ✅ Deleted conflicting {$record['type']} record for $domain", 'success');
+                } else {
+                    $reason = $delRes['errors'][0]['message'] ?? json_encode($delRes);
+                    printLog("[$i] ❌ Failed to delete conflicting {$record['type']} record for $domain - $reason", 'error');
+                }
+            }
+        }
+
+        // Add proxied CNAME to ions.com for apex
+        list($dnsCode, $dnsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records?type=CNAME&name=$domain", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        $payload = [
+            'type'    => 'CNAME',
+            'name'    => $domain,
+            'content' => 'ions.com',
+            'ttl'     => 3600,
+            'proxied' => true
+        ];
+        if (isset($dnsRes['result'][0])) {
+            $recordID = $dnsRes['result'][0]['id'];
+            list($cCode, $cRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records/$recordID", $payload, 'PUT');
+            $action = 'updated';
+        } else {
+            list($cCode, $cRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records", $payload);
+            $action = 'added';
+        }
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($cCode === 200 && ($cRes['success'] ?? false)) {
+            printLog("[$i] ✅ CNAME record $action for apex: $domain → ions.com (proxied)", 'success');
+        } else {
+            $reason = $cRes['errors'][0]['message'] ?? json_encode($cRes);
+            printLog("[$i] ⚠️ CNAME record failed for apex $domain - $reason", 'warning');
+        }
+
+        // Add proxied CNAME to ions.com for www
+        $wwwName = "www.$domain";
+        list($wwwDnsCode, $wwwDnsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records?type=CNAME&name=$wwwName", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        $wwwPayload = [
+            'type'    => 'CNAME',
+            'name'    => $wwwName,
+            'content' => 'ions.com',
+            'ttl'     => 3600,
+            'proxied' => true
+        ];
+        if (isset($wwwDnsRes['result'][0])) {
+            $wwwRecordID = $wwwDnsRes['result'][0]['id'];
+            list($wwwCCode, $wwwCRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records/$wwwRecordID", $wwwPayload, 'PUT');
+            $wwwAction = 'updated';
+        } else {
+            list($wwwCCode, $wwwCRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records", $wwwPayload);
+            $wwwAction = 'added';
+        }
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($wwwCCode === 200 && ($wwwCRes['success'] ?? false)) {
+            printLog("[$i] ✅ CNAME record $wwwAction for www: $wwwName → ions.com (proxied)", 'success');
+        } else {
+            $reason = $wwwCRes['errors'][0]['message'] ?? json_encode($wwwCRes);
+            printLog("[$i] ⚠️ CNAME record failed for www $domain - $reason", 'warning');
+        }
+
+        // Setup redirect rule
+        list($rsCode, $rsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/rulesets/phases/http_request_dynamic_redirect/entrypoint", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        $rulesetID = $rsRes['result']['id'] ?? null;
+
+        if (!$rulesetID) {
+            $createPayload = [
+                'name' => 'Redirect Rules',
+                'kind' => 'zone',
+                'phase' => 'http_request_dynamic_redirect'
+            ];
+            list($createCode, $createRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/rulesets", $createPayload);
+            if ($remaining !== null && $remaining < 10) {
+                $sleepTime = max(0, $reset - time() + 1);
+                printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+                sleep($sleepTime);
+            }
+            if ($createCode === 200 && ($createRes['success'] ?? false)) {
+                $rulesetID = $createRes['result']['id'];
+                printLog("[$i] ✅ Created redirect ruleset for $domain", 'success');
+            } else {
+                $reason = $createRes['errors'][0]['message'] ?? json_encode($createRes);
+                printLog("[$i] ❌ Failed to create redirect ruleset for $domain - $reason", 'error');
+                continue;
+            }
+        }
+
+        if ($rulesetID) {
+            $redirectExpression = "concat(\"{$entry['redirect_url']}\", http.request.uri.path)";
+            $updatePayload = [
+                'rules' => [
+                    [
+                        'expression' => "(http.host eq \"{$domain}\" or http.host eq \"www.{$domain}\")",
+                        'description' => "Redirect for {$domain} (apex and www)",
+                        'action' => 'redirect',
+                        'action_parameters' => [
+                            'from_value' => [
+                                'status_code' => 301,
+                                'target_url' => [
+                                    'expression' => $redirectExpression
+                                ],
+                                'preserve_query_string' => true
+                            ]
+                        ],
+                        'enabled' => true
+                    ]
+                ]
+            ];
+            list($updateCode, $updateRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/rulesets/$rulesetID", $updatePayload, 'PUT');
+            if ($remaining !== null && $remaining < 10) {
+                $sleepTime = max(0, $reset - time() + 1);
+                printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+                sleep($sleepTime);
+            }
+            if ($updateCode === 200 && ($updateRes['success'] ?? false)) {
+                printLog("[$i] ✅ Redirect rule set up for $domain (apex/www) to {$entry['redirect_url']}", 'success');
+            } else {
+                $reason = $updateRes['errors'][0]['message'] ?? json_encode($updateRes);
+                printLog("[$i] ❌ Failed to set up redirect rule for $domain - $reason", 'error');
+            }
+        }
+    }
+
+    // New Step: Automate Domain Redirection
+    if ($zoneID && in_array('automate_redirect', $selectedActions)) {
+        // b) Set SSL/TLS to Full (Strict)
+        list($sslCode, $sslRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/settings/ssl", ['value' => 'strict'], 'PATCH');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($sslCode === 200 && ($sslRes['success'] ?? false)) {
+            printLog("[$i] ✅ SSL/TLS set to Full (Strict) for $domain", 'success');
+        } else {
+            $reason = $sslRes['errors'][0]['message'] ?? json_encode($sslRes);
+            printLog("[$i] ❌ Failed to set SSL/TLS to Full (Strict) for $domain - $reason", 'error');
+        }
+
+        // c) Add/update A record to 192.0.2.1 with proxy on
+        list($dnsCode, $dnsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records?type=A&name=$domain", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        $aPayload = [
+            'type'    => 'A',
+            'name'    => $domain,
+            'content' => '192.0.2.1',
+            'ttl'     => 1,
+            'proxied' => true
+        ];
+        if (isset($dnsRes['result'][0])) {
+            $recordID = $dnsRes['result'][0]['id'];
+            list($aCode, $aRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records/$recordID", $aPayload, 'PUT');
+            $action = 'updated';
+        } else {
+            list($aCode, $aRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records", $aPayload);
+            $action = 'added';
+        }
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($aCode === 200 && ($aRes['success'] ?? false)) {
+            printLog("[$i] ✅ A record $action: $domain → 192.0.2.1 (proxied)", 'success');
+        } else {
+            $reason = $aRes['errors'][0]['message'] ?? json_encode($aRes);
+            printLog("[$i] ❌ A record failed for $domain - $reason", 'error');
+        }
+
+        // d) Add/update CNAME record for www pointing to apex
+        $wwwName = "www.$domain";
+        list($wwwDnsCode, $wwwDnsRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records?type=CNAME&name=$wwwName", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        $cnamePayload = [
+            'type'    => 'CNAME',
+            'name'    => $wwwName,
+            'content' => $domain,
+            'ttl'     => 1,
+            'proxied' => true
+        ];
+        if (isset($wwwDnsRes['result'][0])) {
+            $wwwRecordID = $wwwDnsRes['result'][0]['id'];
+            list($wwwCCode, $wwwCRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records/$wwwRecordID", $cnamePayload, 'PUT');
+            $wwwAction = 'updated';
+        } else {
+            list($wwwCCode, $wwwCRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/dns_records", $cnamePayload);
+            $wwwAction = 'added';
+        }
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($wwwCCode === 200 && ($wwwCRes['success'] ?? false)) {
+            printLog("[$i] ✅ CNAME record $wwwAction: $wwwName → $domain (proxied)", 'success');
+        } else {
+            $reason = $wwwCRes['errors'][0]['message'] ?? json_encode($wwwCRes);
+            printLog("[$i] ❌ CNAME record failed for www.$domain - $reason", 'error');
+        }
+
+        // a) Add/update Worker Routes
+        $script = 'ion-domains';
+        $pattern1 = "$domain/*";
+        $pattern2 = "*.$domain/*";
+
+        // Get existing routes
+        list($routesCode, $routesRes, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/workers/routes", null, 'GET');
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        $existingRoute1 = null;
+        $existingRoute2 = null;
+        if ($routesCode === 200 && isset($routesRes['result'])) {
+            foreach ($routesRes['result'] as $route) {
+                if ($route['pattern'] === $pattern1) {
+                    $existingRoute1 = $route['id'];
+                } elseif ($route['pattern'] === $pattern2) {
+                    $existingRoute2 = $route['id'];
+                }
+            }
+        } else {
+            $reason = $routesRes['errors'][0]['message'] ?? json_encode($routesRes);
+            printLog("[$i] ❌ Failed to fetch existing worker routes for $domain - $reason", 'error');
+        }
+
+        // Route 1: domain/*
+        $routePayload1 = [
+            'pattern' => $pattern1,
+            'script' => $script
+        ];
+        if ($existingRoute1) {
+            list($rCode1, $rRes1, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/workers/routes/$existingRoute1", $routePayload1, 'PUT');
+            $routeAction1 = 'updated';
+        } else {
+            list($rCode1, $rRes1, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/workers/routes", $routePayload1);
+            $routeAction1 = 'added';
+        }
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($rCode1 === 200 && ($rRes1['success'] ?? false)) {
+            printLog("[$i] ✅ Worker route $routeAction1: $pattern1 → $script", 'success');
+        } else {
+            $reason = $rRes1['errors'][0]['message'] ?? json_encode($rRes1);
+            printLog("[$i] ❌ Failed to $routeAction1 worker route $pattern1 for $domain - $reason", 'error');
+        }
+
+        // Route 2: *.domain/*
+        $routePayload2 = [
+            'pattern' => $pattern2,
+            'script' => $script
+        ];
+        if ($existingRoute2) {
+            list($rCode2, $rRes2, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/workers/routes/$existingRoute2", $routePayload2, 'PUT');
+            $routeAction2 = 'updated';
+        } else {
+            list($rCode2, $rRes2, $remaining, $reset) = cloudflareRequest("https://api.cloudflare.com/client/v4/zones/$zoneID/workers/routes", $routePayload2);
+            $routeAction2 = 'added';
+        }
+        if ($remaining !== null && $remaining < 10) {
+            $sleepTime = max(0, $reset - time() + 1);
+            printLog("Rate limit low. Sleeping for $sleepTime seconds.", 'warning');
+            sleep($sleepTime);
+        }
+        if ($rCode2 === 200 && ($rRes2['success'] ?? false)) {
+            printLog("[$i] ✅ Worker route $routeAction2: $pattern2 → $script", 'success');
+        } else {
+            $reason = $rRes2['errors'][0]['message'] ?? json_encode($rRes2);
+            printLog("[$i] ❌ Failed to $routeAction2 worker route $pattern2 for $domain - $reason", 'error');
+        }
+    }
+
+    // End domain group
+    echo "</details>";
+
+    if (isset($zoneID)) {
+        $entry['status'] = 'added';
+        $successCount++;
+        // Write updated CSV after each domain to allow resuming
+        $fp = fopen($csvPath, 'w');
+        foreach ($domains as $dEntry) {
+            fputcsv($fp, [$dEntry['domain'], $dEntry['redirect_url'], $dEntry['status']]);
+        }
+        fclose($fp);
+    }
+    if ($i % 5 === 0) echo str_repeat(' ', 2048);
+    sleep(10); // Increased base sleep to 10 seconds
+
+    if (++$processedThisRun >= $batchSize) {
+        printLog("Batch limit reached ($batchSize domains). Rerun for next batch.", 'info');
+        break;
+    }
+}
+
+// Final log
+printLog("🎉 Batch done! Statuses saved in $csvPath", 'info');
+printLog("✅ Summary: $successCount domains processed, $skippedCount skipped in this batch.", 'info');
+echo "</body></html>";
+?>

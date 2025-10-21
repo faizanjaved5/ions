@@ -1,0 +1,384 @@
+/**
+ * ION Pricing Card CSS
+ * Modern overlay system for pricing display on city cards
+ */
+
+/* CSS Variables for theming */
+:root {
+  --city-card-bg: 160 25% 85%;
+  --city-card-foreground: 158 25% 25%;
+  --city-overlay-bg: 158 40% 35%;
+  --city-overlay-foreground: 160 25% 95%;
+  --pricing-accent: 162 65% 45%;
+  
+  /* Price category colors */
+  --price-monthly: 158 60% 70%;
+  --price-quarterly: 195 85% 65%;
+  --price-semiannual: 45 90% 60%;
+  --price-annual: 15 85% 55%;
+  
+  /* Tier-specific colors */
+  --tier-1-bg: 120 60% 45%;      /* Green - Affordable */
+  --tier-2-bg: 200 70% 50%;      /* Blue - Standard */
+  --tier-3-bg: 45 85% 55%;       /* Orange - Popular */
+  --tier-4-bg: 280 60% 55%;      /* Purple - Premium */
+  --tier-5-bg: 36 35% 45%;       /* Gold #896948 - Luxury */
+  --bundle-bg: 260 80% 45%;      /* Deep Purple - Bundle */
+  --other-bg: 210 20% 40%;       /* Gray - Other/Custom */
+  --error-bg: 0 30% 45%;         /* Dull Red - Error State */
+  
+  /* Gradients */
+  --gradient-overlay: linear-gradient(180deg, hsl(var(--city-overlay-bg) / 0.95), hsl(var(--city-overlay-bg)));
+  
+  /* Shadows */
+  --shadow-overlay: 0 4px 20px hsl(var(--city-overlay-bg) / 0.2);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --city-card-bg: 158 20% 15%;
+    --city-card-foreground: 160 25% 90%;
+    --city-overlay-bg: 160 25% 85%;
+    --city-overlay-foreground: 158 25% 15%;
+    --pricing-accent: 162 65% 55%;
+    
+    --price-monthly: 158 60% 75%;
+    --price-quarterly: 195 85% 70%;
+    --price-semiannual: 45 90% 65%;
+    --price-annual: 15 85% 60%;
+    
+    /* Dark mode tier colors */
+    --tier-1-bg: 120 50% 55%;      /* Lighter Green */
+    --tier-2-bg: 200 60% 60%;      /* Lighter Blue */
+    --tier-3-bg: 45 80% 65%;       /* Lighter Orange */
+    --tier-4-bg: 280 50% 65%;      /* Lighter Purple */
+    --tier-5-bg: 36 40% 55%;       /* Lighter Gold - Dark Mode */
+    --bundle-bg: 260 70% 55%;      /* Lighter Deep Purple */
+    --other-bg: 210 25% 50%;       /* Lighter Gray */
+    --error-bg: 0 35% 55%;         /* Lighter Dull Red - Dark Mode */
+    
+    --gradient-overlay: linear-gradient(180deg, hsl(var(--city-overlay-bg) / 0.95), hsl(var(--city-overlay-bg)));
+    --shadow-overlay: 0 4px 20px hsl(0 0% 0% / 0.4);
+  }
+}
+
+/* City Card Enhancement */
+.city {
+  position: relative !important;
+  overflow: hidden !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer !important;
+}
+
+.city:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Pricing Overlay Container */
+.city-pricing-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60%;
+  background: var(--gradient-overlay);
+  backdrop-filter: blur(8px);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  overflow: hidden;
+  transform: translateY(100%);
+  opacity: 0;
+  z-index: 10;
+  box-shadow: var(--shadow-overlay);
+  will-change: transform, opacity;
+  contain: layout style paint;
+}
+
+/* Show overlay on hover */
+.city:hover .city-pricing-overlay {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Tier Header */
+.city-tier-header {
+  width: 100%;
+  background: hsl(var(--city-overlay-bg));
+  color: hsl(var(--city-overlay-foreground));
+  padding: 0.75rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-bottom: 1px solid hsl(var(--city-overlay-foreground) / 0.1);
+  transition: background-color 0.3s ease;
+  position: relative;
+}
+
+/* Close button for pricing overlay */
+.city-pricing-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 11;
+}
+
+.city-pricing-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+/* Tier-specific header colors */
+.city-pricing-overlay.tier-1 .city-tier-header {
+  background: hsl(var(--tier-1-bg));
+  color: white;
+}
+
+.city-pricing-overlay.tier-2 .city-tier-header {
+  background: hsl(var(--tier-2-bg));
+  color: white;
+}
+
+.city-pricing-overlay.tier-3 .city-tier-header {
+  background: hsl(var(--tier-3-bg));
+  color: white;
+}
+
+.city-pricing-overlay.tier-4 .city-tier-header {
+  background: hsl(var(--tier-4-bg));
+  color: white;
+}
+
+.city-pricing-overlay.tier-5 .city-tier-header {
+  background: hsl(var(--tier-5-bg));
+  color: white;
+}
+
+.city-pricing-overlay.bundle .city-tier-header {
+  background: hsl(var(--bundle-bg));
+  color: white;
+}
+
+.city-pricing-overlay.other .city-tier-header,
+.city-pricing-overlay.custom .city-tier-header {
+  background: hsl(var(--other-bg));
+  color: white;
+}
+
+/* Pricing Grid */
+.city-pricing-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 1fr;
+  gap: 1px;
+  background: hsl(var(--city-overlay-foreground) / 0.1);
+  color: hsl(var(--city-overlay-foreground));
+  height: calc(100% - 3rem);
+}
+
+.city-pricing-item {
+  background: hsl(var(--city-overlay-bg) / 0.8);
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  min-width: 0; /* Allow shrinking */
+}
+
+.city-pricing-item:hover {
+  background: hsl(var(--city-overlay-bg) / 0.9);
+}
+
+.city-pricing-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  opacity: 0.9;
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.city-pricing-value {
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Individual price colors */
+.city-pricing-item.monthly .city-pricing-value {
+  color: hsl(var(--price-monthly));
+}
+
+.city-pricing-item.quarterly .city-pricing-value {
+  color: hsl(var(--price-quarterly));
+}
+
+.city-pricing-item.semi-annual .city-pricing-value {
+  color: hsl(var(--price-semiannual));
+}
+
+.city-pricing-item.annual .city-pricing-value {
+  color: hsl(var(--price-annual));
+}
+
+/* Best value indicator for annual - REMOVED */
+
+/* Loading state */
+.city-pricing-overlay.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.city-pricing-loading {
+  color: hsl(var(--city-overlay-foreground));
+  text-align: center;
+  opacity: 0.8;
+}
+
+.city-pricing-loading .spinner {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 2px solid hsl(var(--city-overlay-foreground) / 0.3);
+  border-top: 2px solid hsl(var(--city-overlay-foreground));
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 0.5rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error state */
+.city-pricing-overlay.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-overlay);
+}
+
+.city-pricing-overlay.error .city-tier-header {
+  background: hsl(var(--error-bg));
+  color: white;
+}
+
+.city-pricing-error {
+  color: hsl(var(--city-overlay-foreground));
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.85rem;
+  background: hsl(var(--city-overlay-bg) / 0.8);
+  border-radius: 0.5rem;
+  margin: 1rem;
+}
+
+/* Animation classes */
+.city-pricing-overlay.animate-in {
+  animation: slideUpSmooth 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.city-pricing-overlay.animate-out {
+  animation: slideDownSmooth 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideUpSmooth {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDownSmooth {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .city-pricing-overlay {
+    height: 65%;
+  }
+  
+  .city-tier-header {
+    padding: 0.4rem;
+    font-size: 0.75rem;
+  }
+  
+  .city-pricing-item {
+    padding: 0.4rem 0.2rem;
+  }
+  
+  .city-pricing-label {
+    font-size: 0.6rem;
+    margin-bottom: 0.15rem;
+  }
+  
+  .city-pricing-value {
+    font-size: 0.75rem;
+  }
+  
+  /* Removed annual ::before styling */
+}
+
+/* Ultra-small screens */
+@media (max-width: 480px) {
+  .city-pricing-overlay {
+    height: 70%;
+  }
+  
+  .city-pricing-grid {
+    grid-template-columns: repeat(4, 1fr); /* Keep 4 columns even on small screens */
+    gap: 0.5px;
+  }
+  
+  .city-pricing-item {
+    padding: 0.3rem 0.15rem;
+  }
+  
+  .city-pricing-label {
+    font-size: 0.55rem;
+    margin-bottom: 0.1rem;
+  }
+  
+  .city-pricing-value {
+    font-size: 0.7rem;
+  }
+  
+  /* Removed annual ::before styling */
+}

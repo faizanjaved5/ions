@@ -1,0 +1,313 @@
+/**
+ * ION Modal Login Styles
+ * Popup login for public pages
+ */
+
+/* Modal Overlay */
+.ion-login-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    animation: fadeIn 0.3s ease;
+}
+
+.ion-login-modal-overlay.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* Modal Container */
+.ion-login-modal {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    max-width: 440px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: slideUp 0.3s ease;
+}
+
+/* Modal Header */
+.ion-login-modal-header {
+    padding: 30px 30px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+}
+
+.ion-login-modal-header h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ion-login-modal-header .icon {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #b28254 0%, #8b6239 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.ion-login-modal-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.ion-login-modal-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+/* Modal Body */
+.ion-login-modal-body {
+    padding: 30px;
+}
+
+.ion-login-modal-message {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: rgba(178, 130, 84, 0.1);
+    border: 1px solid rgba(178, 130, 84, 0.3);
+    border-radius: 8px;
+    color: #e2c9ae;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Form Elements */
+.ion-login-form-group {
+    margin-bottom: 20px;
+}
+
+.ion-login-form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+.ion-login-form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 15px;
+    transition: all 0.2s ease;
+}
+
+.ion-login-form-group input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(178, 130, 84, 0.5);
+    box-shadow: 0 0 0 3px rgba(178, 130, 84, 0.1);
+}
+
+.ion-login-form-group input::placeholder {
+    color: #64748b;
+}
+
+/* Remember Me Checkbox */
+.ion-login-remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.ion-login-remember input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+}
+
+.ion-login-remember label {
+    margin: 0;
+    font-size: 14px;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+/* Submit Button */
+.ion-login-submit {
+    width: 100%;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #b28254 0%, #8b6239 100%);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.ion-login-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(178, 130, 84, 0.4);
+}
+
+.ion-login-submit:active {
+    transform: translateY(0);
+}
+
+.ion-login-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.ion-login-submit .spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.ion-login-submit.loading .spinner {
+    display: block;
+}
+
+.ion-login-submit.loading .text {
+    display: none;
+}
+
+/* Error/Success Messages */
+.ion-login-alert {
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+}
+
+.ion-login-alert.show {
+    display: block;
+}
+
+.ion-login-alert.error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
+.ion-login-alert.success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #86efac;
+}
+
+/* Modal Footer */
+.ion-login-modal-footer {
+    padding: 20px 30px 30px;
+    text-align: center;
+}
+
+.ion-login-modal-footer p {
+    margin: 0;
+    font-size: 14px;
+    color: #94a3b8;
+}
+
+.ion-login-modal-footer a {
+    color: #b28254;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.ion-login-modal-footer a:hover {
+    color: #d4a574;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+    .ion-login-modal {
+        margin: 20px;
+        max-width: none;
+    }
+    
+    .ion-login-modal-header,
+    .ion-login-modal-body,
+    .ion-login-modal-footer {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    
+    .ion-login-modal-header h2 {
+        font-size: 20px;
+    }
+}
+
+/* Prevent body scroll when modal is open */
+body.ion-modal-open {
+    overflow: hidden;
+}
+
