@@ -24,11 +24,13 @@
 .ion-login-modal {
     position: relative;
     width: 90%;
-    max-width: 420px;
-    background: linear-gradient(135deg, #1a1d29 0%, #252936 100%);
-    border-radius: 20px;
-    padding: 40px 32px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    max-width: 400px;
+    background: #262626;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
     animation: slideUp 0.3s ease;
 }
 
@@ -60,8 +62,30 @@
     text-align: center;
 }
 
-.ion-login-logo {
+.ion-login-logo img {
+    height: 100px;
+    width: auto;
     margin-bottom: 20px;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.ion-login-heading {
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+}
+
+.ion-login-subtitle {
+    font-size: 16px;
+    color: #cccccc;
+    margin-bottom: 60px;
+    font-weight: 400;
+}
+
+.ion-login-logo {
+    margin-bottom: 9px;
     display: flex;
     justify-content: center;
 }
@@ -76,27 +100,22 @@
 
 .ion-login-google-btn {
     width: 100%;
-    padding: 14px 24px;
-    background: #fff;
-    border: none;
-    border-radius: 12px;
-    font-size: 15px;
+    padding: 12px 24px;
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    font-size: 14px;
     font-weight: 500;
-    color: #1f2937;
+    color: #ffffff;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 12px;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.ion-login-google-btn:hover {
-    background: #f9fafb;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
+.ion-login-google-btn:hover { background: rgba(255, 255, 255, 0.1); }
 
 .ion-login-divider {
     display: flex;
@@ -118,18 +137,16 @@
     padding: 0 16px;
 }
 
-.ion-login-input-group {
-    margin-bottom: 16px;
-}
+.ion-login-input-group { margin-bottom: 20px; }
 
 .ion-login-input-group input {
     width: 100%;
     padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    color: #fff;
-    font-size: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 16px;
     outline: none;
     transition: all 0.2s ease;
 }
@@ -146,20 +163,20 @@
 
 .ion-login-submit-btn {
     width: 100%;
-    padding: 14px 24px;
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
     border: none;
-    border-radius: 12px;
-    font-size: 15px;
+    border-radius: 8px;
+    font-size: 16px;
     font-weight: 600;
-    color: #fff;
+    color: #1a1a1a;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
 }
 
 .ion-login-submit-btn:hover {
@@ -244,6 +261,10 @@
     display: block;
     animation: shake 0.3s ease;
 }
+
+.ion-login-join { color: #cccccc; font-size: 14px; margin-top: 26px; }
+.ion-login-join a { color: #896948; font-weight: 600; text-decoration: none; }
+.ion-login-join a:hover { text-decoration: underline; }
 
 @keyframes fadeIn {
     from {
