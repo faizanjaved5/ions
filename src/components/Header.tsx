@@ -30,7 +30,6 @@ import IONConnectionsMenu from "@/components/IONConnectionsMenu";
 import UserProfile from "@/components/UserProfile";
 import NotificationsPanel from "@/components/NotificationsPanel";
 
-
 const Header = () => {
   const { isLoggedIn, user, logout, login } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -62,22 +61,25 @@ const Header = () => {
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  
+
   // Default header buttons (these could also come from your JSON)
   const headerButtons = {
     upload: { label: "Upload", link: "/upload", visible: true },
-    signIn: { label: "Sign In", link: "/signin", visible: true }
+    signIn: { label: "Sign In", link: "/login", visible: true },
+    logOut: { label: "Log Out", link: "/login/logout.php", visible: true },
   };
-  
+
   const notifications = user?.notifications || [];
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const handleLogout = () => {
-    logout();
+    const url = headerButtons.logOut.link;
+    window.location.href = url;
   };
 
   const handleSignIn = () => {
-    login();
+    const url = headerButtons.signIn.link;
+    window.location.href = url;
   };
 
   const normalizeUrl = (url?: string | null): string => {
@@ -140,8 +142,15 @@ const Header = () => {
         <div className="mx-auto flex h-20 max-w-[1920px] items-center px-4 gap-4">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="cursor-pointer">
-              <img src={ionLogo} alt="ION Logo" className="h-14 w-auto md:h-20 mt-[5px]" />
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="cursor-pointer"
+            >
+              <img
+                src={ionLogo}
+                alt="ION Logo"
+                className="h-14 w-auto md:h-20 mt-[5px]"
+              />
             </button>
           </div>
 
@@ -149,8 +158,14 @@ const Header = () => {
           <nav className="hidden xl:flex items-center gap-2 flex-1 justify-center">
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span> Networks
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>{" "}
+                  Networks
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -170,8 +185,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span> Local
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>{" "}
+                  Local
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -191,8 +212,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span>ITIATIVES
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
+                  ITIATIVES
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -212,8 +239,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  SHOP <span className="text-primary group-hover:text-white">ION</span>
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  SHOP{" "}
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -233,8 +266,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white">
-                  CONNECT.<span className="text-primary group-hover:text-white">IONS</span>
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white"
+                >
+                  CONNECT.
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -252,18 +291,27 @@ const Header = () => {
               </PopoverContent>
             </Popover>
 
-             <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white">
-              PressPass<span className="text-primary group-hover:text-white">.ION</span>
+            <Button
+              variant="ghost"
+              className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white"
+            >
+              PressPass
+              <span className="text-primary group-hover:text-white">.ION</span>
             </Button>
           </nav>
-
 
           {/* Large Tablet Navigation - 5 items (lg to xl) */}
           <nav className="hidden lg:xl:hidden lg:flex items-center gap-2 flex-1 justify-center">
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span> Networks
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>{" "}
+                  Networks
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -283,8 +331,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span> Local
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>{" "}
+                  Local
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -304,8 +358,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span>ITIATIVES
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
+                  ITIATIVES
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -325,8 +385,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  SHOP <span className="text-primary group-hover:text-white">ION</span>
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  SHOP{" "}
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -346,8 +412,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white">
-                  CONNECT.<span className="text-primary group-hover:text-white">IONS</span>
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase text-gray-400 hover:text-white"
+                >
+                  CONNECT.
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -370,8 +442,14 @@ const Header = () => {
           <nav className="hidden md:lg:hidden md:flex items-center gap-2 flex-1 justify-center">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span> Networks
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>{" "}
+                  Networks
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -391,8 +469,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span> Local
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>{" "}
+                  Local
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -412,8 +496,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  <span className="text-primary group-hover:text-white">ION</span>ITIATIVES
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
+                  ITIATIVES
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -433,8 +523,14 @@ const Header = () => {
 
             <Popover>
               <PopoverTrigger asChild>
-                 <Button variant="ghost" className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white">
-                  SHOP <span className="text-primary group-hover:text-white">ION</span>
+                <Button
+                  variant="ghost"
+                  className="group gap-0 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
+                >
+                  SHOP{" "}
+                  <span className="text-primary group-hover:text-white">
+                    ION
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverPrimitive.Anchor asChild>
@@ -483,7 +579,11 @@ const Header = () => {
                   size="icon"
                   className="xl:hidden h-9 w-9 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
                   title={headerButtons.upload.label}
-                  onClick={() => window.location.href = isLoggedIn ? 'https://ions.com/app/creators.php' : 'https://ions.com/uploader/'}
+                  onClick={() =>
+                    (window.location.href = isLoggedIn
+                      ? "https://ions.com/app/creators.php"
+                      : "https://ions.com/uploader/")
+                  }
                 >
                   <Upload className="h-4 w-4" />
                   <span className="sr-only">{headerButtons.upload.label}</span>
@@ -491,7 +591,11 @@ const Header = () => {
                 <Button
                   variant="default"
                   className="hidden xl:flex items-center gap-2 font-bebas text-xl uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
-                  onClick={() => window.location.href = isLoggedIn ? 'https://ions.com/app/creators.php' : 'https://ions.com/uploader/'}
+                  onClick={() =>
+                    (window.location.href = isLoggedIn
+                      ? "https://ions.com/app/creators.php"
+                      : "https://ions.com/uploader/")
+                  }
                 >
                   <Upload className="h-5 w-5" />
                   {headerButtons.upload.label}
@@ -507,7 +611,8 @@ const Header = () => {
                 className="group gap-0 font-bebas text-lg uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white rounded-md"
                 onClick={handleSignIn}
               >
-                Sign<span className="text-primary group-hover:text-white">ION</span>
+                Sign
+                <span className="text-primary group-hover:text-white">ION</span>
               </Button>
             )}
 
@@ -521,12 +626,12 @@ const Header = () => {
                 onClick={() => setNotificationsOpen(true)}
               >
                 <Bell className="h-4 w-4" />
-                <Badge 
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground rounded-full"
-                >
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground rounded-full">
                   {unreadCount}
                 </Badge>
-                <span className="sr-only">{unreadCount} unread notifications</span>
+                <span className="sr-only">
+                  {unreadCount} unread notifications
+                </span>
               </Button>
             )}
 
@@ -552,7 +657,11 @@ const Header = () => {
             {/* Hamburger Menu - Visible on md and below (hidden on xl+) */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild className="xl:hidden">
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400 hover:text-white">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-gray-400 hover:text-white"
+                >
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Menu</span>
                 </Button>
@@ -562,12 +671,14 @@ const Header = () => {
                   {/* Compact Top Row: Buttons + User Profile */}
                   <div className="flex items-center gap-2 px-3">
                     {headerButtons.upload.visible && (
-                      <Button 
-                        variant="default" 
+                      <Button
+                        variant="default"
                         size="sm"
-                        className="flex-1 justify-center font-bebas uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md" 
+                        className="flex-1 justify-center font-bebas uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
                         onClick={() => {
-                          window.location.href = isLoggedIn ? 'https://ions.com/app/creators.php' : 'https://ions.com/uploader/';
+                          window.location.href = isLoggedIn
+                            ? "https://ions.com/app/creators.php"
+                            : "https://ions.com/uploader/";
                           setMobileMenuOpen(false);
                         }}
                       >
@@ -576,16 +687,19 @@ const Header = () => {
                       </Button>
                     )}
                     {headerButtons.signIn.visible && !isLoggedIn && (
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
-                        className="flex-1 group gap-0 justify-center font-bebas uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white rounded-md" 
+                        className="flex-1 group gap-0 justify-center font-bebas uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white rounded-md"
                         onClick={() => {
                           handleSignIn();
                           setMobileMenuOpen(false);
                         }}
                       >
-                        Sign<span className="text-primary group-hover:text-white">ION</span>
+                        Sign
+                        <span className="text-primary group-hover:text-white">
+                          ION
+                        </span>
                       </Button>
                     )}
                     {isLoggedIn && (
@@ -602,9 +716,7 @@ const Header = () => {
                             }}
                           >
                             <Bell className="h-4 w-4" />
-                            <Badge 
-                              className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[9px] bg-primary text-primary-foreground rounded-full"
-                            >
+                            <Badge className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center p-0 text-[9px] bg-primary text-primary-foreground rounded-full">
                               {unreadCount}
                             </Badge>
                           </Button>
@@ -640,7 +752,10 @@ const Header = () => {
                         setMobileMenuOpen(false);
                       }}
                     >
-                      <span className="text-primary group-hover:text-white">ION</span> Networks
+                      <span className="text-primary group-hover:text-white">
+                        ION
+                      </span>{" "}
+                      Networks
                     </Button>
 
                     <Button
@@ -651,7 +766,10 @@ const Header = () => {
                         setMobileMenuOpen(false);
                       }}
                     >
-                      <span className="text-primary group-hover:text-white">ION</span> Local
+                      <span className="text-primary group-hover:text-white">
+                        ION
+                      </span>{" "}
+                      Local
                     </Button>
 
                     <Button
@@ -662,7 +780,10 @@ const Header = () => {
                         setMobileMenuOpen(false);
                       }}
                     >
-                      <span className="text-primary group-hover:text-white">ION</span>ITIATIVES
+                      <span className="text-primary group-hover:text-white">
+                        ION
+                      </span>
+                      ITIATIVES
                     </Button>
 
                     <Button
@@ -673,7 +794,10 @@ const Header = () => {
                         setMobileMenuOpen(false);
                       }}
                     >
-                      SHOP <span className="text-primary group-hover:text-white">ION</span>
+                      SHOP{" "}
+                      <span className="text-primary group-hover:text-white">
+                        ION
+                      </span>
                     </Button>
 
                     <Button
@@ -684,7 +808,10 @@ const Header = () => {
                         setMobileMenuOpen(false);
                       }}
                     >
-                      CONNECT.<span className="text-primary group-hover:text-white">IONS</span>
+                      CONNECT.
+                      <span className="text-primary group-hover:text-white">
+                        ION
+                      </span>
                     </Button>
 
                     <Button
@@ -692,7 +819,10 @@ const Header = () => {
                       className="group gap-0 justify-start font-bebas text-lg uppercase w-full h-9"
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      PressPass<span className="text-primary group-hover:text-white">.ION</span>
+                      PressPass
+                      <span className="text-primary group-hover:text-white">
+                        .ION
+                      </span>
                     </Button>
                   </div>
 
@@ -702,7 +832,9 @@ const Header = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    onClick={() =>
+                      setTheme(theme === "dark" ? "light" : "dark")
+                    }
                     className="justify-start text-gray-400 hover:text-white h-9"
                   >
                     <Sun className="mr-2 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -717,10 +849,13 @@ const Header = () => {
       </header>
 
       {/* Search Dialog */}
-      <Dialog open={searchOpen} onOpenChange={(open) => {
-        setSearchOpen(open);
-        if (!open) setSearchQuery("");
-      }}>
+      <Dialog
+        open={searchOpen}
+        onOpenChange={(open) => {
+          setSearchOpen(open);
+          if (!open) setSearchQuery("");
+        }}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="font-bebas text-2xl uppercase tracking-wider">
@@ -890,8 +1025,8 @@ const Header = () => {
       </Dialog>
 
       {/* Notifications Panel */}
-      <NotificationsPanel 
-        open={notificationsOpen} 
+      <NotificationsPanel
+        open={notificationsOpen}
         onOpenChange={setNotificationsOpen}
       />
     </>
