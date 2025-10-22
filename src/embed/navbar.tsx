@@ -3,6 +3,7 @@ import { ThemeProvider } from "next-themes";
 import Header from "@/components/Header";
 import "@/index.css";
 import { PortalProvider } from "@/components/ui/portal-provider";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 type MountTarget = string | HTMLElement | undefined;
 type MountOptions = {
@@ -43,16 +44,18 @@ export function mount(
     const startRender = () => {
       const root = createRoot(shadowContainer);
       root.render(
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
-          storageKey="ion-theme"
-        >
-          <PortalProvider container={shadow}>
-            <Header />
-          </PortalProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem={false}
+            storageKey="ion-theme"
+          >
+            <PortalProvider container={shadow}>
+              <Header />
+            </PortalProvider>
+          </ThemeProvider>
+        </AuthProvider>
       );
       mounted.set(host, root);
     };
@@ -79,14 +82,16 @@ export function mount(
 
   const root = createRoot(el);
   root.render(
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem={false}
-      storageKey="ion-theme"
-    >
-      <Header />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        enableSystem={false}
+        storageKey="ion-theme"
+      >
+        <Header />
+      </ThemeProvider>
+    </AuthProvider>
   );
   mounted.set(el, root);
   return el;
