@@ -141,6 +141,7 @@ try {
                 $_SESSION['logged_in'] = true;
                 $_SESSION['post_join_ready_for_upgrade'] = true;
                 $_SESSION['oauth_user_data'] = true;
+                $_SESSION['user_handle'] = $existing_user->handle ?? '';
                 
                 header('Location: /join/index.php?oauth_existing_guest=1');
                 exit;
@@ -156,6 +157,7 @@ try {
                 $_SESSION['fullname'] = $existing_user->fullname;
                 $_SESSION['user_role'] = $existing_user->user_role;
                 $_SESSION['logged_in'] = true;
+                $_SESSION['user_handle'] = $existing_user->handle ?? '';
                 
                 header('Location: /join/index.php');
                 exit;
@@ -196,6 +198,7 @@ try {
             $_SESSION['logged_in'] = true;
             $_SESSION['post_join_ready_for_upgrade'] = true;
             $_SESSION['oauth_user_data'] = true;
+            $_SESSION['user_handle'] = $new_user->handle ?? '';
             
             // Redirect to join step 2 (upgrade offer)
             header('Location: /join/index.php?oauth_new_user=1');
@@ -240,6 +243,7 @@ try {
                 $_SESSION['logged_in'] = true;
                 $_SESSION['post_join_ready_for_upgrade'] = true;
                 $_SESSION['oauth_user_data'] = true;
+                $_SESSION['user_handle'] = $new_user->handle ?? '';
                 
                 // Redirect to join step 2 since they're new
                 header('Location: /join/index.php?oauth_new_user=1');
@@ -263,6 +267,7 @@ try {
             $_SESSION['logged_in'] = true;
             $_SESSION['post_join_ready_for_upgrade'] = true;
             $_SESSION['oauth_user_data'] = true;
+            $_SESSION['user_handle'] = $existing_user->handle ?? '';
             
             // Redirect to join step 2 to complete registration
             header('Location: /join/index.php?oauth_existing_guest=1');
@@ -301,6 +306,7 @@ try {
         $_SESSION['user_id'] = $existing_user->user_id;
         $_SESSION['user_name'] = $name ?: $existing_user->fullname;
         $_SESSION['last_activity'] = time();
+        $_SESSION['user_handle'] = $existing_user->handle ?? '';
         
         // Redirect to app
         header('Location: /app/directory.php');

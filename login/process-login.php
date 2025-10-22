@@ -45,7 +45,7 @@ try {
     // Query user from IONEERS table
     $stmt = $pdo->prepare("
         SELECT user_id, first_name, last_name, email, password, 
-               user_role, account_status, phone, email_verified
+               user_role, account_status, phone, email_verified, handle
         FROM IONEERS 
         WHERE email = :email
         LIMIT 1
@@ -110,6 +110,7 @@ try {
     $_SESSION['last_name'] = $user['last_name'];
     $_SESSION['user_role'] = $user['user_role'];
     $_SESSION['phone'] = $user['phone'];
+    $_SESSION['user_handle'] = $user['handle'] ?? '';
     $_SESSION['logged_in'] = true;
     $_SESSION['login_time'] = time();
     

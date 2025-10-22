@@ -155,6 +155,7 @@ try {
                 $_SESSION['logged_in'] = true;
                 $_SESSION['post_join_ready_for_upgrade'] = true;
                 $_SESSION['oauth_user_data'] = true;
+                $_SESSION['user_handle'] = $existing_user->handle ?? '';
                 
                 header('Location: /join/index.php?oauth_existing_guest=1');
                 exit;
@@ -170,6 +171,7 @@ try {
                 $_SESSION['fullname'] = $existing_user->fullname;
                 $_SESSION['user_role'] = $existing_user->user_role;
                 $_SESSION['logged_in'] = true;
+                $_SESSION['user_handle'] = $existing_user->handle ?? '';
                 
                 header('Location: /join/index.php');
                 exit;
@@ -210,6 +212,7 @@ try {
             $_SESSION['logged_in'] = true;
             $_SESSION['post_join_ready_for_upgrade'] = true;
             $_SESSION['oauth_user_data'] = true;
+            $_SESSION['user_handle'] = $new_user->handle ?? '';
             
             // Redirect to join step 2 (upgrade offer)
             header('Location: /join/index.php?oauth_new_user=1');
@@ -254,6 +257,7 @@ try {
                 $_SESSION['logged_in'] = true;
                 $_SESSION['post_join_ready_for_upgrade'] = true;
                 $_SESSION['oauth_user_data'] = true;
+                $_SESSION['user_handle'] = $new_user->handle ?? '';
                 
                 // Redirect to join step 2 since they're new
                 header('Location: /join/index.php?oauth_new_user=1');
@@ -277,6 +281,7 @@ try {
             $_SESSION['logged_in'] = true;
             $_SESSION['post_join_ready_for_upgrade'] = true;
             $_SESSION['oauth_user_data'] = true;
+            $_SESSION['user_handle'] = $existing_user->handle ?? '';
             
             // Redirect to join step 2 to complete registration
             header('Location: /join/index.php?oauth_existing_guest=1');
@@ -316,7 +321,7 @@ try {
         $_SESSION['user_name'] = $name ?: $existing_user->fullname;
         $_SESSION['last_activity'] = time();
         $_SESSION['photo_url'] = ($existing_user->photo_url ?: ($picture ?: ('https://i0.wp.com/ui-avatars.com/api/?name=' . urlencode(($name ?: $existing_user->fullname) ?: $email) . '&size=256')));
-
+        $_SESSION['user_handle'] = $existing_user->handle ?? '';
         
         // Check for redirect URL from session
         $redirect = $_SESSION['redirect_after_login'] ?? '/app/directory.php';

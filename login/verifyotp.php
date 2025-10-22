@@ -177,6 +177,15 @@ try {
     $_SESSION['user_role'] = $from_join && $row->user_role === 'Guest' ? 'Creator' : $row->user_role;
     $_SESSION['last_activity'] = time();
     $_SESSION['session_regenerated'] = time();
+    // Fetch and set user handle for session
+    try {
+        $handle_row = $db->get_row("SELECT handle FROM IONEERS WHERE user_id = ?", $row->user_id);
+        if ($handle_row && isset($handle_row->handle)) {
+            $_SESSION['user_handle'] = $handle_row->handle;
+        }
+    } catch (Exception $e) {
+        // ignore handle fetch failure
+    }
 
     // Clear any error messages
     unset($_SESSION['otp_error']);

@@ -376,6 +376,7 @@ error_log("=== END USER LOOKUP DEBUG ===");
         $_SESSION['user_name'] = $name;  // Add user name for display
         $_SESSION['last_activity'] = time();
         $_SESSION['session_regenerated'] = time();
+        $_SESSION['user_handle'] = $existing_user->handle ?? '';
         
         // Debug capture for session setting
         @file_get_contents($debug_base . urlencode("Setting session variables for: $email"));

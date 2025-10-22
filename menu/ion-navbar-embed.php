@@ -1,8 +1,77 @@
 <?php
-// Optional: Set $ION_NAVBAR_BASE_URL before including this file to control where assets are loaded from.
-// Example:
-//   $ION_NAVBAR_BASE_URL = "/static/ion-navbar/"; // must be a web-accessible URL
-//   require_once __DIR__ . "/ion-navbar-embed.php";
+// Example payload structure:
+$ION_USER_MENU = [
+        "isLoggedIn" => ((isset($_SESSION['logged_in']) && $_SESSION['logged_in']) || (isset($_SESSION['authenticated']) && $_SESSION['authenticated'])) ? true : false,
+        "user" => [
+            "name" => isset($_SESSION['user_name']) ? $_SESSION['user_name'] : '',
+            "email" => isset($_SESSION['user_email']) ? $_SESSION['user_email'] : '',
+            "avatar" => isset($_SESSION['photo_url']) ? $_SESSION['photo_url'] : '',
+            "notifications" => [                
+                // [
+                //     "id" => 1,
+                //     "message" => "Your video 'Introduction to ION' has reached 1,000 views",
+                //     "time" => "2 hours ago",
+                //     "read" => false
+                // ],              [
+                //     "id" => 2,
+                //     "message" => "New comment on your post",
+                //     "time" => "5 hours ago",
+                //     "read" => false
+                // ],
+                // [
+                //     "id" => 3,
+                //     "message" => "Your profile was viewed 25 times today",
+                //     "time" => "1 day ago",
+                //     "read" => true
+                // ]
+            ],
+            "menuItems" => [
+                [
+                    "label" => "View Profile",
+                    "link" => "/@".$_SESSION['user_handle'],
+                    "icon" => "User"
+                ],
+                [
+                    "label" => "Update Profile",
+                    "link" => "/profile/edit",
+                    "icon" => "UserCog"
+                ],
+                [
+                    "label" => "Creator Dashboard",
+                    "link" => "/app/creators.php",
+                    "icon" => "LayoutDashboard"
+                ],
+                [
+                    "label" => "My Videos",
+                    "link" => "/my-videos",
+                    "icon" => "Video"
+                ],
+                [
+                    "label" => "Preferences",
+                    "link" => "/app/preferences.php",
+                    "icon" => "Settings"
+                ],
+                [
+                    "label" => "Log Out",
+                    "link" => "/login/logout.php",
+                    "icon" => "LogOut"
+                ]
+            ]
+        ],
+        "headerButtons" => [
+            "upload" => [
+                "label" => "Upload",
+                "link" => "/upload",
+                "visible" => true
+            ],
+            "signIn" => [
+                "label" => "Sign In",
+                "link" => "/signin",
+                "visible" => true
+            ]
+        ]
+    ];
+
 
 // Normalize base URL
 $__ion_base = isset($ION_NAVBAR_BASE_URL) ? rtrim($ION_NAVBAR_BASE_URL, "/") . "/" : "";
