@@ -162,7 +162,10 @@ if (isset($_POST['photo_option']) && $_POST['photo_option'] === 'url') {
         $upload_path = $upload_dir . $filename;
         
         if (move_uploaded_file($file['tmp_name'], $upload_path)) {
-            $photo_url = $config['mediaUploadPrefix'] . $filename;
+            // FIXED: Use dynamic domain instead of hard-coded ions.com
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'iblog.bz';
+            $photo_url = $protocol . '://' . $host . $config['mediaUploadPath'] . $filename;
         } else {
             echo json_encode(['success' => false, 'error' => 'Failed to upload file']);
             exit();

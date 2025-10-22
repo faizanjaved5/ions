@@ -151,8 +151,22 @@ $google_oauth_url = '#'; // Placeholder URL for demo
     emailForm.addEventListener('submit', function(e) {
       e.preventDefault();
       const formData = new FormData(emailForm);
+      const submitBtn = emailForm.querySelector('button[type="submit"]');
+      
+      // Disable button and show loading state
+      submitBtn.disabled = true;
+      submitBtn.style.backgroundColor = '#6c757d'; // Gray color
+      submitBtn.style.cursor = 'not-allowed';
+      submitBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite; margin-right: 8px;">
+          <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="0.75"/>
+        </svg>
+        Sending email...
+      `;
+      
       messageBox.style.color = "#ccc";
-      messageBox.textContent = "Sending email... please wait.";
+      messageBox.textContent = "Sending OTP code to your email...";
 
       fetch('sendotp.php', {
         method: 'POST',
@@ -175,13 +189,37 @@ $google_oauth_url = '#'; // Placeholder URL for demo
             startCountdown();
             addResendButton();
             otpDigits[0].focus();
+            
+            // Reset button state after 60 seconds (in case user goes back)
+            setTimeout(() => {
+              submitBtn.disabled = false;
+              submitBtn.style.backgroundColor = '';
+              submitBtn.style.cursor = '';
+              submitBtn.innerHTML = '🔐 Continue with Email';
+            }, 60000);
           }, 1000);
+        } else {
+          // Re-enable button on error after 3 seconds
+          setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.style.backgroundColor = '';
+            submitBtn.style.cursor = '';
+            submitBtn.innerHTML = '🔐 Continue with Email';
+          }, 3000);
         }
       })
       .catch(err => {
         console.error('Fetch error:', err);
         messageBox.style.color = "#ef4444";
         messageBox.textContent = "❌ An error occurred. Please try again later.";
+        
+        // Re-enable button on error after 3 seconds
+        setTimeout(() => {
+          submitBtn.disabled = false;
+          submitBtn.style.backgroundColor = '';
+          submitBtn.style.cursor = '';
+          submitBtn.innerHTML = '🔐 Continue with Email';
+        }, 3000);
       });
     });
 

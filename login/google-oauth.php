@@ -2,13 +2,27 @@
 // google-oauth.php - Updated to handle both login and join flows
 session_start();
 
+// ============================================
+// GOOGLE DRIVE OAUTH DETECTION
+// ============================================
+// If state parameter starts with "googledrive_", this is a Google Drive OAuth request
+// Redirect to the Google Drive OAuth handler
+if (isset($_GET['state']) && strpos($_GET['state'], 'googledrive_') === 0) {
+    error_log("=== GOOGLE DRIVE OAUTH DETECTED - Forwarding to google-drive-oauth.php ===");
+    // Forward the request to the Google Drive OAuth handler
+    $_GET['code'] = $_GET['code'] ?? null;
+    $_GET['state'] = $_GET['state'] ?? null;
+    require_once __DIR__ . '/google-drive-oauth.php';
+    exit;
+}
+
 $config = require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 
 global $db;
 
 // Comprehensive error logging
-error_log("=== GOOGLE OAUTH START ===");
+error_log("=== GOOGLE OAUTH START (Regular Login) ===");
 error_log("GET params: " . print_r($_GET, true));
 
 if (!$db || !$db->isConnected()) {
@@ -301,6 +315,8 @@ try {
         $_SESSION['user_id'] = $existing_user->user_id;
         $_SESSION['user_name'] = $name ?: $existing_user->fullname;
         $_SESSION['last_activity'] = time();
+        $_SESSION['photo_url'] = ($existing_user->photo_url ?: ($picture ?: ('https://i0.wp.com/ui-avatars.com/api/?name=' . urlencode(($name ?: $existing_user->fullname) ?: $email) . '&size=256')));
+
         
         // Check for redirect URL from session
         $redirect = $_SESSION['redirect_after_login'] ?? '/app/directory.php';

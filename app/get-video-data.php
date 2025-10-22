@@ -93,17 +93,55 @@ if (!$can_edit) {
 }
 
 // Fetch badges for this video
+error_log("GET-VIDEO-DATA: Fetching badges for video_id: " . $video_id . " (type: " . gettype($video_id) . ")");
+
+// CRITICAL FIX: Ensure video_id is cast to integer for proper matching
+$video_id_int = (int)$video_id;
+
 $badges = $wpdb->get_results($wpdb->prepare(
-    "SELECT b.name FROM IONBadges b 
+    "SELECT b.name, vb.video_id as linked_video_id FROM IONBadges b 
      JOIN IONVideoBadges vb ON b.id = vb.badge_id 
      WHERE vb.video_id = %d ORDER BY b.name",
-    $video_id
+    $video_id_int
 ));
+
+error_log("GET-VIDEO-DATA: Found " . count($badges) . " badges");
+if (!empty($badges)) {
+    error_log("GET-VIDEO-DATA: Badge data: " . json_encode($badges));
+}
 
 $badge_names = array_map(function($b) { return $b->name; }, $badges);
 $badges_string = implode(',', $badge_names);
 
-error_log("GET-VIDEO-DATA: Video ID $video_id has badges: " . ($badges_string ?: 'none'));
+error_log("GET-VIDEO-DATA: Video ID $video_id_int has badges string: " . ($badges_string ?: 'none'));
+
+// Fetch channels for this video (from IONLocalBlast for distributed channels)
+error_log("GET-VIDEO-DATA: Fetching channels for video_id: " . $video_id_int);
+
+$distributed_channels = $wpdb->get_results($wpdb->prepare(
+    "SELECT DISTINCT channel_slug FROM IONLocalBlast WHERE video_id = %d AND status = 'active'",
+    $video_id_int
+));
+
+error_log("GET-VIDEO-DATA: Found " . count($distributed_channels) . " distributed channels");
+if (!empty($distributed_channels)) {
+    error_log("GET-VIDEO-DATA: Distributed channel data: " . json_encode($distributed_channels));
+}
+
+// Add primary channel (from IONLocalVideos.slug)
+$primary_channel = $video->slug;
+error_log("GET-VIDEO-DATA: Primary channel from IONLocalVideos.slug: " . $primary_channel);
+
+// Combine primary + distributed channels
+$all_channels = [$primary_channel];
+foreach ($distributed_channels as $ch) {
+    if ($ch->channel_slug && $ch->channel_slug !== $primary_channel) {
+        $all_channels[] = $ch->channel_slug;
+    }
+}
+
+$channels_string = json_encode(array_values(array_unique($all_channels)));
+error_log("GET-VIDEO-DATA: Video ID $video_id_int has final channels array: " . $channels_string);
 
 // Return video data in expected format
 echo json_encode([
@@ -115,6 +153,7 @@ echo json_encode([
         'category' => $video->category,
         'tags' => $video->tags,
         'badges' => $badges_string,
+        'channels' => $channels_string,
         'visibility' => $video->visibility ?? 'public',
         'thumbnail' => $video->thumbnail,
         'video_link' => $video->video_link,

@@ -149,8 +149,31 @@ if (!empty($search_term)) {
         error_log("IONEERS SEARCH DEBUG: Field '{$field}' contains 'Sayed': " . ($debug_result ?? 'NULL'));
     }
     
+    // Check for @ search - profile handle or email domain search
+    if (strpos($search_term, '@') !== false) {
+        // @ search: search for profile handle and email domain
+        // Extract term after @
+        if (strpos($search_term, '@') === 0) {
+            // If @ is at the beginning, use everything after it
+            $handle_term = strtolower(substr($search_term, 1));
+        } else {
+            // If @ is somewhere else, use it as is for email search and extract after @ for handle
+            $at_pos = strpos($search_term, '@');
+            $handle_term = strtolower(substr($search_term, $at_pos + 1));
+        }
+        $escaped_handle = $db->esc_like($handle_term);
+        
+        error_log("IONEERS SEARCH DEBUG: @ search detected, searching for handle/domain: " . $handle_term);
+        
+        // Search for:
+        // 1. Handle matching the term (without @)
+        // 2. Email containing @term in the domain part
+        $search_conditions[] = "(LOWER(handle) LIKE CONCAT('%%', %s, '%%') OR LOWER(email) LIKE CONCAT('%%@', %s, '%%'))";
+        $search_params[] = $escaped_handle;
+        $search_params[] = $escaped_handle;
+        
     // Parse search term based on type - CASE-INSENSITIVE using LOWER()
-    if (preg_match('/^"(.+)"$/', $search_term, $matches)) {
+    } elseif (preg_match('/^"(.+)"$/', $search_term, $matches)) {
         // EXACT PHRASE: "john doe" - CASE-INSENSITIVE
         $exact_phrase = strtolower($matches[1]);
         $escaped_phrase = $db->esc_like($exact_phrase);
@@ -933,6 +956,7 @@ if ($is_ajax) {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
+            margin-top: 1rem;
             margin-bottom: 2rem;
         }
 

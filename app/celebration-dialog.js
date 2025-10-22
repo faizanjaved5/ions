@@ -98,34 +98,34 @@ window.shareCelebrationVideo = function() {
     
     // Try to access parent's EnhancedIONShare (since we're in an iframe)
     let EnhancedShare = null;
+    let targetDoc = document; // document where the template must exist
     
-    // Check parent window first (most common case)
+    // Prefer parent window if available
     if (window.parent && window.parent !== window && typeof window.parent.EnhancedIONShare !== 'undefined') {
         console.log('✅ Using parent window EnhancedIONShare');
         EnhancedShare = window.parent.EnhancedIONShare;
-    }
-    // Fall back to current window
-    else if (typeof window.EnhancedIONShare !== 'undefined') {
+        targetDoc = window.parent.document;
+    } else if (typeof window.EnhancedIONShare !== 'undefined') {
+        // Fall back to current window
         console.log('✅ Using current window EnhancedIONShare');
         EnhancedShare = window.EnhancedIONShare;
-    }
-    // Not available anywhere
-    else {
+        targetDoc = document;
+    } else {
+        // Not available anywhere
         console.error('❌ Enhanced ION Share system not loaded in window or parent');
         alert('Share system not available. Please try again.');
         return;
     }
     
-    // Check if template already exists in parent DOM
-    const parentDoc = (window.parent && window.parent !== window) ? window.parent.document : document;
-    const template = parentDoc.getElementById(`enhanced-share-template-${videoId}`);
+    // Check if template already exists in the matching DOM for EnhancedShare
+    const template = targetDoc.getElementById(`enhanced-share-template-${videoId}`);
     
     if (template) {
         // Template exists in parent DOM, use it directly
         console.log('✅ Share template found in parent DOM, opening modal');
         EnhancedShare.openFromTemplate(videoId);
     } else {
-        // Template doesn't exist, fetch and inject it into PARENT document
+        // Template doesn't exist, fetch and inject it into the correct document
         console.log('📥 Fetching share template from server...');
         
         // Construct proper URL (relative to parent page, not iframe)
@@ -136,12 +136,12 @@ window.shareCelebrationVideo = function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.html) {
-                    console.log('✅ Share template fetched, injecting into parent DOM');
+                    console.log('✅ Share template fetched, injecting into target DOM');
                     
-                    // Inject template into PARENT document
-                    const templateContainer = parentDoc.createElement('div');
+                    // Inject template into the chosen document
+                    const templateContainer = targetDoc.createElement('div');
                     templateContainer.innerHTML = data.html;
-                    parentDoc.body.appendChild(templateContainer);
+                    targetDoc.body.appendChild(templateContainer);
                     
                     // Now open the modal using parent's EnhancedIONShare
                     EnhancedShare.openFromTemplate(videoId);

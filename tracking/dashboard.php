@@ -45,7 +45,7 @@ $sql = "SELECT
             unique_impressions,
             unique_clicks,
             ROUND(clicks * 100.0 / NULLIF(impressions, 0), 2) as ctr
-        FROM video_tracking
+        FROM IONVideoTracking
         WHERE impressions > 0
         ORDER BY clicks DESC
         LIMIT 20";
@@ -60,7 +60,7 @@ $sql = "SELECT
             SUM(impressions) as daily_impressions,
             SUM(clicks) as daily_clicks,
             ROUND(SUM(clicks) * 100.0 / NULLIF(SUM(impressions), 0), 2) as daily_ctr
-        FROM video_tracking_daily
+        FROM IONVideoTrackingDaily
         WHERE track_date >= :date_from
         GROUP BY track_date
         ORDER BY track_date DESC";

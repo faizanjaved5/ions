@@ -1,0 +1,93 @@
+/* Shared login styles used by both /login page and the JS modal */
+
+/* Design tokens */
+:root {
+  --ion-bg: #121418;
+  --ion-panel: rgba(255, 255, 255, 0.05);
+  --ion-text: #ffffff;
+  --ion-muted: #cccccc;
+  --ion-border: rgba(255, 255, 255, 0.2);
+  --ion-primary: #ffd700; /* page CTA yellow */
+  --ion-primary-600: #ffed4e; /* lighter yellow */
+  --ion-focus: rgba(255, 215, 0, 0.15);
+  --ion-input-bg: rgba(255, 255, 255, 0.05);
+}
+
+/* Inputs (email fields) */
+input[type="email"]#emailInput,
+.ion-login-input-group input#ion-email-input {
+  width: 100%;
+  background: var(--ion-input-bg);
+  color: var(--ion-text);
+  border: 2px solid var(--ion-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  outline: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+input[type="email"]#emailInput:focus,
+.ion-login-input-group input#ion-email-input:focus {
+  border-color: var(--ion-primary);
+  box-shadow: 0 0 0 3px var(--ion-focus);
+}
+
+/* OTP digit boxes */
+.otp-digit,
+.ion-otp-digit {
+  width: 45px;
+  height: 45px;
+  text-align: center;
+  font-size: 18px;
+  color: var(--ion-text);
+  background: var(--ion-input-bg);
+  border: 2px solid var(--ion-border);
+  border-radius: 8px;
+}
+
+.otp-digit:focus,
+.ion-otp-digit:focus {
+  border-color: var(--ion-primary);
+  box-shadow: 0 0 0 3px var(--ion-focus);
+  outline: none;
+}
+
+/* Primary CTA buttons */
+.btn,
+.ion-login-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--ion-primary) 0%, var(--ion-primary-600) 100%);
+  color: #1a1a1a;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.06s ease, filter 0.2s ease;
+}
+
+.btn:hover,
+.ion-login-submit-btn:hover { filter: brightness(1.05); }
+.btn:active,
+.ion-login-submit-btn:active { transform: translateY(1px); }
+
+/* Secondary button (Google style parity for both) */
+.ion-login-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 12px;
+  background: transparent;
+  color: var(--ion-text);
+  border: 2px solid var(--ion-border);
+  border-radius: 8px;
+  padding: 12px 24px;
+}
+
+.ion-login-divider { display: flex; align-items: center; justify-content: center; color: var(--ion-muted); }
+

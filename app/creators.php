@@ -8,7 +8,7 @@ ini_set('display_startup_errors', 0);
 error_reporting(0);
 
 require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/config.php';
+$config = require __DIR__ . '/../config/config.php'; // CRITICAL: Capture returned config array
 require_once __DIR__ . '/../includes/ioncategories.php';
 require_once __DIR__ . '/../share/share-manager.php';
 $wpdb = $db;
@@ -453,9 +453,22 @@ if (!function_exists('deleteFromCloudflareR2')) {
             return ['success' => false, 'error' => 'Cloudflare R2 credentials not configured'];
         }
         
-        // Extract filename from R2 URL (support both old and new URL formats)
+        // CRITICAL: Handle both full URLs and relative paths/object keys
+        // If video_url doesn't contain a domain, assume it's a relative path or object key
         $is_old_r2_url = strpos($video_url, 'r2.cloudflarestorage.com') !== false;
         $is_new_r2_url = strpos($video_url, 'vid.ions.com') !== false;
+        $is_relative_path = !preg_match('/^https?:\/\//', $video_url);
+        
+        // If it's a relative path, construct the full R2 URL
+        if ($is_relative_path) {
+            error_log("🔧 R2 DELETION: Converting relative path to full URL: $video_url");
+            // Remove leading slash if present
+            $cleaned_path = ltrim($video_url, '/');
+            // Construct full URL using the public URL base from config
+            $video_url = rtrim($r2_config['public_url_base'], '/') . '/' . $cleaned_path;
+            $is_new_r2_url = true; // Mark as R2 URL
+            error_log("🔧 R2 DELETION: Constructed full URL: $video_url");
+        }
         
         if (!$is_old_r2_url && !$is_new_r2_url) {
             return ['success' => false, 'error' => 'Not an R2 URL: ' . $video_url];
@@ -470,16 +483,20 @@ if (!function_exists('deleteFromCloudflareR2')) {
         
         // Try different URL patterns
         $patterns = [
-            // Pattern 1: https://[account].r2.cloudflarestorage.com/[bucket]/[key]
-            '/' . preg_quote($bucket, '/') . '\/(.+)$/',
-            // Pattern 2: https://pub-[hash].r2.dev/[key] (custom domain without bucket in path)
-            '/^https:\/\/pub-[^\/]+\.r2\.dev\/(.+)$/',
-            // Pattern 3: Custom domain with bucket: https://cdn.domain.com/[bucket]/[key]
-            '/' . preg_quote($bucket, '/') . '\/(.+)$/',
-            // Pattern 4: NEW - vid.ions.com domain: https://vid.ions.com/[key]
-            '/^https:\/\/vid\.ions\.com\/(.+)$/',
-            // Pattern 5: Direct key extraction after last slash if other patterns fail
-            '/\/([^\/]+\.(mp4|mov|avi|webm|mkv|flv|wmv))$/i'
+            // Pattern 1: https://[account].r2.cloudflarestorage.com/[key] (direct R2 URL without bucket in path)
+            '/^https:\/\/[^\/]+\.r2\.cloudflarestorage\.com\/(.+?)(?:\?.*)?$/s',
+            // Pattern 2: https://[account].r2.cloudflarestorage.com/[bucket]/[key]
+            '/' . preg_quote($bucket, '/') . '\/(.+?)(?:\?.*)?$/s',
+            // Pattern 3: https://pub-[hash].r2.dev/[key] (custom domain without bucket in path)
+            '/^https:\/\/pub-[^\/]+\.r2\.dev\/(.+?)(?:\?.*)?$/s',
+            // Pattern 4: Custom domain with bucket: https://cdn.domain.com/[bucket]/[key]
+            '/' . preg_quote($bucket, '/') . '\/(.+?)(?:\?.*)?$/s',
+            // Pattern 5: vid.ions.com domain: https://vid.ions.com/[key]
+            '/^https:\/\/vid\.ions\.com\/(.+?)(?:\?.*)?$/s',
+            // Pattern 6: Direct key extraction - full path with slashes
+            '/^https:\/\/[^\/]+\.r2\.cloudflarestorage\.com\/((?:[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/)?[^?]+)/',
+            // Pattern 7: Direct key extraction - filename only (last resort)
+            '/\/([^\/\?]+\.(mp4|mov|avi|webm|mkv|flv|wmv))(?:\?.*)?$/i'
         ];
         
         error_log("🔍 R2 URL PARSING: Trying to extract key from URL: $video_url");
@@ -499,8 +516,15 @@ if (!function_exists('deleteFromCloudflareR2')) {
         }
         
         try {
+            // CRITICAL: Encode each path segment individually to preserve slashes
+            // AWS S3/R2 expects paths like: /bucket/2025/08/08/file.jpg
+            // NOT: /bucket/2025%2F08%2F08%2Ffile.jpg (which breaks signatures)
+            $keyParts = explode('/', $key);
+            $encodedKeyParts = array_map('rawurlencode', $keyParts);
+            $encodedKey = implode('/', $encodedKeyParts);
+            
             // Prepare DELETE request
-            $url = "{$endpoint}/{$bucket}/" . rawurlencode($key);
+            $url = "{$endpoint}/{$bucket}/" . $encodedKey;
             
             // Create AWS v4 signature for DELETE
             $date = gmdate('Ymd\THis\Z');
@@ -525,7 +549,8 @@ if (!function_exists('deleteFromCloudflareR2')) {
             }
             $signed_headers = rtrim($signed_headers, ';');
             
-            $canonical_request = "DELETE\n/{$bucket}/" . rawurlencode($key) . "\n\n{$canonical_headers}\n{$signed_headers}\n" . hash('sha256', '');
+            // CRITICAL: Use encoded key with slashes preserved
+            $canonical_request = "DELETE\n/{$bucket}/" . $encodedKey . "\n\n{$canonical_headers}\n{$signed_headers}\n" . hash('sha256', '');
             
             // Create signature
             $string_to_sign = "AWS4-HMAC-SHA256\n{$date}\n{$scope}\n" . hash('sha256', $canonical_request);
@@ -547,30 +572,40 @@ if (!function_exists('deleteFromCloudflareR2')) {
                         "X-Amz-Date: {$date}",
                         "X-Amz-Content-Sha256: " . hash('sha256', ''),
                         "Authorization: {$authorization}"
-                    ]
+                    ],
+                    'ignore_errors' => true // Don't throw warnings on 404/403
                 ]
             ]);
             
-            $result = file_get_contents($url, false, $context);
+            // Suppress PHP warnings for already-deleted files
+            $result = @file_get_contents($url, false, $context);
             
             // Check HTTP response headers
             $http_response_header_string = isset($http_response_header) ? implode(', ', $http_response_header) : 'No headers';
             error_log("🗑️ R2 DELETE RESPONSE: " . $http_response_header_string);
             
-            if ($result === false) {
-                $error = error_get_last();
-                error_log("❌ R2 DELETE FAILED: " . ($error['message'] ?? 'Unknown error'));
-                return ['success' => false, 'error' => 'Failed to delete from R2: ' . ($error['message'] ?? 'Unknown error')];
+            // Extract HTTP status code
+            $status_code = 0;
+            if (isset($http_response_header[0])) {
+                $status_line = $http_response_header[0];
+                if (preg_match('/HTTP\/\d\.\d\s+(\d+)/', $status_line, $matches)) {
+                    $status_code = intval($matches[1]);
+                }
             }
             
-            // Check if we got a 204 No Content (successful delete) or 404 (already deleted)
-            $status_line = isset($http_response_header[0]) ? $http_response_header[0] : '';
-            if (strpos($status_line, '204') !== false || strpos($status_line, '404') !== false) {
-                error_log("✅ R2 DELETE SUCCESS: $status_line for key: $key");
+            // 2xx = success, 404 = already deleted (success), anything else = actual error
+            if ($status_code >= 200 && $status_code < 300) {
+                error_log("✅ R2 DELETE SUCCESS: HTTP $status_code for key: $key");
                 return ['success' => true, 'message' => 'File deleted from R2 successfully'];
+            } elseif ($status_code == 404) {
+                error_log("✅ R2 DELETE SUCCESS (already deleted): HTTP 404 for key: $key");
+                return ['success' => true, 'message' => 'File already deleted from R2 (does not exist)'];
+            } elseif ($status_code > 0) {
+                error_log("⚠️ R2 DELETE FAILED: HTTP $status_code for key: $key");
+                return ['success' => false, 'error' => "R2 returned HTTP $status_code"];
             } else {
-                error_log("⚠️ R2 DELETE UNEXPECTED RESPONSE: $status_line for key: $key");
-                return ['success' => true, 'message' => 'File deletion request sent to R2 (response: ' . $status_line . ')'];
+                error_log("❌ R2 DELETE FAILED: No valid response for key: $key");
+                return ['success' => false, 'error' => 'Failed to delete from R2: No response'];
             }
             
         } catch (Exception $e) {
@@ -621,6 +656,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     
     // Delete from Cloudflare R2 if it's stored there
+    // CRITICAL: Enhanced logging for R2 deletion debugging
+    $r2_log_file = __DIR__ . '/../uploads/r2_deletion.log';
+    $log_timestamp = date('[Y-m-d H:i:s]');
+    
+    file_put_contents($r2_log_file, "$log_timestamp ==================== DELETE VIDEO REQUEST ====================\n", FILE_APPEND);
+    file_put_contents($r2_log_file, "$log_timestamp Video ID: $video_id\n", FILE_APPEND);
+    file_put_contents($r2_log_file, "$log_timestamp Title: {$video->title}\n", FILE_APPEND);
+    file_put_contents($r2_log_file, "$log_timestamp Video Link: {$video->video_link}\n", FILE_APPEND);
+    file_put_contents($r2_log_file, "$log_timestamp Source: {$video->source}\n", FILE_APPEND);
+    
     error_log("🔍 DELETE DEBUG: video_id=$video_id, video_link='{$video->video_link}', source='{$video->source}'");
     
     if (!empty($video->video_link)) {
@@ -638,27 +683,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         // Only consider it an R2 video if it's definitely stored on R2
         $is_r2_video = ($is_r2_url || $is_r2_custom_domain || $is_r2_cdn || $is_r2_public_domain) && !$is_youtube && !$is_external_platform;
         
+        file_put_contents($r2_log_file, "$log_timestamp R2 Detection: is_r2_url=$is_r2_url, is_r2_public_domain=$is_r2_public_domain, is_youtube=$is_youtube, is_r2_video=$is_r2_video\n", FILE_APPEND);
         error_log("🔍 R2 URL CHECK: is_r2_url=$is_r2_url, is_youtube=$is_youtube, is_external_platform=$is_external_platform, is_r2_video=$is_r2_video");
         
         if ($is_r2_video) {
+            file_put_contents($r2_log_file, "$log_timestamp ✅ Video detected as R2 - attempting deletion\n", FILE_APPEND);
             error_log("🗑️ ATTEMPTING R2 DELETION for: {$video->video_link}");
+            
             $r2_result = deleteFromCloudflareR2($video->video_link);
             
+            file_put_contents($r2_log_file, "$log_timestamp R2 Deletion Result: " . print_r($r2_result, true) . "\n", FILE_APPEND);
             error_log("🗑️ R2 DELETION RESULT: " . print_r($r2_result, true));
             
             if (!$r2_result['success']) {
+                file_put_contents($r2_log_file, "$log_timestamp ❌ R2 deletion FAILED: {$r2_result['error']}\n", FILE_APPEND);
                 error_log("❌ R2 deletion failed for video {$video_id}: " . $r2_result['error']);
                 // For true R2 videos, if deletion fails, we should report the error
                 // But continue with database deletion anyway to avoid orphaned records
             } else {
+                file_put_contents($r2_log_file, "$log_timestamp ✅ R2 file deleted successfully\n", FILE_APPEND);
                 error_log("✅ R2 file deleted successfully for video {$video_id}");
             }
         } else {
+            file_put_contents($r2_log_file, "$log_timestamp ⚠️ Video NOT detected as R2 - skipping R2 deletion\n", FILE_APPEND);
             error_log("⚠️ Video not stored on R2, skipping R2 deletion: {$video->video_link}");
         }
     } else {
+        file_put_contents($r2_log_file, "$log_timestamp ⚠️ No video_link found\n", FILE_APPEND);
         error_log("⚠️ No video_link found for video {$video_id}");
     }
+    
+    file_put_contents($r2_log_file, "$log_timestamp ==================== END DELETE REQUEST ====================\n\n", FILE_APPEND);
     
     // Delete local physical file if it exists (legacy uploads)
     if ($video->source === 'Upload' && !empty($video->video_link) && strpos($video->video_link, 'r2.cloudflarestorage.com') === false) {
@@ -997,7 +1052,8 @@ if (!empty($search_term)) {
     }
     
     // Define search fields for IONLocalVideos (with table alias)
-    $search_fields = ['v.video_id', 'v.slug', 'v.title', 'v.video_link', 'v.description', 'v.transcript', 'v.tags'];
+    // CRITICAL: Include v.id for searching by internal video ID (e.g., searching "51377")
+    $search_fields = ['v.id', 'v.video_id', 'v.slug', 'v.title', 'v.video_link', 'v.description', 'v.transcript', 'v.tags'];
     
     // Parse search term based on type (only if not already handled by @username)
     if (!empty($search_term) && preg_match('/^"(.+)"$/', $search_term, $matches)) {
@@ -1310,11 +1366,24 @@ error_log("User: $user_email (UID: $user_unique_id), Role: $user_role, Videos: "
     .videos-table-container {
         display: none;
         background: transparent;
-        gap: 12px;
-        overflow: visible; /* Remove all overflow restrictions to prevent double scroll */
         width: 100%;
         max-width: 100%;
-        height: auto; /* Ensure natural height */
+        /* CRITICAL: Prevent this container from creating any scroll context */
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+    }
+    
+    /* Hide scrollbar completely for list view */
+    .videos-table-container::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+    
+    .videos-table-container {
+        -ms-overflow-style: none !important;  /* IE and Edge */
+        scrollbar-width: none !important;  /* Firefox */
     }
     
     .videos-table {
@@ -1323,13 +1392,57 @@ error_log("User: $user_email (UID: $user_unique_id), Role: $user_role, Videos: "
         border-collapse: separate;
         border-spacing: 0;
         background: transparent;
-        table-layout: fixed; /* Force table to respect container width */
-        height: auto; /* Ensure natural height */
-        overflow: visible; /* Prevent table from creating scroll */
+        table-layout: fixed;
+        /* CRITICAL: Prevent table from creating scroll */
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+    }
+    
+    /* Hide scrollbar on table */
+    .videos-table::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+    
+    .videos-table {
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
     }
     
     .videos-table thead {
         display: none; /* Hide table headers to match user's design */
+    }
+    
+    .videos-table tbody {
+        display: table-row-group;
+        /* CRITICAL: Prevent tbody from creating scroll */
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+    }
+    
+    /* Hide scrollbar on tbody */
+    .videos-table tbody::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+    }
+    
+    .videos-table tbody {
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
+    }
+    
+    /* When list view is active, ensure no scrolling */
+    .videos-table-container[style*="display: block"],
+    .videos-table-container[style*="display:block"],
+    #listView[style*="display: block"],
+    #listView[style*="display:block"] {
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
     }
     
     .videos-table tbody tr {
@@ -1340,9 +1453,7 @@ error_log("User: $user_email (UID: $user_unique_id), Role: $user_role, Videos: "
         padding: 16px;
         transition: all 0.2s ease;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        position: relative; /* ensure absolutely positioned dropdowns are contained */
-        overflow: visible; /* allow dropdown to overflow the row block */
-        z-index: 0; /* base stacking context below global modal */
+        position: relative;
     }
     
     .videos-table tbody tr:hover {
@@ -1362,12 +1473,11 @@ error_log("User: $user_email (UID: $user_unique_id), Role: $user_role, Videos: "
     .video-row {
         display: flex !important;
         align-items: center;
-        gap: 12px; /* Reduced from 16px to 12px */
-        padding: 8px 16px !important; /* Reduced vertical padding from 16px to 8px */
+        gap: 12px;
+        padding: 8px 16px !important;
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
-        overflow: hidden; /* Prevent content from overflowing */
     }
     
     /* Thumbnail Column - Larger as requested */
@@ -2212,14 +2322,14 @@ include 'headers.php';
                 <form action="" method="get" id="filter-form" style="display: contents;">
                     <input type="hidden" name="view" id="view-input" value="grid">
 
-                    <select name="sort" onchange="this.form.submit()" class="filter-select" style="padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 4px; background: white; color: #333; font-size: 0.825rem; min-width: 120px;">
+                    <select name="sort" onchange="this.form.submit()" class="filter-select">
                         <option value="newest" <?= $sort_option === 'newest' ? 'selected' : '' ?>>Sort by Newest</option>
                         <option value="oldest" <?= $sort_option === 'oldest' ? 'selected' : '' ?>>Sort by Oldest</option>
                         <option value="title" <?= $sort_option === 'title' ? 'selected' : '' ?>>Sort by Title</option>
                         <option value="status" <?= $sort_option === 'status' ? 'selected' : '' ?>>Sort by Status</option>
                     </select>
                     
-                    <select name="status" onchange="this.form.submit()" class="filter-select" style="padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 4px; background: white; color: #333; font-size: 0.825rem; min-width: 100px;">
+                    <select name="status" onchange="this.form.submit()" class="filter-select">
                         <option value="">All Status</option>
                         <option value="approved" <?= $status_filter === 'approved' ? 'selected' : '' ?>>Approved (<?= number_format($video_stats['approved']) ?>)</option>
                         <option value="pending" <?= $status_filter === 'pending' ? 'selected' : '' ?>>Pending (<?= number_format($video_stats['pending']) ?>)</option>
@@ -2227,18 +2337,18 @@ include 'headers.php';
                         <option value="rejected" <?= $status_filter === 'rejected' ? 'selected' : '' ?>>Rejected (<?= number_format($video_stats['rejected']) ?>)</option>
                     </select>
                     
-                    <select name="category" onchange="this.form.submit()" class="filter-select" style="padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 4px; background: white; color: #333; font-size: 0.825rem; min-width: 80px; max-width: 80px;">
+                    <select name="category" onchange="this.form.submit()" class="filter-select" style="min-width: 80px; max-width: 90px;">
                         <?= generate_ion_category_options($category_filter, true) ?>
                     </select>
                     
                     <?php if (in_array($user_role, ['Owner', 'Admin'])): ?>
-                    <select name="uploader" onchange="this.form.submit()" class="filter-select" style="padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 4px; background: white; color: #333; font-size: 0.825rem; min-width: 110px; position: relative; z-index: 10000;">
+                    <select name="uploader" onchange="this.form.submit()" class="filter-select" style="min-width: 120px; position: relative; z-index: 10000;">
                         <option value="">All Creators</option>
                         <option value="<?= $user_unique_id ?>" <?= $uploader_filter === $user_unique_id ? 'selected' : '' ?>>My Videos</option>
                     </select>
                     <?php endif; ?>
                     
-                    <select name="type" onchange="this.form.submit()" class="filter-select" style="padding: 0.4rem 0.6rem; border: 1px solid var(--border-color); border-radius: 4px; background: white; color: #333; font-size: 0.825rem; min-width: 100px;">
+                    <select name="type" onchange="this.form.submit()" class="filter-select">
                         <option value="">All Types</option>
                         <option value="upload" <?= $type_filter === 'upload' ? 'selected' : '' ?>>Uploaded</option>
                         <option value="import" <?= $type_filter === 'import' ? 'selected' : '' ?>>Imported</option>
@@ -2267,7 +2377,7 @@ include 'headers.php';
     </div>
 </div>
 
-<div class="container" style="overflow-x: hidden; max-width: 100%; box-sizing: border-box; height: auto; overflow-y: visible;">
+<div class="container" style="overflow-x: hidden; max-width: 100%; box-sizing: border-box; height: auto; overflow-y: visible; scrollbar-width: none;">
     <!-- Video Statistics -->
     <div class="stats-grid">
         <div class="stat-card videos clickable" onclick="filterByStatus('')">
@@ -2371,8 +2481,11 @@ include 'headers.php';
                         } elseif ($video_type === 'rumble' && $video_id) {
                             $preview_url = 'https://rumble.com/embed/v' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '/?autoplay=1&muted=1';
                         } elseif ($video_type === 'muvi' && $video_id) {
-                            $preview_url = 'https://embed.muvi.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1';
-                        } elseif ($video_type === 'local' && $video_url) {
+                            $preview_url = 'https://embed.muvi.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1';
+                        } elseif ($video_type === 'loom' && $video_id) {
+                            $preview_url = 'https://www.loom.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true';
+                        } elseif (($video_type === 'local' || $video_type === 'upload') && $video_url) {
+                            // FIXED: Check for both 'local' and 'upload' (since source can be 'Upload')
                             // For local/uploaded videos, we'll use a data attribute that JavaScript will handle
                             // Store the video URL to be used by Video.js on hover
                             $preview_url = 'local:' . htmlspecialchars($video_url, ENT_QUOTES, 'UTF-8');
@@ -2384,7 +2497,7 @@ include 'headers.php';
                                data-video-type="<?= htmlspecialchars($video_type, ENT_QUOTES, 'UTF-8') ?>"
                                data-video-url="<?= htmlspecialchars($video->video_link, ENT_QUOTES, 'UTF-8') ?>"
                                data-video-title="<?= htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8') ?>"
-                               <?= $video_type === 'local' ? 'data-video-format="' . htmlspecialchars(pathinfo($video->video_link, PATHINFO_EXTENSION), ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                               <?= ($video_type === 'local' || $video_type === 'upload') ? 'data-video-format="' . htmlspecialchars(pathinfo($video->video_link, PATHINFO_EXTENSION), ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                                 <img class="video-thumbnail" src="<?= htmlspecialchars($thumbnail, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8') ?>" onerror="this.onerror=null; this.src='https://ions.com/assets/default/processing.png';">
                                 <div class="play-icon-overlay">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)">
@@ -2396,7 +2509,11 @@ include 'headers.php';
                                 <?php endif; ?>
                             </a>
                             <div class="video-card-info">
-                                <p><?= html_entity_decode($video->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></p>
+                                <?php 
+                                // Generate video page URL using short_link
+                                $video_page_url = !empty($video->short_link) ? '/v/' . htmlspecialchars($video->short_link, ENT_QUOTES, 'UTF-8') : '#';
+                                ?>
+                                <p><a href="<?= $video_page_url ?>" style="color: inherit; text-decoration: none;" onclick="window.open(this.href, '_blank'); return false;" title="Open video page"><?= html_entity_decode($video->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></a></p>
                                 <?php if (!empty($video->description)): ?>
                                     <small style="color: #a4b3d0; display: block; margin-top: 0.35rem; line-height: 1.3;">
                                         <?= htmlspecialchars(substr($video->description, 0, 80)) ?><?= strlen($video->description) > 80 ? '...' : '' ?>
@@ -2406,7 +2523,7 @@ include 'headers.php';
                                 <!-- Badges moved here (below subtitle, above creator) -->
                                 <?= renderVideoBadges($video->id) ?>
                                 
-                                <!-- Creator Handle with Likes/Dislikes -->
+                                <!-- Creator Handle with Views and Likes/Dislikes -->
                                 <div class="creator-handle-container" style="display: flex; align-items: center; justify-content: space-between; min-height: 24px;">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <?php if (!empty($video->creator_handle)): ?>
@@ -2422,7 +2539,7 @@ include 'headers.php';
                                         
                                         <?php if (in_array($user_role, ['Owner', 'Admin'])): ?>
                                             <button class="edit-creator-btn" 
-                                                    onclick="editVideoCreator(<?= $video->id ?>, '<?= htmlspecialchars($video->creator_handle ?? '', ENT_QUOTES, 'UTF-8') ?>', <?= $video->user_id ?>)" 
+                                                    onclick="editVideoCreator(<?= $video->id ?>, <?= htmlspecialchars(json_encode($video->creator_handle ?? ''), ENT_QUOTES) ?>, <?= $video->user_id ?>)" 
                                                     style="background: none; border: none; cursor: pointer; color: #64748b; padding: 2px 4px; display: none; opacity: 0; transition: opacity 0.2s ease;"
                                                     title="Change video creator">
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2433,20 +2550,31 @@ include 'headers.php';
                                         <?php endif; ?>
                                     </div>
                                     
-                                    <!-- Likes/Dislikes Engagement -->
-                                    <div class="video-reactions" data-video-id="<?= $video->id ?>" data-user-action="<?= htmlspecialchars($video->user_reaction ?? '', ENT_QUOTES, 'UTF-8') ?>" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                                        <button class="reaction-btn like-btn <?= ($video->user_reaction ?? '') === 'like' ? 'active' : '' ?>" data-action="like" style="background: none; border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M7 22V11M2 13V20C2 21.1046 2.89543 22 4 22H17.4262C18.907 22 20.1662 20.9197 20.3914 19.4562L21.4683 12.4562C21.7479 10.6389 20.3418 9 18.5032 9H15V4C15 2.89543 14.1046 2 13 2H12.5C12.2239 2 12 2.22386 12 2.5C12 3.19838 11.8052 3.88237 11.4391 4.47463L8.5 9.5"></path>
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <!-- Video Views Counter -->
+                                        <span style="color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;" title="Video views">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                <circle cx="12" cy="12" r="3"></circle>
                                             </svg>
-                                            <span class="like-count"><?= intval($video->likes ?? 0) ?></span>
-                                        </button>
-                                        <button class="reaction-btn dislike-btn <?= ($video->user_reaction ?? '') === 'dislike' ? 'active' : '' ?>" data-action="dislike" style="background: none; border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M17 2V13M22 11V4C22 2.89543 21.1046 2 20 2H6.57383C5.09299 2 3.83379 3.08025 3.60865 4.54377L2.53172 11.5438C2.25207 13.3611 3.65819 15 5.49666 15H9V20C9 21.1046 9.89543 22 11 22H11.5C11.7761 22 12 21.7761 12 21.5C12 20.8016 12.1948 20.1176 12.5609 19.5254L15.5 14.5"></path>
-                                            </svg>
-                                            <span class="dislike-count"><?= intval($video->dislikes ?? 0) ?></span>
-                                        </button>
+                                            <?= number_format(intval($video->clicks ?? 0)) ?>
+                                        </span>
+                                        
+                                        <!-- Likes/Dislikes Engagement -->
+                                        <div class="video-reactions" data-video-id="<?= $video->id ?>" data-user-action="<?= htmlspecialchars($video->user_reaction ?? '', ENT_QUOTES, 'UTF-8') ?>" style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                                            <button class="reaction-btn like-btn <?= ($video->user_reaction ?? '') === 'like' ? 'active' : '' ?>" data-action="like" style="background: none; border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M7 22V11M2 13V20C2 21.1046 2.89543 22 4 22H17.4262C18.907 22 20.1662 20.9197 20.3914 19.4562L21.4683 12.4562C21.7479 10.6389 20.3418 9 18.5032 9H15V4C15 2.89543 14.1046 2 13 2H12.5C12.2239 2 12 2.22386 12 2.5C12 3.19838 11.8052 3.88237 11.4391 4.47463L8.5 9.5"></path>
+                                                </svg>
+                                                <span class="like-count"><?= intval($video->likes ?? 0) ?></span>
+                                            </button>
+                                            <button class="reaction-btn dislike-btn <?= ($video->user_reaction ?? '') === 'dislike' ? 'active' : '' ?>" data-action="dislike" style="background: none; border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M17 2V13M22 11V4C22 2.89543 21.1046 2 20 2H6.57383C5.09299 2 3.83379 3.08025 3.60865 4.54377L2.53172 11.5438C2.25207 13.3611 3.65819 15 5.49666 15H9V20C9 21.1046 9.89543 22 11 22H11.5C11.7761 22 12 21.7761 12 21.5C12 20.8016 12.1948 20.1176 12.5609 19.5254L15.5 14.5"></path>
+                                                </svg>
+                                                <span class="dislike-count"><?= intval($video->dislikes ?? 0) ?></span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2560,7 +2688,7 @@ include 'headers.php';
                                         ?>
                                         
                                         <!-- Blast Button -->
-                                        <button class="blast-icon action-btn hover-label" onclick="openBlastDialog('<?= $video->id ?>', '<?= htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($thumbnail, ENT_QUOTES, 'UTF-8') ?>')" title="Blast this video" data-label="Blast" style="background: none; border: none; cursor: pointer; padding: 4px 6px; color: #8b5cf6; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; font-size: 12px; position: relative;">
+                                        <button class="blast-icon action-btn hover-label" onclick="openBlastDialog(<?= htmlspecialchars(json_encode($video->id), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($video->title), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($thumbnail), ENT_QUOTES) ?>)" title="Blast this video" data-label="Blast" style="background: none; border: none; cursor: pointer; padding: 4px 6px; color: #8b5cf6; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; font-size: 12px; position: relative;">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.25 4.75l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5"/>
                                             </svg>
@@ -2635,6 +2763,16 @@ include 'headers.php';
                                     $preview_url = 'https://player.vimeo.com/video/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&background=1';
                                 } elseif ($video_type === 'wistia' && $video_id) {
                                     $preview_url = 'https://fast.wistia.net/embed/iframe/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoPlay=true&muted=true';
+                                } elseif ($video_type === 'rumble' && $video_id) {
+                                    $preview_url = 'https://rumble.com/embed/v' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '/?autoplay=1&muted=1';
+                                } elseif ($video_type === 'muvi' && $video_id) {
+                                    $preview_url = 'https://embed.muvi.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1';
+                                } elseif ($video_type === 'loom' && $video_id) {
+                                    $preview_url = 'https://www.loom.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true';
+                                } elseif (($video_type === 'local' || $video_type === 'upload') && $video_url) {
+                                    // FIXED: Check for both 'local' and 'upload' (since source can be 'Upload')
+                                    // For local/uploaded videos, we'll use a data attribute that JavaScript will handle
+                                    $preview_url = 'local:' . htmlspecialchars($video_url, ENT_QUOTES, 'UTF-8');
                                 }
                             ?>
                             <tr class="video-row" data-video-id="<?= $video->id ?>">
@@ -2647,7 +2785,7 @@ include 'headers.php';
                                            data-video-url="<?= htmlspecialchars($video->video_link, ENT_QUOTES, 'UTF-8') ?>" 
                                            data-video-title="<?= htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8') ?>"
                                            <?= $preview_url ? 'data-preview-url="' . htmlspecialchars($preview_url, ENT_QUOTES, 'UTF-8') . '"' : '' ?>
-                                           <?= $video_type === 'local' ? 'data-video-format="' . htmlspecialchars(pathinfo($video->video_link, PATHINFO_EXTENSION), ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
+                                           <?= ($video_type === 'local' || $video_type === 'upload') ? 'data-video-format="' . htmlspecialchars(pathinfo($video->video_link, PATHINFO_EXTENSION), ENT_QUOTES, 'UTF-8') . '"' : '' ?>>
                                             <img src="<?= htmlspecialchars($thumbnail, ENT_QUOTES, 'UTF-8') ?>" 
                                                  alt="<?= htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8') ?>" 
                                                  onerror="this.onerror=null; this.src='https://ions.com/assets/default/processing.png';">
@@ -2664,40 +2802,71 @@ include 'headers.php';
                                 </td>
                                 <td class="col-title">
                                     <div class="table-title-content">
-                                        <div class="table-video-title"><?= html_entity_decode($video->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></div>
+                                        <?php 
+                                        // Generate video page URL using short_link
+                                        $video_page_url = !empty($video->short_link) ? '/v/' . htmlspecialchars($video->short_link, ENT_QUOTES, 'UTF-8') : '#';
+                                        ?>
+                                        <div class="table-video-title"><a href="<?= $video_page_url ?>" style="color: inherit; text-decoration: none;" onclick="window.open(this.href, '_blank'); return false;" title="Open video page"><?= html_entity_decode($video->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></a></div>
                                         <?php if (!empty($video->description)): ?>
                                             <div class="table-video-description">
                                                 <?= htmlspecialchars(substr($video->description, 0, 80)) ?><?= strlen($video->description) > 80 ? '...' : '' ?>
                                             </div>
                                         <?php endif; ?>
                                         
-                                        <!-- Creator Handle -->
-                                        <div class="creator-handle-container" style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
-                                            <?php if (!empty($video->creator_handle)): ?>
-                                                <a href="/@<?= htmlspecialchars($video->creator_handle, ENT_QUOTES, 'UTF-8') ?>" 
-                                                   style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;"
-                                                   onclick="window.open(this.href, '_blank'); return false;"
-                                                   title="View <?= htmlspecialchars($video->creator_name ?? $video->creator_handle, ENT_QUOTES, 'UTF-8') ?>'s profile">
-                                                    <span>@<?= htmlspecialchars($video->creator_handle, ENT_QUOTES, 'UTF-8') ?></span>
-                                                </a>
-                                            <?php else: ?>
-                                                <span style="color: #64748b; font-size: 0.875rem;">@unknown</span>
-                                            <?php endif; ?>
+                                        <!-- Creator Handle with Views, Engagement, and Badges -->
+                                        <div class="creator-handle-container" style="display: flex; align-items: center; gap: 12px; margin-top: 6px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <?php if (!empty($video->creator_handle)): ?>
+                                                    <a href="/@<?= htmlspecialchars($video->creator_handle, ENT_QUOTES, 'UTF-8') ?>" 
+                                                       style="color: #3b82f6; text-decoration: none; font-size: 0.875rem;"
+                                                       onclick="window.open(this.href, '_blank'); return false;"
+                                                       title="View <?= htmlspecialchars($video->creator_name ?? $video->creator_handle, ENT_QUOTES, 'UTF-8') ?>'s profile">
+                                                        <span>@<?= htmlspecialchars($video->creator_handle, ENT_QUOTES, 'UTF-8') ?></span>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <span style="color: #64748b; font-size: 0.875rem;">@unknown</span>
+                                                <?php endif; ?>
+                                                
+                                                <?php if (in_array($user_role, ['Owner', 'Admin'])): ?>
+                                                    <button class="edit-creator-btn" 
+                                                            onclick="editVideoCreator(<?= $video->id ?>, <?= htmlspecialchars(json_encode($video->creator_handle ?? ''), ENT_QUOTES) ?>, <?= $video->user_id ?>)" 
+                                                            style="background: none; border: none; cursor: pointer; color: #64748b; padding: 2px 4px; display: none; opacity: 0; transition: opacity 0.2s ease;"
+                                                            title="Change video creator">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                        </svg>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
                                             
-                                            <?php if (in_array($user_role, ['Owner', 'Admin'])): ?>
-                                                <button class="edit-creator-btn" 
-                                                        onclick="editVideoCreator(<?= $video->id ?>, '<?= htmlspecialchars($video->creator_handle ?? '', ENT_QUOTES, 'UTF-8') ?>', <?= $video->user_id ?>)" 
-                                                        style="background: none; border: none; cursor: pointer; color: #64748b; padding: 2px 4px; display: none; opacity: 0; transition: opacity 0.2s ease;"
-                                                        title="Change video creator">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            <!-- Video Views Counter -->
+                                            <span style="color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px;" title="Video views">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                    <circle cx="12" cy="12" r="3"></circle>
+                                                </svg>
+                                                <?= number_format(intval($video->clicks ?? 0)) ?>
+                                            </span>
+                                            
+                                            <!-- Likes/Dislikes Engagement -->
+                                            <div class="video-reactions" data-video-id="<?= $video->id ?>" data-user-action="<?= htmlspecialchars($video->user_reaction ?? '', ENT_QUOTES, 'UTF-8') ?>" style="display: flex; align-items: center; gap: 8px;">
+                                                <button class="reaction-btn like-btn <?= ($video->user_reaction ?? '') === 'like' ? 'active' : '' ?>" data-action="like" style="background: none; border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M7 22V11M2 13V20C2 21.1046 2.89543 22 4 22H17.4262C18.907 22 20.1662 20.9197 20.3914 19.4562L21.4683 12.4562C21.7479 10.6389 20.3418 9 18.5032 9H15V4C15 2.89543 14.1046 2 13 2H12.5C12.2239 2 12 2.22386 12 2.5C12 3.19838 11.8052 3.88237 11.4391 4.47463L8.5 9.5"></path>
                                                     </svg>
+                                                    <span class="like-count"><?= intval($video->likes ?? 0) ?></span>
                                                 </button>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <?= renderVideoBadges($video->id) ?>
+                                                <button class="reaction-btn dislike-btn <?= ($video->user_reaction ?? '') === 'dislike' ? 'active' : '' ?>" data-action="dislike" style="background: none; border: 1px solid rgba(100, 116, 139, 0.3); border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #64748b; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; transition: all 0.2s;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M17 2V13M22 11V4C22 2.89543 21.1046 2 20 2H6.57383C5.09299 2 3.83379 3.08025 3.60865 4.54377L2.53172 11.5438C2.25207 13.3611 3.65819 15 5.49666 15H9V20C9 21.1046 9.89543 22 11 22H11.5C11.7761 22 12 21.7761 12 21.5C12 20.8016 12.1948 20.1176 12.5609 19.5254L15.5 14.5"></path>
+                                                    </svg>
+                                                    <span class="dislike-count"><?= intval($video->dislikes ?? 0) ?></span>
+                                                </button>
+                                            </div>
+                                            
+                                            <!-- Badges -->
+                                            <?= renderVideoBadges($video->id) ?>
                                     </div>
                                 </td>
                                 <td class="col-date">
@@ -2815,7 +2984,7 @@ include 'headers.php';
                                         <!-- Blast Button (Same icon as Cards View) -->
                                         <?php if (in_array($user_role, ['Owner', 'Admin'])): ?>
                                             <button class="blast-icon action-btn hover-label" 
-                                                    onclick="openBlastModal('<?= $video->id ?>', '<?= htmlspecialchars($video->title, ENT_QUOTES, 'UTF-8') ?>', '<?= htmlspecialchars($thumbnail, ENT_QUOTES, 'UTF-8') ?>')" 
+                                                    onclick="openBlastModal(<?= htmlspecialchars(json_encode($video->id), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($video->title), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($thumbnail), ENT_QUOTES) ?>)" 
                                                     title="Blast to Channels"
                                                     data-label="Blast"
                                                     style="background: none; border: none; cursor: pointer; padding: 4px 6px; color: #8b5cf6; border-radius: 6px; position: relative;">
@@ -2926,7 +3095,7 @@ include 'headers.php';
 // Video modal will be included at the end of the file for proper rendering
 ?>
 
-    <!-- Old Uploader Modal Removed - Now using ionuploader.php -->
+    <!-- Old Uploader Modal Removed - Now using ionuploads.php -->
 
     <script>
         // Video modal functionality is now handled by includes/video-modal.php
@@ -2943,6 +3112,12 @@ include 'headers.php';
                 // Update views
                 cardView.style.display = 'none';
                 listView.style.display = 'block';
+                
+                // CRITICAL: Force no scrolling on list view
+                listView.style.overflow = 'visible';
+                listView.style.overflowY = 'visible';
+                listView.style.maxHeight = 'none';
+                listView.style.height = 'auto';
                 
                 // Update button styles
                 cardBtn.classList.remove('active');
@@ -3120,6 +3295,20 @@ include 'headers.php';
                     if (!previewLoaded) {
                         loadPreviewIframe(previewContainer);
                         previewLoaded = true;
+                    } else {
+                        // CRITICAL FIX: If iframe was stopped (set to about:blank), restart it
+                        const existingIframe = previewContainer.querySelector('iframe');
+                        if (existingIframe && existingIframe.dataset.originalSrc && existingIframe.src.includes('about:blank')) {
+                            console.log('🔄 Restarting stopped iframe on hover');
+                            existingIframe.src = existingIframe.dataset.originalSrc;
+                            delete existingIframe.dataset.originalSrc; // Clear the flag
+                        }
+                        
+                        // Also check for stopped video elements
+                        const videoElement = previewContainer.querySelector('video');
+                        if (videoElement && videoElement.paused) {
+                            videoElement.play().catch(err => console.log('⚠️ Video restart failed:', err));
+                        }
                     }
                     // Show the preview
                     previewContainer.style.display = 'block';
@@ -3127,7 +3316,7 @@ include 'headers.php';
                 }, 300); // 300ms delay to avoid loading on quick mouse-overs
             });
             
-            // Hide preview on mouse leave
+            // Hide preview on mouse leave and STOP playback
             thumb.addEventListener('mouseleave', function() {
                 if (hoverTimeout) {
                     clearTimeout(hoverTimeout);
@@ -3135,6 +3324,28 @@ include 'headers.php';
                 }
                 if (previewContainer) {
                     previewContainer.style.opacity = '0';
+                    
+                    // CRITICAL FIX: Stop video/iframe playback to prevent audio from continuing
+                    setTimeout(() => {
+                        // Only stop if still hidden (user didn't hover back within 500ms)
+                        if (previewContainer.style.opacity === '0') {
+                            // Stop video elements
+                            const videoElement = previewContainer.querySelector('video');
+                            if (videoElement) {
+                                videoElement.pause();
+                                videoElement.currentTime = 0;
+                            }
+                            
+                            // Stop iframe by clearing src (most reliable way to stop iframe audio)
+                            const iframeElement = previewContainer.querySelector('iframe');
+                            if (iframeElement) {
+                                const originalSrc = iframeElement.src;
+                                iframeElement.src = 'about:blank';  // Stop playback immediately
+                                // Store original src so we can restore it on next hover if needed
+                                iframeElement.dataset.originalSrc = originalSrc;
+                            }
+                        }
+                    }, 500); // 500ms delay to avoid stopping if user quickly hovers back
                 }
             });
         }
@@ -3142,6 +3353,16 @@ include 'headers.php';
         // Function to load preview iframe on demand
         function loadPreviewIframe(container) {
             const previewUrl = container.getAttribute('data-preview-url');
+            
+            // Check if iframe already exists and was stopped (src set to about:blank)
+            const existingIframe = container.querySelector('iframe');
+            if (existingIframe && existingIframe.dataset.originalSrc) {
+                // Restore the iframe by setting src back to original
+                existingIframe.src = existingIframe.dataset.originalSrc;
+                console.log('🔄 Restarting preview iframe:', existingIframe.dataset.originalSrc);
+                return;
+            }
+            
             if (!previewUrl || container.querySelector('iframe, video')) return;
             
             console.log('🎥 Loading preview on demand:', previewUrl);
@@ -3234,13 +3455,16 @@ include 'headers.php';
                 
                 const button = e.target.closest('.delete-icon');
                 const videoId = button.getAttribute('data-video-id');
-                const videoTitle = button.getAttribute('data-video-title');
+                const videoTitle = button.getAttribute('data-video-title') || 'Untitled Video';
                 const videoInfo = button.getAttribute('data-video-info');
                 
                 console.log('🗑️ Delete clicked - Video Info:', videoInfo, 'ID:', videoId, 'Title:', videoTitle);
                 
-                if (videoId && videoTitle) {
+                // Only check for videoId (title can be empty)
+                if (videoId) {
                     deleteVideo(videoId, videoTitle);
+                } else {
+                    console.error('❌ Cannot delete: Invalid video ID');
                 }
             }
         });
@@ -3347,10 +3571,28 @@ include 'headers.php';
     <script>
         // Function to open the new ION Video Uploader in optimized iframe
         function openIONVideoUploader() {
+            const isMobile = window.innerWidth <= 768;
+            
             // Create modal overlay with proper sizing
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'ionVideoUploaderModal';
-            modalOverlay.style.cssText = `
+            
+            // Mobile: no padding, full screen; Desktop: centered with padding
+            modalOverlay.style.cssText = isMobile ? `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: #0f172a;
+                z-index: 99999;
+                display: flex;
+                align-items: stretch;
+                justify-content: stretch;
+                padding: 0;
+                margin: 0;
+                overflow: hidden;
+            ` : `
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -3366,13 +3608,24 @@ include 'headers.php';
                 overflow: hidden;
             `;
             
-            // Create iframe with exact dimensions
+            // Create iframe with responsive dimensions
             const iframe = document.createElement('iframe');
             // Get the current directory path and construct the uploader URL
             const currentPath = window.location.pathname;
             const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-            iframe.src = basePath + '/ionuploader.php?v=' + Date.now();
-            iframe.style.cssText = `
+            iframe.src = basePath + '/ionuploads.php?v=' + Date.now();
+            
+            // Mobile: full screen; Desktop: centered with max dimensions
+            iframe.style.cssText = isMobile ? `
+                width: 100vw;
+                height: 100vh;
+                border: none;
+                border-radius: 0;
+                background: #0f172a;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
+            ` : `
                 width: 1200px;
                 max-width: 95vw;
                 height: 90vh;
@@ -3390,26 +3643,80 @@ include 'headers.php';
             // Disable page scrolling when modal is open
             document.body.style.overflow = 'hidden';
             
-            // Close functionality
-            const closeModal = () => {
+            // Track upload state from iframe
+            let uploadInProgress = false;
+            let hasUnsavedData = false;
+            
+            // Listen for upload state changes from iframe
+            const stateTracker = (e) => {
+                if (e.origin !== window.location.origin) return;
+                
+                if (e.data?.type === 'upload_started') {
+                    uploadInProgress = true;
+                    console.log('🔒 Upload in progress - modal close disabled');
+                } else if (e.data?.type === 'upload_complete' || e.data?.type === 'upload_error') {
+                    uploadInProgress = false;
+                    console.log('🔓 Upload finished - modal close enabled');
+                } else if (e.data?.type === 'data_entered') {
+                    hasUnsavedData = true;
+                } else if (e.data?.type === 'data_cleared') {
+                    hasUnsavedData = false;
+                }
+            };
+            window.addEventListener('message', stateTracker);
+            
+            // Close functionality with safety checks
+            const closeModal = (skipConfirmation = false) => {
+                // CRITICAL: Prevent closing during upload
+                if (uploadInProgress && !skipConfirmation) {
+                    const confirmClose = confirm(
+                        '⚠️ Upload in Progress!\n\n' +
+                        'An upload is currently in progress. Closing this window will cancel the upload.\n\n' +
+                        'Are you sure you want to close?'
+                    );
+                    if (!confirmClose) {
+                        console.log('❌ User cancelled close - upload continues');
+                        return;
+                    }
+                }
+                
+                // Warn about unsaved data (less critical)
+                if (hasUnsavedData && !uploadInProgress && !skipConfirmation) {
+                    const confirmClose = confirm(
+                        '⚠️ Unsaved Changes\n\n' +
+                        'You have entered information that hasn\'t been uploaded yet.\n\n' +
+                        'Are you sure you want to close?'
+                    );
+                    if (!confirmClose) {
+                        console.log('❌ User cancelled close - data preserved');
+                        return;
+                    }
+                }
+                
+                // Clean up event listeners
+                window.removeEventListener('message', stateTracker);
+                
                 // Restore page scrolling
                 document.body.style.overflow = '';
                 modalOverlay.remove();
                 location.reload(); // Refresh the video list
             };
             
-            // Close on overlay click
+            // Close on overlay click (with safety checks)
             modalOverlay.addEventListener('click', (e) => {
                 if (e.target === modalOverlay) {
                     closeModal();
                 }
             });
             
-            // Close on escape key
+            // Close on escape key (with safety checks)
             const escapeHandler = (e) => {
                 if (e.key === 'Escape') {
                     closeModal();
-                    document.removeEventListener('keydown', escapeHandler);
+                    if (!modalOverlay.parentNode) {
+                        // Modal was closed, remove listener
+                        document.removeEventListener('keydown', escapeHandler);
+                    }
                 }
             };
             document.addEventListener('keydown', escapeHandler);
@@ -3422,8 +3729,23 @@ include 'headers.php';
                 const messageType = typeof e.data === 'string' ? e.data : e.data?.type;
                 
                 if (messageType === 'upload_complete' || messageType === 'close_modal' || messageType === 'video_deleted') {
-                    closeModal();
+                    console.log('✅ Message received:', messageType);
+                    console.log('📍 DEBUG: Closing modal and refreshing page...');
+                    closeModal(true); // Skip confirmation on success
                     window.removeEventListener('message', messageHandler);
+                    
+                    console.log('📍 DEBUG: Modal closed, scheduling page reload in 300ms');
+                    // Refresh the page to show new video
+                    setTimeout(() => {
+                        console.log('📍 DEBUG: Reloading page now...');
+                        location.reload();
+                    }, 300);
+                } else if (messageType === 'video_uploaded') {
+                    // Video uploaded and celebration dialog is showing
+                    // DON'T reload the page yet - let user interact with celebration dialog
+                    // The dialog will send close_modal when user manually closes it
+                    console.log('✅ Video uploaded - celebration dialog is showing, waiting for user to close');
+                    console.log('📍 DEBUG: NOT reloading yet - waiting for user to close celebration dialog');
                 }
             };
             window.addEventListener('message', messageHandler);
@@ -3783,21 +4105,24 @@ include 'headers.php';
 }
 
 .filter-select {
-    background: white !important;
-    color: #333 !important;
-    border: 1px solid #ddd !important;
+    background: #1f2937 !important;
+    color: #ffffff !important;
+    border: 1px solid #8a6948 !important;
     position: relative !important;
     z-index: 10000 !important;
+    height: 40px !important;
+    padding: 0.5rem !important;
+    border-radius: 8px !important;
 }
 
 .filter-select:hover {
-    border-color: var(--primary-color) !important;
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1) !important;
+    border-color: #9d7856 !important;
+    box-shadow: 0 0 0 2px rgba(138, 105, 72, 0.2) !important;
 }
 
 .filter-select option {
-    background: white !important;
-    color: #333 !important;
+    background: #1f2937 !important;
+    color: #ffffff !important;
 }
 
 /* Creator search removed - using simple dropdown */
@@ -4304,10 +4629,28 @@ include 'headers.php';
 
         // Function to open ION Video Uploader in edit mode with FIXED PATHS
         function openIONVideoUploaderEdit(videoData) {
+            const isMobile = window.innerWidth <= 768;
+            
             // Create modal overlay with proper sizing
             const modalOverlay = document.createElement('div');
             modalOverlay.id = 'ionVideoUploaderModal';
-            modalOverlay.style.cssText = `
+            
+            // Mobile: no padding, full screen; Desktop: centered with padding
+            modalOverlay.style.cssText = isMobile ? `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: #0f172a;
+                z-index: 99999;
+                display: flex;
+                align-items: stretch;
+                justify-content: stretch;
+                padding: 0;
+                margin: 0;
+                overflow: hidden;
+            ` : `
                 position: fixed;
                 top: 0;
                 left: 0;
@@ -4323,7 +4666,7 @@ include 'headers.php';
                 overflow: hidden;
             `;
            
-            // Create iframe with exact dimensions - pass edit mode and video data
+            // Create iframe with responsive dimensions - pass edit mode and video data
             const iframe = document.createElement('iframe');
             const editParams = new URLSearchParams({
                 edit_mode: '1',
@@ -4333,6 +4676,7 @@ include 'headers.php';
                 category: videoData.category || '',
                 tags: videoData.tags || '',
                 badges: videoData.badges || '',
+                channels: videoData.channels || '[]',
                 visibility: videoData.privacy || videoData.visibility || 'public',
                 thumbnail: videoData.thumbnail || '',
                 source: videoData.source || '',
@@ -4344,8 +4688,19 @@ include 'headers.php';
             // Get the current directory path and construct the uploader URL
             const currentPath = window.location.pathname;
             const basePath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-            iframe.src = basePath + '/ionuploader.php?' + editParams.toString();
-            iframe.style.cssText = `
+            iframe.src = basePath + '/ionuploads.php?' + editParams.toString();
+            
+            // Mobile: full screen; Desktop: centered with max dimensions
+            iframe.style.cssText = isMobile ? `
+                width: 100vw;
+                height: 100vh;
+                border: none;
+                border-radius: 0;
+                background: #0f172a;
+                overflow: hidden;
+                margin: 0;
+                padding: 0;
+            ` : `
                 width: 1200px;
                 max-width: 95vw;
                 height: 90vh;
@@ -4363,15 +4718,66 @@ include 'headers.php';
             // Disable page scrolling when modal is open
             document.body.style.overflow = 'hidden';
            
-            // Close functionality
-            const closeModal = () => {
+            // Track upload state from iframe
+            let uploadInProgress = false;
+            let hasUnsavedData = false;
+            
+            // Listen for upload state changes from iframe
+            const stateTracker = (e) => {
+                if (e.origin !== window.location.origin) return;
+                
+                if (e.data?.type === 'upload_started') {
+                    uploadInProgress = true;
+                    console.log('🔒 Upload in progress - modal close disabled');
+                } else if (e.data?.type === 'upload_complete' || e.data?.type === 'upload_error') {
+                    uploadInProgress = false;
+                    console.log('🔓 Upload finished - modal close enabled');
+                } else if (e.data?.type === 'data_entered') {
+                    hasUnsavedData = true;
+                } else if (e.data?.type === 'data_cleared') {
+                    hasUnsavedData = false;
+                }
+            };
+            window.addEventListener('message', stateTracker);
+           
+            // Close functionality with safety checks
+            const closeModal = (skipConfirmation = false) => {
+                // CRITICAL: Prevent closing during upload
+                if (uploadInProgress && !skipConfirmation) {
+                    const confirmClose = confirm(
+                        '⚠️ Upload in Progress!\n\n' +
+                        'An upload is currently in progress. Closing this window will cancel the upload.\n\n' +
+                        'Are you sure you want to close?'
+                    );
+                    if (!confirmClose) {
+                        console.log('❌ User cancelled close - upload continues');
+                        return;
+                    }
+                }
+                
+                // Warn about unsaved data (less critical)
+                if (hasUnsavedData && !uploadInProgress && !skipConfirmation) {
+                    const confirmClose = confirm(
+                        '⚠️ Unsaved Changes\n\n' +
+                        'You have entered information that hasn\'t been uploaded yet.\n\n' +
+                        'Are you sure you want to close?'
+                    );
+                    if (!confirmClose) {
+                        console.log('❌ User cancelled close - data preserved');
+                        return;
+                    }
+                }
+                
+                // Clean up event listeners
+                window.removeEventListener('message', stateTracker);
+                
                 // Restore page scrolling
                 document.body.style.overflow = '';
                 modalOverlay.remove();
                 location.reload(); // Refresh the video list to show updates
             };
            
-            // Close on overlay click
+            // Close on overlay click (with safety checks)
             modalOverlay.addEventListener('click', (e) => {
                 if (e.target === modalOverlay) {
                     closeModal();
@@ -4386,8 +4792,23 @@ include 'headers.php';
                 const messageType = typeof event.data === 'string' ? event.data : event.data?.type;
                
                 if (messageType === 'upload_complete' || messageType === 'edit_complete' || messageType === 'close_modal' || messageType === 'video_deleted') {
-                    closeModal();
+                    console.log('✅ Edit message received:', messageType);
+                    console.log('📍 DEBUG: Closing edit modal and refreshing page...');
+                    closeModal(true); // Skip confirmation on success
                     window.removeEventListener('message', editMessageHandler);
+                    
+                    console.log('📍 DEBUG: Edit modal closed, scheduling page reload in 300ms');
+                    // Refresh the page to show updated video
+                    setTimeout(() => {
+                        console.log('📍 DEBUG: Reloading page now...');
+                        location.reload();
+                    }, 300);
+                } else if (messageType === 'video_uploaded') {
+                    // Video uploaded and celebration dialog is showing
+                    // DON'T reload the page yet - let user interact with celebration dialog
+                    // The dialog will send close_modal when user manually closes it
+                    console.log('✅ Video uploaded (edit mode) - celebration dialog is showing, waiting for user to close');
+                    console.log('📍 DEBUG: NOT reloading yet - waiting for user to close celebration dialog');
                 }
             };
             window.addEventListener('message', editMessageHandler);
@@ -4627,6 +5048,13 @@ document.addEventListener('DOMContentLoaded', function() {
 $require_auth = true; // Admin page - authentication required
 include __DIR__ . '/../includes/video-modal.php';
 ?>
+
+<!-- Pollybot Chatbot Widget -->
+<script 
+  src="https://pollybot.app/widget-packages.min.js"
+  data-chatbot-id="cmgo2cfvr0003np2yvvozxdfb"
+  data-widget-id="cmgo2cfvx0005np2ymynim8ad"
+></script>
 
 </body>
 </html>

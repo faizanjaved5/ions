@@ -369,6 +369,13 @@ function handleFileUpload() {
         }
     }
     
+    // Ping database to ensure connection is alive (prevent "MySQL server has gone away")
+    try {
+        $db->get_var("SELECT 1");
+    } catch (Exception $e) {
+        error_log("⚠️ Database connection check failed, will auto-reconnect");
+    }
+    
     // Insert into database first
     error_log('🎬 Attempting to insert video data: ' . json_encode($videoData));
     $insertResult = $db->insert('IONLocalVideos', $videoData);
@@ -376,6 +383,12 @@ function handleFileUpload() {
     if (!$insertResult) {
         $dbError = $db->last_error ?? 'Unknown database error';
         error_log('❌ Database insert failed: ' . $dbError);
+        
+        // Check if this is a duplicate entry error
+        if (strpos($dbError, 'Duplicate entry') !== false || strpos($dbError, '1062') !== false) {
+            throw new Exception('This video has already been uploaded. Please check your uploaded videos or try uploading a different video.');
+        }
+        
         throw new Exception('Failed to save video to database: ' . $dbError);
     }
     
@@ -424,25 +437,36 @@ function handleFileUpload() {
     // Handle multi-channel distribution
     try {
         $selectedChannels = isset($_POST['selected_channels']) ? json_decode($_POST['selected_channels'], true) : [];
+        error_log('🔍 DEBUG: selected_channels POST value: ' . ($_POST['selected_channels'] ?? 'NOT SET'));
+        error_log('🔍 DEBUG: decoded selectedChannels: ' . print_r($selectedChannels, true));
         
         if (!empty($selectedChannels) && is_array($selectedChannels)) {
-            error_log('📺 Processing channel distribution for ' . count($selectedChannels) . ' channels');
+            error_log('📺 Processing channel distribution for video ID ' . $videoId . ' with ' . count($selectedChannels) . ' channels');
+            error_log('📺 Channel list: ' . implode(', ', $selectedChannels));
             
             // First channel = Primary (update video's slug)
             $primaryChannelSlug = $selectedChannels[0];
-            $db->update('IONLocalVideos', 
+            
+            $updateResult = $db->update('IONLocalVideos', 
                 ['slug' => $primaryChannelSlug],
                 ['id' => $videoId]
             );
-            error_log('✅ Primary channel set: ' . $primaryChannelSlug);
+            error_log('✅ Primary channel update for video ' . $videoId . ': ' . ($updateResult ? 'SUCCESS' : 'FAILED') . ' - Slug: ' . $primaryChannelSlug);
+            
+            // Verify the update
+            $verifySlug = $db->get_var("SELECT slug FROM IONLocalVideos WHERE id = ?", $videoId);
+            error_log('🔍 Verified slug in database: ' . ($verifySlug ?? 'NULL'));
             
             // Remaining channels = Distribute to IONLocalBlast
             if (count($selectedChannels) > 1) {
                 $distributionChannels = array_slice($selectedChannels, 1);
+                error_log('📺 Distributing to ' . count($distributionChannels) . ' additional channels: ' . implode(', ', $distributionChannels));
+                
                 $category = $metadata['category'] ?: 'General';
                 $publishedAt = $publishedAt ?: date('Y-m-d H:i:s');
                 
                 foreach ($distributionChannels as $channelSlug) {
+                    error_log('📺 Processing distribution channel: ' . $channelSlug);
                     // Verify channel exists in IONLocalNetwork
                     $channelExists = $db->get_var(
                         "SELECT slug FROM IONLocalNetwork WHERE slug = %s LIMIT 1",
@@ -474,7 +498,11 @@ function handleFileUpload() {
                     error_log('✅ Video distributed to channel: ' . $channelSlug);
                 }
                 
-                error_log('✅ Multi-channel distribution completed for video ID: ' . $videoId);
+                // Verify what was saved
+                $savedChannels = $db->get_results("SELECT channel_slug, status FROM IONLocalBlast WHERE video_id = ?", $videoId);
+                error_log('✅ Multi-channel distribution completed for video ID: ' . $videoId . ' - Saved ' . ($savedChannels ? count($savedChannels) : 0) . ' distributed channels');
+            } else {
+                error_log('📺 No additional channels to distribute (only primary channel selected)');
             }
         } else {
             error_log('ℹ️ No additional channels selected for distribution');
@@ -512,6 +540,13 @@ function handleFileUpload() {
                 $updateData['optimized_url'] = $uploadResult['optimized_url'];
             }
             
+            // CRITICAL: Preserve the user's custom thumbnail (don't overwrite it)
+            // Only update thumbnail if upload result provides a new one (e.g., from Cloudflare Stream)
+            if (!empty($uploadResult['thumbnail']) && empty($thumbnailUrl)) {
+                $updateData['thumbnail'] = $uploadResult['thumbnail'];
+            }
+            // If we already have a user thumbnail, keep it (don't add to updateData)
+            
             // Set optimization status based on mode
             if ($uploadMode === 'cloudflare_stream') {
                 $updateData['optimization_status'] = 'completed';  // Stream does it automatically
@@ -545,18 +580,22 @@ function handleFileUpload() {
     
     error_log('✅ Upload process completed, sending response');
     
+    // Generate Enhanced Share template for this video
+    $shareTemplate = generateShareTemplate($videoId, $shortLink, $metadata['title'], $db);
+    
     echo json_encode([
-        'success'     => true,
-        'message'     => 'Video uploaded successfully',
-        'video_id'    => $videoId,
-        'filename'    => $file['name'],
-        'size'        => $file['size'],
-        'title'       => $metadata['title'],
-        'thumbnail'   => $thumbnailUrl ?: '', // Return the actual thumbnail URL
-        'shortlink'   => $shortLink,
-        'video_url'   => $r2Url ?? '',
-        'celebration' => true, // This triggers the celebration dialog
-        'debug_info'  => [
+        'success'       => true,
+        'message'       => 'Video uploaded successfully',
+        'video_id'      => $videoId,
+        'filename'      => $file['name'],
+        'size'          => $file['size'],
+        'title'         => $metadata['title'],
+        'thumbnail'     => $thumbnailUrl ?: '', // Return the actual thumbnail URL
+        'shortlink'     => $shortLink,
+        'video_url'     => $r2Url ?? '',
+        'celebration'   => true, // This triggers the celebration dialog
+        'share_template' => $shareTemplate, // Enhanced ION Share template for this video
+        'debug_info'    => [
             'user_id'             => $user->id,
             'user_role'           => $user->role ?? 'unknown',
             'user_email'          => $userEmail,
@@ -966,12 +1005,37 @@ function handlePlatformImport() {
     // Extract platform and video ID
     $platformInfo = extractPlatformInfo($url);
     
-    // Generate thumbnail URL
+    // Handle custom thumbnail upload first (user-uploaded takes priority)
     $thumbnail = '';
-    if ($platformInfo['platform'] === 'youtube') {
-        $thumbnail = "https://img.youtube.com/vi/{$platformInfo['video_id']}/maxresdefault.jpg";
-    } elseif ($platformInfo['platform'] === 'vimeo') {
-        $thumbnail = "https://vumbnail.com/{$platformInfo['video_id']}.jpg";
+    error_log('🔍 PLATFORM IMPORT - Checking for custom thumbnail...');
+    error_log('🔍 PLATFORM IMPORT - $_FILES[thumbnail] exists: ' . (isset($_FILES['thumbnail']) ? 'YES' : 'NO'));
+    error_log('🔍 PLATFORM IMPORT - $_POST[thumbnail_data] exists: ' . (!empty($_POST['thumbnail_data']) ? 'YES' : 'NO'));
+    error_log('🔍 PLATFORM IMPORT - $_POST[thumbnail_url] exists: ' . (!empty($_POST['thumbnail_url']) ? 'YES' : 'NO'));
+    
+    if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
+        error_log('📸 PLATFORM IMPORT - Custom thumbnail file uploaded: ' . $_FILES['thumbnail']['name'] . ' (' . $_FILES['thumbnail']['size'] . ' bytes)');
+        $thumbnail = handleThumbnailUpload($_FILES['thumbnail']);
+        error_log('📸 PLATFORM IMPORT - Custom thumbnail saved at: ' . ($thumbnail ?: 'FAILED'));
+    } elseif (!empty($_POST['thumbnail_data'])) {
+        error_log('📸 PLATFORM IMPORT - Custom thumbnail data (base64) provided, length: ' . strlen($_POST['thumbnail_data']));
+        $thumbnail = handleThumbnailFromData($_POST['thumbnail_data'], $metadata['title']);
+        error_log('📸 PLATFORM IMPORT - Custom thumbnail saved at: ' . ($thumbnail ?: 'FAILED'));
+    } elseif (!empty($_POST['thumbnail_url'])) {
+        // CORS fallback: Fetch thumbnail from URL on server-side (no CORS restriction)
+        error_log('📸 PLATFORM IMPORT - Thumbnail URL provided (CORS fallback): ' . $_POST['thumbnail_url']);
+        $thumbnail = handleThumbnailFromUrl($_POST['thumbnail_url'], $metadata['title']);
+        error_log('📸 PLATFORM IMPORT - Thumbnail fetched and saved at: ' . ($thumbnail ?: 'FAILED'));
+    }
+    
+    // Fallback: Generate auto thumbnail from platform if no custom thumbnail provided
+    if (empty($thumbnail)) {
+        error_log('📸 PLATFORM IMPORT - No custom thumbnail, generating auto thumbnail from platform');
+        if ($platformInfo['platform'] === 'youtube') {
+            $thumbnail = "https://img.youtube.com/vi/{$platformInfo['video_id']}/maxresdefault.jpg";
+        } elseif ($platformInfo['platform'] === 'vimeo') {
+            $thumbnail = "https://vumbnail.com/{$platformInfo['video_id']}.jpg";
+        }
+        error_log('📸 PLATFORM IMPORT - Auto thumbnail URL: ' . ($thumbnail ?: 'NONE'));
     }
     
     // Get user information
@@ -1097,6 +1161,13 @@ function handlePlatformImport() {
         'transcript'        => null
     ];
     
+    // Ping database to ensure connection is alive (prevent "MySQL server has gone away")
+    try {
+        $db->get_var("SELECT 1");
+    } catch (Exception $e) {
+        error_log("⚠️ Database connection check failed, will auto-reconnect");
+    }
+    
     // Insert video into database
     error_log('🎬 Platform import - Attempting to insert video data: ' . json_encode($videoData));
     $insertResult = $db->insert('IONLocalVideos', $videoData);
@@ -1105,6 +1176,12 @@ function handlePlatformImport() {
         $dbError = $db->last_error ?? 'Unknown database error';
         error_log('❌ Platform import - Database insert failed: ' . $dbError);
         error_log('❌ Platform import - Failed data: ' . json_encode($videoData));
+        
+        // Check if this is a duplicate entry error
+        if (strpos($dbError, 'Duplicate entry') !== false || strpos($dbError, '1062') !== false) {
+            throw new Exception('This video has already been imported. Please check your uploaded videos or try importing a different video.');
+        }
+        
         throw new Exception('Failed to save video to database: ' . $dbError);
     }
     
@@ -1142,6 +1219,75 @@ function handlePlatformImport() {
         handleVideoBadges($videoId, $metadata['badges'], $user->user_id);
     }
     
+    // Handle multi-channel distribution (CRITICAL FIX: was missing for platform imports!)
+    try {
+        $selectedChannels = isset($_POST['selected_channels']) ? json_decode($_POST['selected_channels'], true) : [];
+        error_log('🔍 PLATFORM IMPORT - selected_channels POST value: ' . ($_POST['selected_channels'] ?? 'NOT SET'));
+        error_log('🔍 PLATFORM IMPORT - decoded selectedChannels: ' . print_r($selectedChannels, true));
+        
+        if (!empty($selectedChannels) && is_array($selectedChannels)) {
+            error_log('📺 PLATFORM IMPORT - Processing channel distribution for video ID ' . $videoId . ' with ' . count($selectedChannels) . ' channels');
+            error_log('📺 PLATFORM IMPORT - Channel list: ' . implode(', ', $selectedChannels));
+            
+            // First channel = Primary (update video's slug)
+            $primaryChannelSlug = $selectedChannels[0];
+            
+            $updateResult = $db->update('IONLocalVideos', 
+                ['slug' => $primaryChannelSlug],
+                ['id' => $videoId]
+            );
+            error_log('✅ PLATFORM IMPORT - Primary channel update for video ' . $videoId . ': ' . ($updateResult ? 'SUCCESS' : 'FAILED') . ' - Slug: ' . $primaryChannelSlug);
+            
+            // Remaining channels = Distribute to IONLocalBlast
+            foreach ($selectedChannels as $index => $channelSlug) {
+                $channelSlug = trim($channelSlug);
+                if (empty($channelSlug)) continue;
+                
+                error_log('📺 PLATFORM IMPORT - Processing channel ' . ($index + 1) . ': ' . $channelSlug);
+                
+                // Get channel details from IONLocalNetwork
+                $channelData = $db->get_row(
+                    "SELECT id, name, slug FROM IONLocalNetwork WHERE slug = %s LIMIT 1",
+                    $channelSlug
+                );
+                
+                if (!$channelData) {
+                    error_log('⚠️ PLATFORM IMPORT - Channel not found in IONLocalNetwork: ' . $channelSlug);
+                    continue;
+                }
+                
+                // Insert into IONLocalBlast for distribution (even for primary channel for consistency)
+                $blastData = [
+                    'video_id' => $videoId,
+                    'channel_slug' => $channelSlug,
+                    'channel_id' => $channelData->id,
+                    'category' => $metadata['category'],
+                    'published_at' => date('Y-m-d H:i:s'),
+                    'status' => 'active',
+                    'priority' => ($index === 0) ? 10 : 5 // Primary channel gets higher priority
+                ];
+                
+                $blastResult = $db->insert('IONLocalBlast', $blastData);
+                
+                if ($blastResult) {
+                    error_log('✅ PLATFORM IMPORT - Channel ' . $channelSlug . ' distributed to IONLocalBlast (ID: ' . $blastResult . ')');
+                } else {
+                    error_log('❌ PLATFORM IMPORT - Failed to distribute channel: ' . $channelSlug);
+                }
+            }
+            
+            error_log('✅ PLATFORM IMPORT - Multi-channel distribution complete for video ' . $videoId);
+        } else {
+            error_log('📺 PLATFORM IMPORT - No channels selected, video assigned to slug: ' . $channelSlug);
+        }
+    } catch (Exception $e) {
+        error_log('❌ PLATFORM IMPORT - Channel distribution failed: ' . $e->getMessage());
+        // Don't fail the whole import if just channel distribution fails
+    }
+    
+    // Generate Enhanced Share template for this video
+    $shareTemplate = generateShareTemplate($videoId, $shortLink, $metadata['title'], $db);
+    
     echo json_encode([
         'success' => true,
         'message' => 'Platform import completed successfully',
@@ -1152,6 +1298,7 @@ function handlePlatformImport() {
         'thumbnail' => $thumbnail,
         'shortlink' => $shortLink,
         'celebration' => true,
+        'share_template' => $shareTemplate, // Enhanced ION Share template for this video
         'debug_info' => [
             'user_id' => $user->user_id,
             'user_email' => $userEmail,
@@ -1237,8 +1384,17 @@ function extractPlatformInfo($url) {
         ];
     }
     
+    // Muvi - support embed URLs
+    if (preg_match('/(?:embed\.)?muvi\.com\/embed\/([a-zA-Z0-9]+)/', $url, $matches)) {
+        return [
+            'platform' => 'muvi',
+            'video_id' => $matches[1],
+            'url' => $url
+        ];
+    }
+    
     error_log('❌ extractPlatformInfo - Could not extract platform info from URL: ' . $url);
-    throw new Exception('Unsupported platform or invalid URL format. Supported: YouTube (including Shorts), Vimeo');
+    throw new Exception('Unsupported platform or invalid URL format. Supported: YouTube (including Shorts), Vimeo, Muvi');
 }
 
 /**
@@ -1385,6 +1541,60 @@ function handleThumbnailFromData($base64Data, $videoName) {
         }
     } catch (Exception $e) {
         error_log('❌ Thumbnail data exception: ' . $e->getMessage());
+        return '';
+    }
+}
+
+/**
+ * Handle thumbnail from URL (CORS fallback - fetch on server-side)
+ */
+function handleThumbnailFromUrl($thumbnailUrl, $videoName = 'video') {
+    try {
+        error_log('📥 Fetching thumbnail from URL: ' . $thumbnailUrl);
+        
+        // Fetch image from URL using cURL (no CORS restrictions server-side)
+        $ch = curl_init($thumbnailUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Allow HTTPS
+        $imageData = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+        
+        if ($httpCode !== 200 || empty($imageData)) {
+            error_log('❌ Failed to fetch thumbnail: HTTP ' . $httpCode);
+            return '';
+        }
+        
+        // Determine file extension from content type
+        $fileExt = 'jpg'; // Default
+        if (strpos($contentType, 'png') !== false) $fileExt = 'png';
+        elseif (strpos($contentType, 'gif') !== false) $fileExt = 'gif';
+        elseif (strpos($contentType, 'webp') !== false) $fileExt = 'webp';
+        
+        // Create thumbs directory if it doesn't exist
+        $uploadDir = __DIR__ . '/../uploads/thumbs/';
+        if (!file_exists($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        // Generate unique filename
+        $fileName = 'thumb_' . uniqid() . '.' . $fileExt;
+        $filePath = $uploadDir . $fileName;
+        
+        // Save image
+        if (file_put_contents($filePath, $imageData)) {
+            $publicUrl = '/uploads/thumbs/' . $fileName;
+            error_log("✅ Thumbnail fetched and saved from URL: {$publicUrl}");
+            return $publicUrl;
+        } else {
+            error_log("❌ Failed to save thumbnail from URL");
+            return '';
+        }
+    } catch (Exception $e) {
+        error_log('❌ Thumbnail URL fetch exception: ' . $e->getMessage());
         return '';
     }
 }
@@ -1576,6 +1786,13 @@ function handleGoogleDriveImport() {
     
     if ($httpCode !== 200) {
         error_log("❌ Google Drive API error: HTTP $httpCode - $response");
+        
+        // Handle authentication errors gracefully
+        if ($httpCode === 401 || $httpCode === 403) {
+            http_response_code(403);
+            throw new Exception('Your Google Drive session has expired. Please reconnect your account.');
+        }
+        
         throw new Exception('Failed to get file info from Google Drive');
     }
     
@@ -1612,42 +1829,34 @@ function handleGoogleDriveImport() {
     
     if (!$success || $httpCode !== 200) {
         if (file_exists($tempFilePath)) unlink($tempFilePath);
+        
+        // Handle authentication errors gracefully
+        if ($httpCode === 401 || $httpCode === 403) {
+            http_response_code(403);
+            throw new Exception('Your Google Drive session has expired. Please reconnect your account.');
+        }
+        
         throw new Exception("Failed to download file from Google Drive (HTTP $httpCode)");
     }
     
     error_log("✅ File downloaded successfully: " . filesize($tempFilePath) . " bytes");
     
-    // Upload to R2
+    // Upload to R2 using direct HTTP/S3 API (no SDK needed)
     error_log("☁️ Uploading to Cloudflare R2...");
     
-    require_once __DIR__ . '/../config/aws-sdk/aws-autoloader.php';
-    
     $r2Config = $config['cloudflare_r2_api'];
-    $s3Client = new Aws\S3\S3Client([
-        'version' => 'latest',
-        'region' => 'auto',
-        'endpoint' => $r2Config['endpoint'],
-        'credentials' => [
-            'key' => $r2Config['access_key_id'],
-            'secret' => $r2Config['secret_access_key']
-        ],
-        'use_path_style_endpoint' => false
-    ]);
+    $objectKey = 'videos/' . date('Y/m/d') . '/' . $uniqueFileName;
     
     try {
-        $result = $s3Client->putObject([
-            'Bucket' => $r2Config['bucket'],
-            'Key' => 'videos/' . $uniqueFileName,
-            'SourceFile' => $tempFilePath,
-            'ContentType' => $mimeType
-        ]);
+        // Upload file directly to R2
+        $uploaded = uploadFileToR2($tempFilePath, $objectKey, $mimeType, $r2Config);
         
-        $videoUrl = $result['@metadata']['effectiveUri'];
-        
-        // Use custom domain if configured
-        if (!empty($r2Config['custom_domain'])) {
-            $videoUrl = 'https://' . $r2Config['custom_domain'] . '/videos/' . $uniqueFileName;
+        if (!$uploaded) {
+            throw new Exception('Failed to upload file to R2');
         }
+        
+        // Generate public URL
+        $videoUrl = rtrim($r2Config['public_url_base'], '/') . '/' . $objectKey;
         
         error_log("✅ R2 upload successful: $videoUrl");
         
@@ -1669,6 +1878,35 @@ function handleGoogleDriveImport() {
     
     $shortLink = substr(md5($slug . time()), 0, 8);
     
+    // Handle custom thumbnail upload (user-uploaded takes priority)
+    $thumbnail = '';
+    error_log('🔍 GOOGLE DRIVE - Checking for custom thumbnail...');
+    error_log('🔍 GOOGLE DRIVE - $_FILES[thumbnail] exists: ' . (isset($_FILES['thumbnail']) ? 'YES' : 'NO'));
+    error_log('🔍 GOOGLE DRIVE - $_POST[thumbnail_data] exists: ' . (!empty($_POST['thumbnail_data']) ? 'YES' : 'NO'));
+    
+    if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
+        error_log('📸 GOOGLE DRIVE - Custom thumbnail file uploaded: ' . $_FILES['thumbnail']['name'] . ' (' . $_FILES['thumbnail']['size'] . ' bytes)');
+        $thumbnail = handleThumbnailUpload($_FILES['thumbnail']);
+        error_log('📸 GOOGLE DRIVE - Custom thumbnail saved at: ' . ($thumbnail ?: 'FAILED'));
+    } elseif (!empty($_POST['thumbnail_data'])) {
+        error_log('📸 GOOGLE DRIVE - Custom thumbnail data (base64) provided, length: ' . strlen($_POST['thumbnail_data']));
+        $thumbnail = handleThumbnailFromData($_POST['thumbnail_data'], $title);
+        error_log('📸 GOOGLE DRIVE - Custom thumbnail saved at: ' . ($thumbnail ?: 'FAILED'));
+    } else {
+        error_log('📸 GOOGLE DRIVE - No custom thumbnail provided, will be auto-generated later');
+    }
+    
+    // CRITICAL: Reconnect to database if connection timed out during long upload
+    // Google Drive downloads can take several minutes, causing "MySQL server has gone away"
+    error_log("🔄 Checking database connection...");
+    try {
+        $db->get_var("SELECT 1"); // Ping database
+        error_log("✅ Database connection alive");
+    } catch (Exception $e) {
+        error_log("⚠️ Database connection lost, reconnecting...");
+        // Database will auto-reconnect on next query
+    }
+    
     // Save to database
     $insertData = [
         'user_id' => $userId,
@@ -1677,26 +1915,38 @@ function handleGoogleDriveImport() {
         'short_link' => $shortLink,
         'description' => $description,
         'video_link' => $videoUrl,
-        'thumbnail' => '', // Will be auto-generated later
+        'thumbnail' => $thumbnail, // Use custom thumbnail if provided
         'source' => 'googledrive',
         'video_id' => $fileId,
         'category' => $category,
         'tags' => $tags,
         'visibility' => $visibility,
-        'status' => 'Published',
+        'status' => 'Approved',  // Changed from 'Published' to match enum
         'videotype' => 'video',
-        'layout' => 'default',
-        'published_at' => date('Y-m-d H:i:s'),
-        'created_at' => date('Y-m-d H:i:s')
+        'layout' => 'Wide',  // Changed from 'default' to match enum ('Wide','Tall','Short')
+        'published_at' => date('Y-m-d H:i:s')
+        // Note: 'date_added' auto-fills with current_timestamp(), don't include it
     ];
     
+    error_log("💾 Inserting video into database...");
     $videoId = $db->insert('IONLocalVideos', $insertData);
     
     if (!$videoId) {
-        throw new Exception('Failed to save video to database');
+        $dbError = $db->last_error ?? 'Unknown database error';
+        error_log('❌ Google Drive import - Database insert failed: ' . $dbError);
+        
+        // Check if this is a duplicate entry error
+        if (strpos($dbError, 'Duplicate entry') !== false || strpos($dbError, '1062') !== false) {
+            throw new Exception('This video has already been imported from Google Drive. Please check your uploaded videos or try a different video.');
+        }
+        
+        throw new Exception('Failed to save video to database: ' . $dbError);
     }
     
     error_log("✅ Google Drive import complete - Video ID: $videoId");
+    
+    // Generate Enhanced Share template for this video
+    $shareTemplate = generateShareTemplate($videoId, $shortLink, $title, $db);
     
     echo json_encode([
         'success' => true,
@@ -1704,7 +1954,188 @@ function handleGoogleDriveImport() {
         'video_id' => $videoId,
         'video_url' => $videoUrl,
         'slug' => $slug,
-        'short_link' => $shortLink
+        'short_link' => $shortLink,
+        'shortlink' => $shortLink, // Add this for consistency with other uploads
+        'title' => $title,
+        'thumbnail' => $thumbnail, // Use the thumbnail we saved
+        'celebration' => true, // Trigger celebration dialog
+        'share_template' => $shareTemplate // Enhanced ION Share template for this video
     ]);
+}
+
+/**
+ * Upload file to R2 using direct S3 API (AWS Signature V4)
+ */
+function uploadFileToR2($filePath, $objectKey, $contentType, $r2Config) {
+    $endpoint = $r2Config['endpoint'];
+    $bucket = $r2Config['bucket_name'];
+    $accessKey = $r2Config['access_key_id'];
+    $secretKey = $r2Config['secret_access_key'];
+    
+    $url = "$endpoint/$bucket/$objectKey";
+    $urlParts = parse_url($url);
+    $host = $urlParts['host'];
+    $path = $urlParts['path'];
+    
+    // Read file content
+    $fileContent = file_get_contents($filePath);
+    $contentLength = strlen($fileContent);
+    
+    // AWS SigV4 requires specific date format
+    $timestamp = gmdate('Ymd\THis\Z');
+    $date = gmdate('Ymd');
+    
+    $service = 's3';
+    $region = 'auto';
+    
+    // Prepare headers
+    $canonicalHeaders = [
+        'content-type' => $contentType,
+        'host' => $host,
+        'x-amz-content-sha256' => hash('sha256', $fileContent),
+        'x-amz-date' => $timestamp
+    ];
+    
+    // Sort headers alphabetically
+    ksort($canonicalHeaders);
+    
+    // Build canonical request
+    $canonicalHeadersStr = '';
+    $signedHeadersStr = '';
+    foreach ($canonicalHeaders as $key => $value) {
+        $canonicalHeadersStr .= strtolower($key) . ':' . trim($value) . "\n";
+        $signedHeadersStr .= strtolower($key) . ';';
+    }
+    $signedHeadersStr = rtrim($signedHeadersStr, ';');
+    
+    $hashedPayload = hash('sha256', $fileContent);
+    
+    // Build canonical request
+    $canonicalRequest = "PUT\n" .
+                       $path . "\n" .
+                       "\n" . // query string
+                       $canonicalHeadersStr . "\n" .
+                       $signedHeadersStr . "\n" .
+                       $hashedPayload;
+    
+    $hashedCanonicalRequest = hash('sha256', $canonicalRequest);
+    
+    // Build string to sign
+    $credentialScope = "$date/$region/$service/aws4_request";
+    $stringToSign = "AWS4-HMAC-SHA256\n" .
+                   $timestamp . "\n" .
+                   $credentialScope . "\n" .
+                   $hashedCanonicalRequest;
+    
+    // Calculate signature
+    $kDate = hash_hmac('sha256', $date, 'AWS4' . $secretKey, true);
+    $kRegion = hash_hmac('sha256', $region, $kDate, true);
+    $kService = hash_hmac('sha256', $service, $kRegion, true);
+    $kSigning = hash_hmac('sha256', 'aws4_request', $kService, true);
+    $signature = hash_hmac('sha256', $stringToSign, $kSigning);
+    
+    // Build authorization header
+    $authorization = "AWS4-HMAC-SHA256 Credential=$accessKey/$credentialScope, " .
+                    "SignedHeaders=$signedHeadersStr, " .
+                    "Signature=$signature";
+    
+    // Upload file
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_CUSTOMREQUEST => 'PUT',
+        CURLOPT_HTTPHEADER => [
+            "Host: $host",
+            "Content-Type: $contentType",
+            "Content-Length: $contentLength",
+            "x-amz-content-sha256: " . hash('sha256', $fileContent),
+            "x-amz-date: $timestamp",
+            "Authorization: $authorization"
+        ],
+        CURLOPT_POSTFIELDS => $fileContent,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 300 // 5 minutes for large files
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+    
+    if ($curlError) {
+        error_log("❌ R2 upload CURL error: $curlError");
+        throw new Exception("R2 upload failed: $curlError");
+    }
+    
+    if ($httpCode !== 200) {
+        error_log("❌ R2 upload HTTP error $httpCode: $response");
+        throw new Exception("R2 upload failed: HTTP $httpCode");
+    }
+    
+    return true;
+}
+
+/**
+ * Generate Enhanced ION Share template for a video (same as /share/)
+ */
+function generateShareTemplate($videoId, $shortLink, $title, $db) {
+    try {
+        // Generate video URL
+        $videoUrl = "https://iblog.bz/v/" . $shortLink;
+        
+        // Simple template HTML (same structure as Enhanced Share Manager)
+        $template = '<script type="text/template" id="enhanced-share-template-' . $videoId . '">
+        <div class="enhanced-share-modal-content" style="position: relative; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); border-radius: 16px; max-width: 600px; width: 90vw; max-height: 90vh; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8); border: 1px solid #333;">
+            <button class="enhanced-share-close" onclick="window.EnhancedIONShare.closeModal(\'enhanced-share-modal-global\')" style="position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.1); border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: all 0.2s;" onmouseover="this.style.background=\'rgba(255,255,255,0.2)\'" onmouseout="this.style.background=\'rgba(255,255,255,0.1)\'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+            
+            <div class="share-tab-content" id="share-tab-' . $videoId . '" style="padding: 24px;">
+                <h3 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 700; color: #e5e5e5;">Share This Video</h3>
+                
+                <div class="share-url-section" style="margin-bottom: 24px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 16px; font-weight: 700; color: #e5e5e5;">Share Link</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" value="' . htmlspecialchars($videoUrl) . '" readonly id="enhanced-share-url-' . $videoId . '" style="flex: 1; padding: 8px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: white; font-size: 14px;">
+                        <button onclick="window.open(\'' . htmlspecialchars($videoUrl, ENT_QUOTES) . '\', \'_blank\')" title="Open link in new tab" style="padding: 8px 12px; background: #2a2a2a; color: #3b82f6; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; display: flex; align-items: center; transition: all 0.2s;" onmouseover="this.style.background=\'#333\'; this.style.borderColor=\'#3b82f6\'" onmouseout="this.style.background=\'#2a2a2a\'; this.style.borderColor=\'#444\'">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </button>
+                        <button onclick="EnhancedIONShare.copyText(\'enhanced-share-url-' . $videoId . '\')" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap;">Copy</button>
+                    </div>
+                </div>
+                
+                <div class="share-platforms-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px;">
+                    <a href="https://www.facebook.com/sharer/sharer.php?u=' . urlencode($videoUrl) . '" target="_blank" class="share-platform-btn" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: white; text-decoration: none; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#2a2a2a\'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877f2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                        <span>Facebook</span>
+                    </a>
+                    <a href="https://twitter.com/intent/tweet?url=' . urlencode($videoUrl) . '&text=' . urlencode($title) . '" target="_blank" class="share-platform-btn" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: white; text-decoration: none; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#2a2a2a\'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#1da1f2"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
+                        <span>Twitter</span>
+                    </a>
+                    <a href="https://wa.me/?text=' . urlencode($title . ' ' . $videoUrl) . '" target="_blank" class="share-platform-btn" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: white; text-decoration: none; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#2a2a2a\'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                        <span>WhatsApp</span>
+                    </a>
+                    <a href="https://www.linkedin.com/sharing/share-offsite/?url=' . urlencode($videoUrl) . '" target="_blank" class="share-platform-btn" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #2a2a2a; border: 1px solid #444; border-radius: 8px; color: white; text-decoration: none; font-size: 13px; transition: all 0.2s;" onmouseover="this.style.background=\'#333\'" onmouseout="this.style.background=\'#2a2a2a\'">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#0077b5"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                        <span>LinkedIn</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </script>';
+        
+        return $template;
+    } catch (Exception $e) {
+        error_log('❌ Error generating share template: ' . $e->getMessage());
+        return ''; // Return empty string if generation fails
+    }
 }
 ?>

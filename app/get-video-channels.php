@@ -40,12 +40,22 @@ try {
         exit();
     }
     
-    error_log('📺 Video found - Slug: ' . ($video->slug ?? 'NULL'));
+    error_log('📺 Video found - Slug: ' . ($video->slug ?? 'NULL') . ' (Video ID: ' . $video->id . ')');
+    
+    // DEBUG: Check what channels exist in IONLocalBlast for this video
+    $blastCheck = $db->get_results("SELECT * FROM IONLocalBlast WHERE video_id = ?", $video_id);
+    error_log('🔍 DEBUG: IONLocalBlast entries for video ' . $video_id . ': ' . ($blastCheck ? count($blastCheck) : 0));
+    if ($blastCheck) {
+        foreach ($blastCheck as $entry) {
+            error_log('  - Channel: ' . $entry->channel_slug . ', Status: ' . $entry->status);
+        }
+    }
     
     $channels = [];
     
     // Add primary channel if it exists
     if (!empty($video->slug)) {
+        error_log('🔍 Looking up primary channel in IONLocalNetwork with slug: ' . $video->slug);
         $primaryChannel = $db->get_row(
             "SELECT slug, city_name, state_code, state_name FROM IONLocalNetwork WHERE slug = ?",
             $video->slug

@@ -648,7 +648,7 @@
                     showError('Invalid Muvi video URL or ID');
                     return;
                 }
-                src = `https://embed.muvi.com/embed/${videoId}?autoplay=${autoplayParam}`;
+                src = `https://embed.muvi.com/embed/${videoId}?autoplay=${autoplayParam}&muted=${muteParam}`;
                 break;
             case 'wistia':
                 if (!videoId) {
@@ -664,7 +664,7 @@
                     showError('Invalid Rumble video URL or ID');
                     return;
                 }
-                src = `https://rumble.com/embed/v${videoId}/?autoplay=${autoplayParam}`;
+                src = `https://rumble.com/embed/v${videoId}/?autoplay=${autoplayParam}&muted=${muteParam}`;
                 break;
             case 'loom':
                 if (!videoId) {

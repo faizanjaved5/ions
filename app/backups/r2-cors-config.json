@@ -1,0 +1,24 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://iblog.bz",
+      "http://localhost",
+      "http://127.0.0.1"
+    ],
+    "AllowedMethods": [
+      "GET",
+      "PUT",
+      "POST",
+      "DELETE",
+      "HEAD"
+    ],
+    "AllowedHeaders": [
+      "*"
+    ],
+    "ExposeHeaders": [
+      "ETag"
+    ],
+    "MaxAgeSeconds": 3600
+  }
+]
+

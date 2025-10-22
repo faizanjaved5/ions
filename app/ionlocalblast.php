@@ -225,12 +225,177 @@ if (!$user_data) {
 
 $user_role = $user_data['user_role'] ?? 'Guest';
 
-// Simple role check - same as working files
-if (!in_array($user_role, ['Admin', 'Owner'])) {
+// Simple role check - Allow Admin, Owner, and Creator roles
+if (!in_array($user_role, ['Admin', 'Owner', 'Creator'])) {
     ob_end_clean();
-    echo "ERROR: Insufficient privileges. Your role: " . $user_role . "<br>";
-    echo "Required: Admin or Owner<br>";
-    echo "<a href='../login/'>Go to Login</a>";
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Access Denied - Media Distribution Center</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            .header {
+                background: rgba(30, 41, 59, 0.95);
+                padding: 20px 40px;
+                border-bottom: 2px solid rgba(178, 130, 84, 0.3);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
+            .header-content {
+                display: flex;
+                align-items: center;
+                gap: 20px;
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+            .header-logo {
+                height: 50px;
+                width: auto;
+            }
+            .header-title {
+                color: #f1f5f9;
+                font-size: 28px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+            }
+            .content-wrapper {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 40px 20px;
+            }
+            .error-container {
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                padding: 48px;
+                max-width: 600px;
+                width: 100%;
+                text-align: center;
+            }
+            .error-icon {
+                font-size: 64px;
+                margin-bottom: 24px;
+            }
+            .error-title {
+                color: #1e293b;
+                font-size: 32px;
+                font-weight: 700;
+                margin-bottom: 16px;
+            }
+            .error-message {
+                color: #64748b;
+                font-size: 18px;
+                line-height: 1.6;
+                margin-bottom: 12px;
+            }
+            .error-details {
+                background: #f1f5f9;
+                border-left: 4px solid #f59e0b;
+                padding: 16px;
+                margin: 24px 0;
+                text-align: left;
+            }
+            .error-details-label {
+                color: #475569;
+                font-size: 14px;
+                font-weight: 600;
+                margin-bottom: 8px;
+            }
+            .error-details-value {
+                color: #1e293b;
+                font-size: 16px;
+                font-weight: 500;
+            }
+            .button-group {
+                display: flex;
+                gap: 12px;
+                justify-content: center;
+                margin-top: 32px;
+            }
+            .btn {
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 600;
+                text-decoration: none;
+                transition: all 0.2s;
+                cursor: pointer;
+                border: none;
+            }
+            .btn-primary {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                color: white;
+            }
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            }
+            .btn-secondary {
+                background: #e2e8f0;
+                color: #1e293b;
+            }
+            .btn-secondary:hover {
+                background: #cbd5e1;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="header-content">
+                <img src="/assets/logos/avenuei-logo.png" alt="Avenue i Logo" class="header-logo">
+                <h1 class="header-title">Media Distribution Center</h1>
+            </div>
+        </div>
+        
+        <div class="content-wrapper">
+            <div class="error-container">
+                <div class="error-icon">🔒</div>
+                <h1 class="error-title">Access Restricted</h1>
+                <p class="error-message">
+                    You don't have permission to access the Media Distribution Center at this time.
+                </p>
+                
+                <div class="error-details">
+                    <div class="error-details-label">Your Current Role:</div>
+                    <div class="error-details-value"><?php echo htmlspecialchars($user_role); ?></div>
+                </div>
+                
+                <p class="error-message">
+                    This tool is available to <strong>Admin</strong>, <strong>Owner</strong>, and <strong>Creator</strong> accounts.
+                </p>
+                
+                <p class="error-message">
+                    If you need access to distribute videos, please contact our support team to request the appropriate permissions.
+                </p>
+                
+                <div class="button-group">
+                    <a href="mailto:support@iblog.bz?subject=Media Distribution Access Request" class="btn btn-primary">
+                        📧 Contact Support
+                    </a>
+                    <a href="/app/directory.php" class="btn btn-secondary">
+                        ← Back to Directory
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
     exit;
 }
 
@@ -626,14 +791,34 @@ function search_channels($query) {
             $null_city = $wpdb->get_var("SELECT COUNT(*) FROM IONLocalNetwork WHERE city_name IS NULL");
             error_log("🔍 CHANNEL SEARCH DEBUG: Total rows=$total_rows, NULL slug=$null_slug, NULL city_name=$null_city");
             
-            // Try WITHOUT the strict NULL checks first to see if we get any data
+            // Debug: Check if Dallas specifically exists
+            $dallas_check = $wpdb->get_var("SELECT COUNT(*) FROM IONLocalNetwork WHERE LOWER(city_name) LIKE '%dallas%'");
+            error_log("🔍 CHANNEL SEARCH DEBUG: Dallas rows found (direct check) = $dallas_check");
+            
+            // Debug: Get a sample Dallas row
+            $sample_dallas = $wpdb->get_row("SELECT slug, city_name, channel_name FROM IONLocalNetwork WHERE LOWER(city_name) LIKE '%dallas%' LIMIT 1", 'ARRAY_A');
+            error_log("🔍 CHANNEL SEARCH DEBUG: Sample Dallas row = " . json_encode($sample_dallas));
+            
+            // Use COALESCE to handle NULL values properly in search
             $sql = "SELECT slug, city_name, channel_name, population, state_name, state_code, country_name, country_code, latitude, longitude, custom_domain
                     FROM IONLocalNetwork 
-                    WHERE (LOWER(city_name) LIKE ? OR LOWER(state_name) LIKE ? OR LOWER(country_name) LIKE ? OR LOWER(channel_name) LIKE ? OR LOWER(slug) LIKE ? OR LOWER(custom_domain) LIKE ?)
+                    WHERE (
+                        LOWER(COALESCE(city_name, '')) LIKE %s OR 
+                        LOWER(COALESCE(state_name, '')) LIKE %s OR 
+                        LOWER(COALESCE(country_name, '')) LIKE %s OR 
+                        LOWER(COALESCE(channel_name, '')) LIKE %s OR 
+                        LOWER(COALESCE(slug, '')) LIKE %s OR 
+                        LOWER(COALESCE(custom_domain, '')) LIKE %s
+                    )
+                    AND slug IS NOT NULL 
+                    AND city_name IS NOT NULL
                     ORDER BY population DESC, city_name ASC
                     LIMIT 50";
             
-            $channels_objects = $wpdb->get_results($wpdb->prepare($sql, $search_term, $search_term, $search_term, $search_term, $search_term, $search_term));
+            $prepared_sql = $wpdb->prepare($sql, $search_term, $search_term, $search_term, $search_term, $search_term, $search_term);
+            error_log("🔍 CHANNEL SEARCH: Prepared SQL = " . $prepared_sql);
+            
+            $channels_objects = $wpdb->get_results($prepared_sql);
             
             error_log("🔍 CHANNEL SEARCH: Text search for '$query' returned " . (is_array($channels_objects) ? count($channels_objects) : 'NULL') . " results");
             error_log("🔍 CHANNEL SEARCH: Search term used: '$search_term'");
@@ -983,7 +1168,7 @@ function distribute_video($data) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ION Multi-Channel Video Distribution Platform</title>
+    <title>Media Distribution Center - Avenue i</title>
     <link rel="stylesheet" href="ionuploader.css">
     <link rel="stylesheet" href="css/pricing-localblast.css?v=<?php echo time(); ?>">
     <link rel="stylesheet" href="../cart/css/cart-styles.css?v=<?php echo time(); ?>">
@@ -1015,7 +1200,7 @@ function distribute_video($data) {
             max-width: 1200px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: 1fr auto 1fr;
+            grid-template-columns: 1fr auto minmax(180px, 1fr);
             align-items: center;
             padding: 20px;
             gap: 20px;
@@ -1052,6 +1237,11 @@ function distribute_video($data) {
         }
         .ion-header-right {
             text-align: right;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            min-width: 160px;
+            padding-right: 20px;
         }
         
         .container {
@@ -1088,7 +1278,7 @@ function distribute_video($data) {
             border-bottom: 3px solid #f59e0b;
             padding: 20px;
             display: grid;
-            grid-template-columns: 1fr auto 1fr;
+            grid-template-columns: 1fr auto minmax(180px, 1fr);
             align-items: center;
             gap: 20px;
         }
@@ -1118,10 +1308,11 @@ function distribute_video($data) {
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            gap: 12px;
             position: relative;
             z-index: 10;
             flex: 1;
+            min-width: 160px;
+            padding-right: 20px;
         }
         
         /* Cart Button Styles */
@@ -1138,6 +1329,10 @@ function distribute_video($data) {
             cursor: pointer;
             transition: all 0.2s ease;
             box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+            flex-shrink: 0;
+            min-width: fit-content;
+            margin-right: 20px;
+            z-index: 10;
         }
         
         .cart-btn:hover {
@@ -1192,16 +1387,21 @@ function distribute_video($data) {
             background: #ef4444;
             color: white;
             border: none;
-            border-radius: 8px;
-            width: 48px;
-            height: 48px;
-            cursor: pointer;
+            padding: 0;
+            border-radius: 6px;
+            width: 36px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
             font-size: 24px;
             font-weight: bold;
             transition: all 0.2s ease;
+            flex-shrink: 0;
+            margin-left: 20px;
+            position: relative;
+            z-index: 20;
         }
         
         .close-btn:hover {
@@ -1235,7 +1435,6 @@ function distribute_video($data) {
         /* Override container styles for full-screen modal */
         .modal-container .container {
             max-width: none;
-            border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             margin-bottom: 30px;
         }
@@ -1530,17 +1729,17 @@ function distribute_video($data) {
         
         .results-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 14px;
+            justify-content: start;
         }
         .main-layout {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 40% 60%;
             gap: 20px;
-            margin-top: 20px;
-            background: #ffffff;
-            transition: all 0.3s ease;
+            padding: 0 20px 20px 20px;
+            max-width: 100%;
+            margin: 0 auto;
         }
         
         /* When cart is open, don't change grid - cart is now outside */
@@ -1562,27 +1761,30 @@ function distribute_video($data) {
             min-width: 200px; /* Reduce min-width when compressed */
         }
         
-        /* Fix column overflow issues */
+        /* Fix column overflow issues - Proper scrolling within columns */
         .left-column,
         .right-column {
             display: flex;
             flex-direction: column;
-            max-height: calc(100vh - 200px);
             overflow: hidden;
+            min-width: 0;
+            max-width: 100%;
+            height: 100%;
         }
         
         .left-column > *:not(.section-header),
         .right-column > *:not(.section-header) {
-            overflow-y: auto;
-            overflow-x: hidden;
+            min-width: 0;
         }
         
         #channelResults,
         #videoResults {
-            max-height: calc(100vh - 400px);
             overflow-y: auto;
             overflow-x: hidden;
             padding-right: 8px;
+            width: 100%;
+            max-width: 100%;
+            flex: 1;
         }
         
         /* Custom scrollbar for channel/video results */
@@ -1621,23 +1823,27 @@ function distribute_video($data) {
             background: #f8f9fa;
             border: 2px solid #e1e8ed;
             border-radius: 8px;
-            padding: 20px;
+            padding: 14px 16px;
             transition: all 0.3s ease;
             cursor: pointer;
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
         }
         
         .result-card:hover {
             border-color: #3498db;
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 50; /* Elevate on hover to prevent overlapping tooltips */
         }
         
         .result-card.selected {
             border-color: #27ae60;
             background: #e8f5e8;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.3);
-            padding: 24px;
         }
         
         .result-card.selected.preselected {
@@ -1701,18 +1907,33 @@ function distribute_video($data) {
             padding: 6px 10px;
             border-radius: 4px;
             text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .result-card.selected:hover .toggle-hint {
+            opacity: 1;
         }
         
         .result-card h3 {
             color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 1.2em;
+            margin-bottom: 8px;
+            margin-top: 0;
+            font-size: 1.1em;
+            font-weight: 600;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.3;
         }
         
         .result-card p {
             color: #7f8c8d;
             margin-bottom: 5px;
+            margin-top: 0;
             font-size: 0.9em;
+            line-height: 1.5;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         
         /* Channel Card Specific Styles */
@@ -1720,29 +1941,76 @@ function distribute_video($data) {
             position: relative;
             display: flex;
             flex-direction: column;
-            max-height: 320px;
+            gap: 12px;
+            min-height: 130px;
             overflow: visible;
+            z-index: 1; /* Base z-index for stacking */
+            transition: z-index 0s ease;
+        }
+        
+        /* Elevate card when hovering over button to ensure tooltip appears above other cards */
+        .channel-card:hover {
+            z-index: 100 !important;
         }
         
         .channel-card .card-content {
             flex: 1;
-            overflow: hidden;
+            min-width: 0;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        
+        /* Add to Cart Button Container for proper tooltip positioning */
+        .channel-card .add-to-cart-btn-container {
+            position: relative;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: auto;
+            z-index: 10;
+            width: 100%; /* Ensure container fits within card */
+            max-width: 100%;
+            overflow: visible; /* Allow tooltip to overflow */
+        }
+        
+        /* Channel Meta Info Container (Population & Distance) */
+        .channel-meta-container {
+            display: flex;
+            flex-direction: row;
+            gap: 12px;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        
+        .channel-meta-info {
+            color: #64748b;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            white-space: nowrap;
         }
         
         /* Add to Cart Button for Channels */
         .add-to-cart-channel-btn {
-            width: 100%;
             padding: 10px 16px;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
             border: none;
             border-radius: 6px;
             font-weight: 600;
+            font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s ease;
-            margin-top: 12px;
             position: relative;
-            z-index: 1;
+            z-index: 20;
+            white-space: nowrap;
+            flex-shrink: 0;
+            max-width: fit-content;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .add-to-cart-channel-btn:hover {
@@ -1764,40 +2032,60 @@ function distribute_video($data) {
         /* Quick Pricing Tooltip */
         .quick-pricing-tooltip {
             position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             color: white;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 8px;
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
-            z-index: 1000;
-            min-width: 250px;
-            margin-bottom: 8px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+            z-index: 10000 !important;
             border: 2px solid rgba(178, 130, 84, 0.3);
-            animation: tooltipFadeIn 0.2s ease-out;
+            pointer-events: none; /* Prevent tooltip from interfering with mouse events */
+            min-width: 200px;
+            max-width: 100%;
+            white-space: normal;
+            opacity: 1;
+            transition: opacity 0.15s ease-in-out; /* Smooth fade effect */
+        }
+        
+        /* Ensure tooltip is visible when parent is hovered */
+        .add-to-cart-btn-container:hover .quick-pricing-tooltip {
+            display: block !important;
+            opacity: 1 !important;
         }
         
         .quick-pricing-tooltip::after {
             content: '';
             position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
+            bottom: 100%;
+            left: 20px;
             border: 8px solid transparent;
-            border-top-color: #1e293b;
+            border-bottom-color: #1e293b;
         }
         
         @keyframes tooltipFadeIn {
             from {
                 opacity: 0;
-                transform: translateX(-50%) translateY(-5px);
+                transform: translateY(5px);
             }
             to {
                 opacity: 1;
-                transform: translateX(-50%) translateY(0);
+                transform: translateY(0);
             }
+        }
+        
+        .pricing-tier-header {
+            background: linear-gradient(135deg, #b8860b 0%, #8b6914 100%);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px 4px 0 0;
+            text-align: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+            margin: -8px -12px 8px -12px;
         }
         
         .pricing-row {
@@ -2095,12 +2383,16 @@ function distribute_video($data) {
         }
         
         .cart-panel-header {
-            padding: 20px 24px;
+            padding: 12px 20px;
             border-bottom: 1px solid rgba(178, 130, 84, 0.2);
+            background: rgba(178, 130, 84, 0.1);
+        }
+        
+        .cart-header-top {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: rgba(178, 130, 84, 0.1);
+            margin-bottom: 12px;
         }
         
         .cart-panel-header h3 {
@@ -2130,15 +2422,67 @@ function distribute_video($data) {
             background: rgba(178, 130, 84, 0.2);
         }
         
+        /* Global Interval Selector */
+        .cart-global-interval-selector {
+            display: flex;
+            gap: 6px;
+            background: rgba(30, 41, 59, 0.3);
+            padding: 4px;
+            border-radius: 6px;
+        }
+        
+        .cart-global-interval-btn {
+            flex: 1;
+            padding: 8px 12px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+        
+        .cart-global-interval-btn:hover {
+            background: rgba(178, 130, 84, 0.1);
+            color: #cbd5e1;
+        }
+        
+        .cart-global-interval-btn.active {
+            background: rgba(178, 130, 84, 0.3);
+            border-color: rgb(178, 130, 84);
+            color: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(178, 130, 84, 0.2);
+        }
+        
+        .cart-global-interval-btn.best-value::after {
+            content: 'BEST';
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.6rem;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 700;
+        }
+        
+        .cart-global-interval-btn {
+            position: relative;
+        }
+        
         .cart-panel-content {
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
             scrollbar-width: thin;
             scrollbar-color: rgba(178, 130, 84, 0.6) rgba(30, 41, 59, 0.3);
-            padding: 20px;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(178, 130, 84, 0.6) rgba(30, 41, 59, 0.3);
+            padding: 12px 16px;
         }
         
         .cart-panel-content::-webkit-scrollbar {
@@ -2155,13 +2499,55 @@ function distribute_video($data) {
         }
         
         .cart-video-section {
-            margin-bottom: 24px;
-            padding-bottom: 24px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
             border-bottom: 1px solid rgba(178, 130, 84, 0.2);
         }
         
         .cart-channels-section {
             /* Channel items will be added here */
+        }
+        
+        .cart-clear-all-btn {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+            width: 100%;
+        }
+        
+        .cart-clear-all-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+        
+        .cart-total-display {
+            background: rgba(178, 130, 84, 0.15);
+            border: 2px solid rgba(178, 130, 84, 0.4);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .cart-total-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .cart-total-amount {
+            color: #10b981;
+            font-size: 1.25rem;
+            font-weight: 700;
         }
         
         .cart-channel-item {
@@ -2228,7 +2614,7 @@ function distribute_video($data) {
         
         .cart-interval-selector {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 8px;
         }
         
@@ -2287,9 +2673,10 @@ function distribute_video($data) {
         /* Collapsed channel styles */
         .cart-channel-collapsed {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 8px;
             width: 100%;
+            padding: 4px 0;
         }
         
         .cart-channel-expand-icon {
@@ -2297,6 +2684,7 @@ function distribute_video($data) {
             font-size: 14px;
             transition: transform 0.2s;
             flex-shrink: 0;
+            margin-top: 3px;
         }
         
         .cart-channel-item.expanded .cart-channel-expand-icon {
@@ -2304,11 +2692,16 @@ function distribute_video($data) {
         }
         
         .cart-channel-quick-info {
-            flex: 1;
             display: flex;
+            align-items: flex-start;
             justify-content: space-between;
-            align-items: center;
-            gap: 8px;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .cart-channel-name-wrapper {
+            flex: 1;
             min-width: 0;
         }
         
@@ -2319,7 +2712,16 @@ function distribute_video($data) {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            flex: 1;
+        }
+        
+        .cart-channel-slug {
+            color: #94a3b8;
+            font-size: 0.7rem;
+            font-weight: 400;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .cart-channel-price-badge {
@@ -2330,6 +2732,7 @@ function distribute_video($data) {
             font-size: 0.75rem;
             font-weight: 700;
             white-space: nowrap;
+            margin-top: 2px;
         }
         
         .cart-channel-details {
@@ -2410,6 +2813,13 @@ function distribute_video($data) {
             font-size: 0.9rem;
         }
         
+        /* Better styling for select dropdown */
+        select.cart-form-input {
+            background: rgba(30, 41, 59, 0.9);
+            color: #f1f5f9;
+            cursor: pointer;
+        }
+        
         .cart-form-input:focus,
         .cart-form-select:focus {
             outline: none;
@@ -2417,9 +2827,11 @@ function distribute_video($data) {
             box-shadow: 0 0 0 2px rgba(178, 130, 84, 0.2);
         }
         
-        .cart-form-select option {
+        .cart-form-select option,
+        select.cart-form-input option {
             background: #1e293b;
             color: #f1f5f9;
+            padding: 8px;
         }
         
         .cart-panel-footer {
@@ -2869,17 +3281,14 @@ function distribute_video($data) {
         }
         
         .tab-content.active {
-            display: block;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
         }
         
         /* Pagination Styles */
         .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 20px;
-            padding: 20px 0;
         }
         
         .pagination button {
@@ -2916,10 +3325,10 @@ function distribute_video($data) {
             margin: 0 10px;
         }
         
-        /* Video Results Grid - 4 per row */
+        /* Video Results Grid - single column for narrower left panel */
         .video-results-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 1fr;
             gap: 15px;
             margin-top: 20px;
         }
@@ -2932,13 +3341,42 @@ function distribute_video($data) {
             margin-top: 20px;
         }
         
+        /* Responsive Design */
+        
+        /* Large tablets and small desktops - reduce to single column when cart is open */
         @media (max-width: 1400px) {
             body.cart-open .main-layout {
-                grid-template-columns: 0.8fr 0.8fr 420px;
-                gap: 12px;
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            body.cart-open .results-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 350px));
             }
         }
         
+        /* Medium screens - single column layout */
+        @media (max-width: 1200px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .results-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 350px));
+                justify-content: center;
+            }
+            
+            .modal-header {
+                padding: 15px;
+            }
+            
+            .modal-title-text {
+                font-size: 20px;
+            }
+        }
+        
+        /* Tablets and smaller - stack everything */
         @media (max-width: 768px) {
             .main-layout {
                 grid-template-columns: 1fr;
@@ -2950,7 +3388,24 @@ function distribute_video($data) {
             }
             
             .cart-panel {
-                max-height: 400px;
+                width: 90%;
+                max-width: 400px;
+            }
+            
+            body.cart-open .main-content-wrapper {
+                margin-right: 0;
+            }
+            
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal-title-text {
+                font-size: 16px;
+            }
+            
+            .header-left h1 {
+                font-size: 16px;
             }
             
             .section-header {
@@ -2988,11 +3443,11 @@ function distribute_video($data) {
         <div class="main-content-wrapper">
             <div class="modal-header">
                 <div class="header-left">
-                    <h1 class="modal-title-text">ION Channel Blast</h1>
+                    <h1 class="modal-title-text">Media Distribution Center</h1>
                 </div>
                 <div class="header-center">
                     <div class="ion-logo">
-                        <img src="https://ions.com/menu/ion-logo-gold.png" alt="ION Network" class="h-[70px] w-auto" style="height:70px;width:auto">
+                        <img src="/assets/logos/avenuei-logo.png" alt="Avenue i" class="h-[70px] w-auto" style="height:70px;width:auto;max-height:70px;object-fit:contain;">
                     </div>
                 </div>
                 <div class="header-right">
@@ -3009,7 +3464,7 @@ function distribute_video($data) {
                     </button>
                 </div>          
             </div>
-            <div class="container" style="flex:1;margin:0;padding:0;max-width:none;height:100%;min-height:500px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(178,130,84,0.6) rgba(30,41,59,0.3);">
+            <div class="container" style="flex:1;margin:0;padding:0;max-width:none;height:100%;min-height:500px;overflow-y:auto;scrollbar-width:thin;">
         <!-- Main Layout: Side by Side -->
         <div class="main-layout">
             <!-- Left Column: Video Search -->
@@ -3136,15 +3591,11 @@ function distribute_video($data) {
                             <?php echo generate_ion_category_options('News', false); ?>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="priority">Priority (0-100)</label>
-                        <input type="number" id="priority" name="priority" min="0" max="100" value="0">
-                    </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="published_at">Publish Date & Time</label>
+                        <label for="published_at">Requested Publish Date & Time</label>
                         <input type="datetime-local" id="published_at" name="published_at">
                     </div>
                     <div class="form-group">
@@ -3166,8 +3617,29 @@ function distribute_video($data) {
         <!-- Full Height Cart Panel (Fixed Right Sidebar) -->
         <div id="cartPanel" class="cart-panel hidden">
             <div class="cart-panel-header">
-                <h3>📦 Distribution Cart</h3>
-                <button class="cart-close-btn" onclick="toggleCartPanel()">×</button>
+                <div class="cart-header-top">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <img src="/assets/logos/avenuei-logo.png" alt="Avenue i" style="height:32px;width:auto;object-fit:contain;">
+                        <h3 style="margin:0;">Distribution Cart</h3>
+                    </div>
+                    <button class="cart-close-btn" onclick="toggleCartPanel()">×</button>
+                </div>
+                
+                <!-- Global Interval Selector -->
+                <div class="cart-global-interval-selector">
+                    <button class="cart-global-interval-btn" onclick="setGlobalInterval('weekly')">
+                        Weekly
+                    </button>
+                    <button class="cart-global-interval-btn active" onclick="setGlobalInterval('monthly')">
+                        Monthly
+                    </button>
+                    <button class="cart-global-interval-btn" onclick="setGlobalInterval('quarterly')">
+                        Quarterly
+                    </button>
+                    <button class="cart-global-interval-btn best-value" onclick="setGlobalInterval('annual')">
+                        Annual
+                    </button>
+                </div>
             </div>
             
             <div class="cart-panel-content">
@@ -3177,27 +3649,23 @@ function distribute_video($data) {
                 <!-- Selected Channels -->
                 <div id="cartSelectedChannels" class="cart-channels-section"></div>
                 
-                <!-- Distribution Settings -->
+                <!-- Distribution Preferences -->
                 <div class="cart-distribution-section" id="cartDistributionSection" style="display: none;">
-                    <div class="cart-section-header expanded" onclick="toggleDistributionSettings()">
+                    <div class="cart-section-header" onclick="toggleDistributionSettings()">
                         <div class="cart-section-title">
                             <span class="cart-section-icon">▶</span>
-                            ⚙️ Distribution Settings
+                            ⚙️ Distribution Preferences
                         </div>
                     </div>
                     <div class="cart-section-content">
                         <div class="cart-form-group">
-                            <label class="cart-form-label" for="cartCategory">Category</label>
-                            <select id="cartCategory" class="cart-form-select">
+                            <label class="cart-form-label" for="cartCategory">ION Category</label>
+                            <select id="cartCategory" class="cart-form-input" required>
                                 <?php echo generate_ion_category_options('News', false); ?>
                             </select>
                         </div>
                         <div class="cart-form-group">
-                            <label class="cart-form-label" for="cartPriority">Priority (0-100)</label>
-                            <input type="number" id="cartPriority" class="cart-form-input" min="0" max="100" value="0">
-                        </div>
-                        <div class="cart-form-group">
-                            <label class="cart-form-label" for="cartPublishedAt">Publish Date & Time</label>
+                            <label class="cart-form-label" for="cartPublishedAt">Requested Publish Date & Time</label>
                             <input type="datetime-local" id="cartPublishedAt" class="cart-form-input">
                         </div>
                         <div class="cart-form-group">
@@ -3209,7 +3677,10 @@ function distribute_video($data) {
             </div>
             
             <div class="cart-panel-footer">
-                <button class="btn btn-secondary" style="flex: 1;" onclick="clearAllSelections()">Clear All</button>
+                <div class="cart-total-display">
+                    <span class="cart-total-label">Total:</span>
+                    <span class="cart-total-amount" id="cartTotalAmount">$0.00</span>
+                </div>
                 <button class="cart-submit-btn" onclick="distributeFromCart()">🚀 Distribute Video</button>
             </div>
         </div>
@@ -3792,8 +4263,11 @@ function distribute_video($data) {
                 const locationText = location.length > 0 ? location.join(', ') : 'Location not specified';
                 
                 // Add distance info if available (for zip code searches)
-                const distanceInfo = channel.distance ? `<p><strong>Distance:</strong> ${channel.distance.toFixed(1)} miles</p>` : '';
-                const populationInfo = channel.population ? `<p><strong>Population:</strong> ${channel.population.toLocaleString()}</p>` : '';
+                const distanceInfo = channel.distance ? `<div class="channel-meta-info">Distance: ${channel.distance.toFixed(1)} miles</div>` : '';
+                const populationInfo = channel.population ? `<div class="channel-meta-info">Population: ${channel.population.toLocaleString()}</div>` : '';
+                
+                // Escape quotes in channel name for JavaScript
+                const escapedChannelName = channel.channel_name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
                 
                 return `
                     <div class="result-card channel-card ${isSelected ? 'selected' : ''}" 
@@ -3803,16 +4277,20 @@ function distribute_video($data) {
                             <p><strong>City:</strong> ${channel.city_name}</p>
                             <p><strong>Slug:</strong> ${channel.slug}</p>
                             <p><strong>Location:</strong> ${locationText}</p>
-                            ${populationInfo}
-                            ${distanceInfo}
                         </div>
-                        <button class="add-to-cart-channel-btn" 
-                                onclick="event.stopPropagation(); addChannelDirectlyToCart('${channel.slug}', '${channel.channel_name}')"
-                                onmouseenter="showQuickPricing(this, '${channel.slug}')"
-                                onmouseleave="hideQuickPricing(this)">
-                            ${isSelected ? '✓ Added' : '🛒 Add to Cart'}
-                        </button>
-                        <div class="quick-pricing-tooltip" style="display: none;"></div>
+                        <div class="add-to-cart-btn-container">
+                            <div class="channel-meta-container">
+                                ${populationInfo}
+                                ${distanceInfo}
+                            </div>
+                            <button class="add-to-cart-channel-btn" 
+                                    onclick="event.stopPropagation(); addChannelDirectlyToCart('${channel.slug}', '${escapedChannelName}')"
+                                    onmouseenter="showQuickPricing(this, '${channel.slug}')"
+                                    onmouseleave="hideQuickPricing(this)">
+                                ${isSelected ? '✓ Added' : '🛒 Add to Cart'}
+                            </button>
+                            <div class="quick-pricing-tooltip" style="display: none;"></div>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -4131,41 +4609,58 @@ function distribute_video($data) {
             
             // Show individual channels with interval selectors (collapsed by default)
             if (selectedChannels.length > 0) {
-                const prices = { monthly: '$3.95', quarterly: '$6.95', annual: '$24.95' };
                 html += selectedChannels.map((channel, index) => {
                     const interval = channel.interval || 'monthly';
-                    const price = prices[interval];
+                    // Use channel's actual pricing or fallback to defaults
+                    const channelPricing = channel.pricing || { weekly: 1.95, monthly: 6.95, quarterly: 12.95, annual: 49.95 };
+                    const price = channelPricing[interval] ? `$${channelPricing[interval].toFixed(2)}` : '$0.00';
                     const expanded = channel.expanded ? ' expanded' : '';
+                    
+                    // Map interval to short display name
+                    const intervalDisplay = {
+                        weekly: 'Week',
+                        monthly: 'Month',
+                        quarterly: 'Quarter',
+                        annual: 'Year'
+                    }[interval] || 'Month';
                     
                     return `
                     <div class="cart-channel-item${expanded}" id="cart-channel-${channel.slug}">
                         <div class="cart-channel-collapsed" onclick="toggleChannelExpand('${channel.slug}')">
                             <span class="cart-channel-expand-icon">▶</span>
                             <div class="cart-channel-quick-info">
-                                <div class="cart-channel-title">${channel.channel_name || channel.city_name}</div>
-                                <div class="cart-channel-price-badge">${price}/${interval.charAt(0).toUpperCase() + interval.slice(1)}</div>
+                                <div class="cart-channel-name-wrapper">
+                                    <div class="cart-channel-title">${channel.name || channel.channel_name || channel.city_name || 'Channel'}</div>
+                                    <div class="cart-channel-slug">${channel.slug}</div>
+                                </div>
+                                <div class="cart-channel-price-badge">${price}/${intervalDisplay}</div>
                             </div>
                         </div>
                         <div class="cart-channel-details">
                             <div class="cart-channel-info">
-                                <div class="cart-channel-location">${channel.city_name}, ${channel.state_name || ''}</div>
+                                <div class="cart-channel-location">${channel.city_name || channel.state_name || channel.name || ''}</div>
                             </div>
                             <div style="margin-top: 12px;">
                                 <div class="cart-interval-selector">
+                                    <div class="cart-interval-option ${interval === 'weekly' ? 'selected' : ''}" 
+                                         onclick="event.stopPropagation(); setChannelInterval('${channel.slug}', 'weekly')">
+                                        <div class="cart-interval-label">Week</div>
+                                        <div class="cart-interval-price">$${channelPricing.weekly.toFixed(2)}</div>
+                                    </div>
                                     <div class="cart-interval-option ${interval === 'monthly' ? 'selected' : ''}" 
                                          onclick="event.stopPropagation(); setChannelInterval('${channel.slug}', 'monthly')">
-                                        <div class="cart-interval-label">Monthly</div>
-                                        <div class="cart-interval-price">$3.95</div>
+                                        <div class="cart-interval-label">Month</div>
+                                        <div class="cart-interval-price">$${channelPricing.monthly.toFixed(2)}</div>
                                     </div>
                                     <div class="cart-interval-option ${interval === 'quarterly' ? 'selected' : ''}" 
                                          onclick="event.stopPropagation(); setChannelInterval('${channel.slug}', 'quarterly')">
-                                        <div class="cart-interval-label">Quarterly</div>
-                                        <div class="cart-interval-price">$6.95</div>
+                                        <div class="cart-interval-label">Quarter</div>
+                                        <div class="cart-interval-price">$${channelPricing.quarterly.toFixed(2)}</div>
                                     </div>
                                     <div class="cart-interval-option best-value ${interval === 'annual' ? 'selected' : ''}" 
                                          onclick="event.stopPropagation(); setChannelInterval('${channel.slug}', 'annual')">
-                                        <div class="cart-interval-label">Annual</div>
-                                        <div class="cart-interval-price">$24.95</div>
+                                        <div class="cart-interval-label">Year</div>
+                                        <div class="cart-interval-price">$${channelPricing.annual.toFixed(2)}</div>
                                     </div>
                                 </div>
                             </div>
@@ -4178,7 +4673,27 @@ function distribute_video($data) {
                 }).join('');
             }
             
+            // Add Clear All button below the channels list
+            if (totalItems > 0) {
+                html += `
+                    <button class="cart-clear-all-btn" onclick="clearAllSelections()">
+                        🗑️ Clear All Selections
+                    </button>
+                `;
+            }
+            
             channelsSection.innerHTML = html;
+            
+            // Calculate total price based on selected intervals using actual channel pricing
+            let cartTotal = 0;
+            selectedChannels.forEach(channel => {
+                const interval = channel.interval || 'monthly';
+                const channelPricing = channel.pricing || { weekly: 1.95, monthly: 6.95, quarterly: 12.95, annual: 49.95 };
+                cartTotal += channelPricing[interval] || 0;
+            });
+            
+            // Update the footer total display
+            updateCartTotal(cartTotal);
             
             // Show distribution settings if video and channels are selected
             const distSection = document.getElementById('cartDistributionSection');
@@ -4189,11 +4704,39 @@ function distribute_video($data) {
             }
         }
         
+        // Update cart total display in footer
+        function updateCartTotal(total) {
+            const totalAmountEl = document.getElementById('cartTotalAmount');
+            if (totalAmountEl) {
+                totalAmountEl.textContent = `$${total.toFixed(2)}`;
+            }
+        }
+        
+        // Set global interval for all channels
+        function setGlobalInterval(interval) {
+            // Update all channels to the new interval
+            selectedChannels.forEach(channel => {
+                channel.interval = interval;
+            });
+            
+            // Update UI - highlight active button
+            document.querySelectorAll('.cart-global-interval-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Refresh display to show new intervals and prices
+            displaySelectedChannels();
+        }
+        
         // Set interval for a specific channel
         function setChannelInterval(slug, interval) {
             const channel = selectedChannels.find(ch => ch.slug === slug);
             if (channel) {
                 channel.interval = interval;
+                // Update price based on new interval using channel's actual pricing
+                const channelPricing = channel.pricing || { weekly: 1.95, monthly: 3.95, quarterly: 6.95, annual: 24.95 };
+                channel.price = channelPricing[interval] || channelPricing.monthly;
                 displaySelectedChannels();
             }
         }
@@ -4248,7 +4791,6 @@ function distribute_video($data) {
             }
             
             const category = document.getElementById('cartCategory').value;
-            const priority = document.getElementById('cartPriority').value;
             const published_at = document.getElementById('cartPublishedAt').value;
             const expires_at = document.getElementById('cartExpiresAt').value;
             
@@ -4259,7 +4801,6 @@ function distribute_video($data) {
             formData.append('packages', JSON.stringify(selectedPackages.map(pkg => pkg.name)));
             formData.append('ott_channels', JSON.stringify(selectedOTTChannels.map(ch => ch.id)));
             formData.append('category', category);
-            formData.append('priority', priority);
             if (published_at) formData.append('published_at', published_at);
             if (expires_at) formData.append('expires_at', expires_at);
             
@@ -5026,6 +5567,9 @@ function distribute_video($data) {
                         // First, search for the video to display it in the video search results
                         await searchVideosForPreselected(preselectedVideoId, preselectedVideoTitle);
                         
+                        // Wait a moment for DOM to update
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        
                         // Then auto-select the video
                         console.log('🎯 Auto-selecting preselected video:', preselectedVideoId);
                         await selectVideo(preselectedVideoId);
@@ -5521,54 +6065,81 @@ function distribute_video($data) {
         
         // ===== NEW QUICK PRICING TOOLTIP SYSTEM =====
         
+        // Track active tooltip timers to prevent flickering
+        const tooltipTimers = new Map();
+        
         // Show quick pricing tooltip on button hover
         async function showQuickPricing(buttonElement, slug) {
-            const cardElement = buttonElement.closest('.channel-card');
-            const tooltip = cardElement.querySelector('.quick-pricing-tooltip');
+            const container = buttonElement.parentElement;
+            const tooltip = container.querySelector('.quick-pricing-tooltip');
             
-            // Show loading state
-            tooltip.innerHTML = '<div style="text-align: center; color: #94a3b8;">Loading pricing...</div>';
+            // Clear any pending hide timer for this tooltip
+            if (tooltipTimers.has(tooltip)) {
+                clearTimeout(tooltipTimers.get(tooltip));
+                tooltipTimers.delete(tooltip);
+            }
+            
+            // Show loading state immediately
+            tooltip.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 0.85rem;">Loading pricing...</div>';
             tooltip.style.display = 'block';
+            tooltip.style.opacity = '1';
             
             try {
                 const pricing = await getChannelPricing(slug);
                 if (pricing && pricing.pricing) {
                     const p = pricing.pricing;
+                    // Use API pricing or fallback to new defaults
+                    const weekly = p.weekly || 1.95;
+                    const monthly = p.monthly || 6.95;
+                    const quarterly = p.quarterly || 12.95;
+                    const annual = p.annual || 49.95;
+                    
                     tooltip.innerHTML = `
-                        <div class="pricing-row">
-                            <span class="pricing-label">Monthly:</span>
-                            <span class="pricing-value">$${p.monthly.toFixed(2)}</span>
+                        <div style="display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;">
+                            <div style="flex: 1; text-align: center; padding: 6px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; min-width: 65px;">
+                                <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">WEEK</div>
+                                <div style="color: #8b5cf6; font-weight: 700; font-size: 0.9rem;">$${weekly.toFixed(2)}</div>
+                            </div>
+                            <div style="flex: 1; text-align: center; padding: 6px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; min-width: 65px;">
+                                <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">MONTH</div>
+                                <div style="color: #10b981; font-weight: 700; font-size: 0.9rem;">$${monthly.toFixed(2)}</div>
+                            </div>
+                            <div style="flex: 1; text-align: center; padding: 6px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; min-width: 65px;">
+                                <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 2px;">QUARTER</div>
+                                <div style="color: #60a5fa; font-weight: 700; font-size: 0.9rem;">$${quarterly.toFixed(2)}</div>
+                            </div>
+                            <div style="flex: 1; text-align: center; padding: 6px 8px; background: rgba(255,255,255,0.1); border-radius: 4px; border: 1px solid rgba(251, 191, 36, 0.4); min-width: 65px;">
+                                <div style="font-size: 0.7rem; color: #fbbf24; margin-bottom: 2px;">YEAR</div>
+                                <div style="color: #f59e0b; font-weight: 700; font-size: 0.9rem;">$${annual.toFixed(2)}</div>
+                            </div>
                         </div>
-                        <div class="pricing-row">
-                            <span class="pricing-label">Quarterly:</span>
-                            <span class="pricing-value">$${p.quarterly.toFixed(2)}</span>
-                        </div>
-                        <div class="pricing-row">
-                            <span class="pricing-label">Semi-Annual:</span>
-                            <span class="pricing-value">$${p.semi_annual.toFixed(2)}</span>
-                        </div>
-                        <div class="pricing-row">
-                            <span class="pricing-label">Annual:</span>
-                            <span class="pricing-value">$${p.annual.toFixed(2)}</span>
-                        </div>
-                        <div class="pricing-tier-badge">${p.label || 'Standard Pricing'}</div>
                     `;
                 } else {
-                    tooltip.innerHTML = '<div style="text-align: center; color: #ef4444;">Pricing unavailable</div>';
+                    tooltip.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.85rem;">Pricing unavailable</div>';
                 }
             } catch (error) {
                 console.error('Error loading pricing:', error);
-                tooltip.innerHTML = '<div style="text-align: center; color: #ef4444;">Error loading pricing</div>';
+                tooltip.innerHTML = '<div style="text-align: center; color: #ef4444; font-size: 0.85rem;">Error loading pricing</div>';
             }
         }
         
-        // Hide quick pricing tooltip
+        // Hide quick pricing tooltip with improved logic to prevent flickering
         function hideQuickPricing(buttonElement) {
-            const cardElement = buttonElement.closest('.channel-card');
-            const tooltip = cardElement.querySelector('.quick-pricing-tooltip');
-            setTimeout(() => {
-                tooltip.style.display = 'none';
-            }, 200);
+            const container = buttonElement.parentElement;
+            const tooltip = container.querySelector('.quick-pricing-tooltip');
+            
+            // Use a slightly longer delay to prevent flickering when moving mouse
+            const hideTimer = setTimeout(() => {
+                tooltip.style.opacity = '0';
+                setTimeout(() => {
+                    tooltip.style.display = 'none';
+                    tooltip.style.opacity = '1'; // Reset for next show
+                    tooltipTimers.delete(tooltip);
+                }, 150); // Wait for fade out
+            }, 150);
+            
+            // Store the timer so it can be cancelled if mouse re-enters
+            tooltipTimers.set(tooltip, hideTimer);
         }
         
         // Add channel directly to cart with default monthly pricing
@@ -5593,12 +6164,18 @@ function distribute_video($data) {
                     return;
                 }
                 
-                // Add to selected channels with monthly interval by default
+                // Add to selected channels with monthly interval by default and all pricing tiers
                 selectedChannels.push({
                     slug: slug,
                     name: name,
                     interval: 'monthly',
-                    price: pricing.pricing.monthly
+                    price: pricing.pricing.monthly,
+                    pricing: {
+                        weekly: pricing.pricing.weekly || 1.95,
+                        monthly: pricing.pricing.monthly || 3.95,
+                        quarterly: pricing.pricing.quarterly || 6.95,
+                        annual: pricing.pricing.annual || 24.95
+                    }
                 });
                 
                 // Update display

@@ -45,7 +45,7 @@ try {
     // Query user from IONEERS table
     $stmt = $pdo->prepare("
         SELECT user_id, first_name, last_name, email, password, 
-               user_role, account_status, phone, email_verified
+               user_role, account_status, phone, email_verified, photo_url
         FROM IONEERS 
         WHERE email = :email
         LIMIT 1
@@ -112,6 +112,9 @@ try {
     $_SESSION['phone'] = $user['phone'];
     $_SESSION['logged_in'] = true;
     $_SESSION['login_time'] = time();
+$full_name_for_avatar = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
+    $avatar_fallback = 'https://i0.wp.com/ui-avatars.com/api/?name=' . urlencode($full_name_for_avatar ?: $user['email']) . '&size=256';
+    $_SESSION['photo_url'] = !empty($user['photo_url']) ? $user['photo_url'] : $avatar_fallback;
     
     // Set remember me cookie if requested
     if ($remember) {

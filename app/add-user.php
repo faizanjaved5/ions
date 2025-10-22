@@ -253,8 +253,10 @@ try {
             
             // Rename the temp file to final filename
             if (rename($temp_photo_path, $final_path)) {
-                // Update the database with the final photo URL
-                $photo_url = $config['mediaUploadPrefix'] . $final_filename;
+                // Update the database with the final photo URL (FIXED: Use dynamic domain)
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? 'iblog.bz';
+                $photo_url = $protocol . '://' . $host . $config['mediaUploadPath'] . $final_filename;
                 $db->update('IONEERS', ['photo_url' => $photo_url], ['user_id' => $new_user->user_id]);
             } else {
                 // If renaming fails, clean up the temp file

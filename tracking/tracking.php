@@ -32,7 +32,7 @@ class VideoTracker {
      */
     private function initializeDatabase() {
         $sql = "
-        CREATE TABLE IF NOT EXISTS video_tracking (
+        CREATE TABLE IF NOT EXISTS IONVideoTracking (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             video_id VARCHAR(255) NOT NULL,
             video_type VARCHAR(50) NOT NULL,
@@ -51,7 +51,7 @@ class VideoTracker {
             UNIQUE KEY unique_video_page (video_id, video_type, page_slug)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         
-        CREATE TABLE IF NOT EXISTS video_tracking_daily (
+        CREATE TABLE IF NOT EXISTS IONVideoTrackingDaily (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             video_id VARCHAR(255) NOT NULL,
             video_type VARCHAR(50) NOT NULL,
@@ -67,7 +67,7 @@ class VideoTracker {
             UNIQUE KEY unique_video_date (video_id, video_type, page_slug, track_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         
-        CREATE TABLE IF NOT EXISTS video_tracking_queue (
+        CREATE TABLE IF NOT EXISTS IONVideoTrackingQueue (
             id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             batch_data JSON NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -95,7 +95,7 @@ class VideoTracker {
             return ['status' => 'queued'];
         } else {
             // Store in database queue for processing
-            $stmt = $this->pdo->prepare("INSERT INTO video_tracking_queue (batch_data) VALUES (:batch_data)");
+            $stmt = $this->pdo->prepare("INSERT INTO IONVideoTrackingQueue (batch_data) VALUES (:batch_data)");
             $stmt->execute([':batch_data' => json_encode($batchData)]);
             return ['status' => 'queued'];
         }
@@ -126,7 +126,7 @@ class VideoTracker {
     }
     
     private function processDatabaseQueue() {
-        $stmt = $this->pdo->prepare("SELECT id, batch_data FROM video_tracking_queue WHERE processed = 0 ORDER BY created_at LIMIT 100");
+        $stmt = $this->pdo->prepare("SELECT id, batch_data FROM IONVideoTrackingQueue WHERE processed = 0 ORDER BY created_at LIMIT 100");
         $stmt->execute();
         $batches = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -134,12 +134,12 @@ class VideoTracker {
             $batchData = json_decode($batch['batch_data'], true);
             $this->processBatchData($batchData);
             
-            $updateStmt = $this->pdo->prepare("UPDATE video_tracking_queue SET processed = 1 WHERE id = :id");
+            $updateStmt = $this->pdo->prepare("UPDATE IONVideoTrackingQueue SET processed = 1 WHERE id = :id");
             $updateStmt->execute([':id' => $batch['id']]);
         }
         
         // Clean old processed records
-        $this->pdo->exec("DELETE FROM video_tracking_queue WHERE processed = 1 AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
+        $this->pdo->exec("DELETE FROM IONVideoTrackingQueue WHERE processed = 1 AND created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)");
     }
     
     private function processBatchData($batchData) {
@@ -154,7 +154,7 @@ class VideoTracker {
             $sessionId = $event['sessionId'];
             
             // Update main tracking table
-            $sql = "INSERT INTO video_tracking (video_id, video_type, page_slug, city_slug, impressions, clicks) 
+            $sql = "INSERT INTO IONVideoTracking (video_id, video_type, page_slug, city_slug, impressions, clicks) 
                     VALUES (:video_id, :video_type, :page_slug, :city_slug, :impressions, :clicks)
                     ON DUPLICATE KEY UPDATE 
                     impressions = impressions + :impressions_update,
@@ -179,7 +179,7 @@ class VideoTracker {
             }
             
             // Update daily tracking table
-            $sql = "INSERT INTO video_tracking_daily (video_id, video_type, page_slug, city_slug, track_date, impressions, clicks) 
+            $sql = "INSERT INTO IONVideoTrackingDaily (video_id, video_type, page_slug, city_slug, track_date, impressions, clicks) 
                     VALUES (:video_id, :video_type, :page_slug, :city_slug, :track_date, :impressions, :clicks)
                     ON DUPLICATE KEY UPDATE 
                     impressions = impressions + :impressions_update,
@@ -212,7 +212,7 @@ class VideoTracker {
             $columnName = $eventType === 'impression' ? 'unique_impressions' : 'unique_clicks';
             
             // Update main table
-            $sql = "UPDATE video_tracking SET {$columnName} = {$columnName} + 1 
+            $sql = "UPDATE IONVideoTracking SET {$columnName} = {$columnName} + 1 
                     WHERE video_id = :video_id AND video_type = :video_type AND page_slug = :page_slug";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([
@@ -222,7 +222,7 @@ class VideoTracker {
             ]);
             
             // Update daily table
-            $sql = "UPDATE video_tracking_daily SET {$columnName} = {$columnName} + 1 
+            $sql = "UPDATE IONVideoTrackingDaily SET {$columnName} = {$columnName} + 1 
                     WHERE video_id = :video_id AND video_type = :video_type AND page_slug = :page_slug AND track_date = :track_date";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([
@@ -246,7 +246,7 @@ class VideoTracker {
             $columnName = $eventType === 'impression' ? 'unique_impressions' : 'unique_clicks';
             
             // Update both tables as in Redis version
-            $sql = "UPDATE video_tracking SET {$columnName} = {$columnName} + 1 
+            $sql = "UPDATE IONVideoTracking SET {$columnName} = {$columnName} + 1 
                     WHERE video_id = :video_id AND video_type = :video_type AND page_slug = :page_slug";
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute([
@@ -293,7 +293,7 @@ class VideoTracker {
                         SUM(unique_impressions) as total_unique_impressions,
                         SUM(unique_clicks) as total_unique_clicks,
                         ROUND(SUM(clicks) * 100.0 / NULLIF(SUM(impressions), 0), 2) as ctr
-                    FROM video_tracking_daily";
+                    FROM IONVideoTrackingDaily";
             
             if ($dateFrom) {
                 $where[] = "track_date >= :date_from";
@@ -319,7 +319,7 @@ class VideoTracker {
                         unique_impressions as total_unique_impressions,
                         unique_clicks as total_unique_clicks,
                         ROUND(clicks * 100.0 / NULLIF(impressions, 0), 2) as ctr
-                    FROM video_tracking " . $whereClause;
+                    FROM IONVideoTracking " . $whereClause;
         }
         
         $stmt = $this->pdo->prepare($sql);

@@ -676,8 +676,9 @@ window.EnhancedIONShare = (function() {
                 
                 // Show using the pattern that fixes visibility issues - force with !important
                 globalModal.style.setProperty('display', 'flex', 'important');
-                globalModal.style.setProperty('opacity', '1', 'important');
-                globalModal.style.setProperty('z-index', '99999', 'important');
+            globalModal.style.setProperty('opacity', '1', 'important');
+            // Force above any uploader/iframe overlays
+            globalModal.style.setProperty('z-index', '2147483647', 'important');
                 globalModal.style.setProperty('position', 'fixed', 'important');
                 globalModal.style.setProperty('top', '0', 'important');
                 globalModal.style.setProperty('left', '0', 'important');

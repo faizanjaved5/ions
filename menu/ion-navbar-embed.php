@@ -28,6 +28,12 @@ $__ion_base = isset($ION_NAVBAR_BASE_URL) ? rtrim($ION_NAVBAR_BASE_URL, "/") . "
         }
     };
     window.global = window.global || window;
+    // Optional: Inline user/menu data provided by PHP
+    <?php if (isset($ION_USER_MENU)) { ?>
+        try {
+            window.__ION_PROFILE_DATA = JSON.parse('<?php echo json_encode($ION_USER_MENU, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>');
+        } catch (e) {}
+    <?php } ?>
 </script>
 <script src="<?php echo htmlspecialchars($__ion_base, ENT_QUOTES); ?>ion-navbar.iife.js"></script>
 <script>

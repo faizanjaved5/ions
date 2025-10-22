@@ -11,8 +11,7 @@ let selectedFiles = [];
 let bulkMode = false;
 let selectedGoogleDriveFile = null;
 let selectedGoogleDriveFiles = []; // For bulk Drive
-let accessToken = null;
-let tokenClient = null;
+// accessToken and tokenClient declared in ionuploaderpro.js (loaded first)
 let currentView = 'grid'; // grid/list toggle for bulk
 let uploadQueue = [];
 let currentUploadIndex = 0;
@@ -151,13 +150,20 @@ function handleFileSelect(event) {
         const uploadZone = document.getElementById('uploadZone');
         if (uploadZone) {
             uploadZone.innerHTML = `
-                <div style="text-align: center; padding: 20px;">
+                <div style="text-align: center; padding: 20px; cursor: pointer;" title="Click to select a different file">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                         <polyline points="22,4 12,14.01 9,11.01"></polyline>
                     </svg>
                     <h3 style="color: #10b981; margin: 12px 0 8px 0;">File Selected!</h3>
-                    <p style="color: #cbd5e1; margin: 0 0 8px 0;">${selectedFile.name}</p>
+                    <p style="color: #cbd5e1; margin: 0 0 4px 0;">${selectedFile.name}</p>
+                    <p style="color: #64748b; font-size: 13px; margin: 0;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        Click to change file
+                    </p>
                 </div>
             `;
         }
@@ -211,7 +217,8 @@ async function processSingleUpload() {
             description: document.getElementById('videoDescription')?.value || '',
             category: document.getElementById('videoCategory')?.value || 'General',
             tags: document.getElementById('videoTags')?.value || '',
-            visibility: document.getElementById('videoVisibility')?.value || 'public'
+            visibility: document.getElementById('videoVisibility')?.value || 'public',
+            selected_channels: document.getElementById('selectedChannels')?.value || '' // CRITICAL: Include selected channels
         };
         
         // Try R2 multipart upload first (if available)
@@ -251,6 +258,14 @@ async function uploadWithSimpleHandler(file, metadata) {
     Object.keys(metadata).forEach(key => {
         formData.append(key, metadata[key]);
     });
+    
+    // CRITICAL: Add thumbnail blob if available (must be separate from metadata)
+    if (window.capturedThumbnailBlob) {
+        formData.append('thumbnail', window.capturedThumbnailBlob, 'thumbnail.jpg');
+        console.log('📸 Added thumbnail to upload:', window.capturedThumbnailBlob.size, 'bytes');
+    } else {
+        console.log('⚠️ No thumbnail blob available for upload');
+    }
     
     const response = await fetch('./ionuploadvideos.php', {
         method: 'POST',
@@ -311,6 +326,36 @@ async function uploadWithR2Multipart(file, metadata) {
 // ============================================
 // PLATFORM IMPORTS
 // ============================================
+
+/**
+ * Check if a video already exists by URL (early duplicate detection)
+ */
+async function checkDuplicateVideo(url, platform) {
+    console.log('🔍 Checking duplicate for:', url, platform);
+    
+    const formData = new FormData();
+    formData.append('action', 'check_platform_url');
+    formData.append('url', url);
+    formData.append('platform', platform);
+    
+    const response = await fetch('./check-duplicate-video.php', {
+        method: 'POST',
+        body: formData
+    });
+    
+    if (!response.ok) {
+        throw new Error('Duplicate check request failed');
+    }
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+        throw new Error(result.error || 'Duplicate check failed');
+    }
+    
+    return result; // Returns { exists: true/false, message: '...', video_id?: ..., ... }
+}
+
 function validatePlatformUrl(url, platform) {
     if (!url || !platform) return false;
     
@@ -328,7 +373,7 @@ function validatePlatformUrl(url, platform) {
 
 function validatePlatformUrlFallback(url, platform) {
     const patterns = {
-        youtube: /(?:youtube\.com\/watch\?.*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+        youtube: /(?:youtube\.com\/(?:watch\?.*v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
         vimeo: /vimeo\.com\/(?:channels\/[^\/]+\/|groups\/[^\/]+\/videos\/|album\/[^\/]+\/video\/|video\/|)(\d+)/,
         wistia: /(?:wistia\.(?:com|net)\/(?:medias|embed)\/|wi\.st\/)([a-zA-Z0-9]{10})/,
         loom: /(?:loom\.com\/share\/)([a-zA-Z0-9]+)/,
@@ -349,9 +394,6 @@ function validatePlatformUrlFallback(url, platform) {
 // ============================================
 // UI HELPERS
 // ============================================
-// showProgress function moved to consolidated version below
-
-// hideProgress function moved to consolidated version below
 
 function showCustomAlert(title, message) {
     console.log('🎯 showCustomAlert called with HTML support - Cache cleared!', {title, message});
@@ -425,6 +467,10 @@ function proceedToStep2() {
     }
     
     if (step2) {
+        // IMPORTANT: Reset ALL visibility properties that were set in goBackToStep1()
+        step2.style.visibility = 'visible';
+        step2.style.position = 'relative';
+        step2.style.left = '0';
         step2.style.display = 'block';
         step2.classList.add('step2-content');
         
@@ -434,13 +480,14 @@ function proceedToStep2() {
         step2.style.setProperty('gap', '32px', 'important');
         step2.style.setProperty('padding', '12px 0 12px 12px', 'important');
         
-        console.log('✅ Step 2 shown with grid layout');
+        console.log('✅ Step 2 shown with grid layout and ALL visibility properties reset');
         console.log('🔍 Step 2 classes:', step2.className);
         console.log('🔍 Step 2 computed display:', window.getComputedStyle(step2).display);
         console.log('🔍 Step 2 computed grid-template-columns:', window.getComputedStyle(step2).gridTemplateColumns);
     }
     
-    // Update button text for step 2
+    // Update button text for step 2 AND enable it
+    const nextBtn = document.getElementById('nextBtn');
     const nextBtnText = document.getElementById('nextBtnText');
     if (nextBtnText) {
         if (currentUploadType === 'import') {
@@ -452,12 +499,18 @@ function proceedToStep2() {
         }
     }
     
-    // Update cancel button to "Back" button for step 2
-    const cancelBtn = document.getElementById('cancelBtn');
-    if (cancelBtn) {
-        cancelBtn.textContent = 'Back';
-        cancelBtn.onclick = goBackToStep1;
-        console.log('✅ Cancel button changed to "Back" button');
+    // Enable the button for Step 2 (user is ready to upload/import)
+    if (nextBtn) {
+        nextBtn.disabled = false;
+        console.log('✅ Upload/Import button ENABLED for Step 2');
+    }
+    
+    // Change back button to "< Back" button for step 2
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+        backBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><polyline points="15,18 9,12 15,6"></polyline></svg> Back';
+        backBtn.onclick = goBackToStep1;
+        console.log('✅ Back button changed to "< Back"');
     }
     
     // Setup preview for files or imports
@@ -469,19 +522,71 @@ function proceedToStep2() {
 function goBackToStep1() {
     console.log('⬅️ Going back to step 1');
     
+    // Clear all upload state
+    selectedFile = null;
+    selectedFiles = [];
+    currentUploadType = null;
+    currentSource = null;
+    window.capturedThumbnailBlob = null;
+    window.customThumbnailSource = null;
+    
+    // Clear URL input
+    const urlInput = document.getElementById('urlInput');
+    if (urlInput) {
+        urlInput.value = '';
+    }
+    
+    // Clear file input
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    
+    // Hide URL section
+    const urlSection = document.getElementById('urlInputSection');
+    if (urlSection) {
+        urlSection.style.display = 'none';
+    }
+    
+    // Clear video player
+    const playerContainer = document.getElementById('videoPlayerContainer');
+    if (playerContainer) {
+        playerContainer.innerHTML = '';
+    }
+    
+    // Remove selected state from platform buttons
+    document.querySelectorAll('.source-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+    
     // Hide step 2, show step 1
     const step1 = document.getElementById('step1');
     const step2 = document.getElementById('step2');
+    const bulkStep2 = document.getElementById('bulkStep2');
     
+    // IMPORTANT: Hide step 2 completely
     if (step2) {
-        step2.style.display = 'none';
+        step2.style.display = 'none !important';
+        step2.style.visibility = 'hidden';
+        step2.style.position = 'absolute';
+        step2.style.left = '-9999px';
         step2.classList.remove('step2-content');
-        console.log('✅ Step 2 hidden');
+        console.log('✅ Step 2 completely hidden');
     }
     
+    // Also hide bulk step 2 if visible
+    if (bulkStep2) {
+        bulkStep2.style.display = 'none';
+        console.log('✅ Bulk Step 2 hidden');
+    }
+    
+    // Show step 1
     if (step1) {
         step1.style.display = 'block';
-        console.log('✅ Step 1 shown');
+        step1.style.visibility = 'visible';
+        step1.style.position = 'relative';
+        step1.style.left = '0';
+        console.log('✅ Step 1 shown and visible');
     }
     
     // Reset button text for step 1
@@ -491,13 +596,25 @@ function goBackToStep1() {
         console.log('✅ Button text reset to "Next"');
     }
     
-    // Reset cancel button to original behavior
-    const cancelBtn = document.getElementById('cancelBtn');
-    if (cancelBtn) {
-        cancelBtn.textContent = 'Cancel';
-        cancelBtn.onclick = handleDiscardAndClose;
-        console.log('✅ Cancel button reset to original behavior');
+    // Reset back button to "Cancel" for step 1
+    const backBtn = document.getElementById('backBtn');
+    if (backBtn) {
+        backBtn.textContent = 'Cancel';
+        // Remove all event listeners by cloning the button
+        const newBackBtn = backBtn.cloneNode(true);
+        backBtn.parentNode.replaceChild(newBackBtn, backBtn);
+        // Set new click handler
+        newBackBtn.onclick = handleDiscardAndClose;
+        console.log('✅ Back button reset to "Cancel" with close handler');
     }
+    
+    // Disable Next button until new selection
+    const nextBtn = document.getElementById('nextBtn');
+    if (nextBtn) {
+        nextBtn.disabled = true;
+    }
+    
+    console.log('✅ Upload state reset, ready for new selection');
 }
 
 function setupVideoPreview() {
@@ -542,6 +659,45 @@ function setupVideoPreview() {
     
     // For new uploads, use selectedFile
     if (selectedFile) {
+        // Handle Google Drive files specially
+        if (selectedFile.source === 'googledrive') {
+            console.log('🎬 Setting up Google Drive file preview:', selectedFile.name);
+            
+            // Auto-populate title from Google Drive file name
+            const titleInput = document.getElementById('videoTitle');
+            if (titleInput && !titleInput.value) {
+                // Remove file extension and clean up the name
+                let cleanTitle = selectedFile.name.replace(/\.[^/.]+$/, ''); // Remove extension
+                cleanTitle = cleanTitle.replace(/[_-]/g, ' '); // Replace underscores/dashes with spaces
+                cleanTitle = cleanTitle.replace(/\s+/g, ' ').trim(); // Clean up multiple spaces
+                
+                // Capitalize first letter of each word
+                cleanTitle = cleanTitle.split(' ').map(word => 
+                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                ).join(' ');
+                
+                titleInput.value = cleanTitle;
+                console.log('📝 Title auto-populated from Google Drive file:', cleanTitle);
+            }
+            
+            // Show Google Drive placeholder (file will be fetched server-side on upload)
+            container.innerHTML = `
+                <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 20px; text-align: center;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 16px; opacity: 0.6;">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: rgba(255,255,255,0.9);">Google Drive File</div>
+                    <div style="font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 4px;">${selectedFile.name}</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.4);">File will be imported from Google Drive</div>
+                </div>
+            `;
+            
+            // Update capture button visibility for Google Drive (hide it)
+            updateCaptureButtonVisibility();
+            return;
+        }
+        
+        // Handle local file uploads
         console.log('🎬 Setting up video preview for new file:', selectedFile.name);
         const fileUrl = URL.createObjectURL(selectedFile);
         const videoData = {
@@ -614,6 +770,8 @@ function setupEditModeUI() {
 
 function populateFormFields(videoData) {
     console.log('📝 Populating form fields with:', videoData);
+    console.log('📝 Badges value:', videoData.badges);
+    console.log('📝 All keys:', Object.keys(videoData));
     
     // Title
     const titleInput = document.getElementById('videoTitle');
@@ -843,10 +1001,19 @@ function getFormMetadata() {
     formData.append('visibility', visibility);
     formData.append('badges', badges);
     
-    // Add thumbnail if available
+    // CRITICAL: Include selected channels
+    const selectedChannelsValue = document.getElementById('selectedChannels')?.value || '';
+    if (selectedChannelsValue) {
+        formData.append('selected_channels', selectedChannelsValue);
+        console.log('📝 Selected channels:', selectedChannelsValue);
+    }
+    
+    // Add thumbnail if available (CRITICAL: must be named 'thumbnail' to match backend)
     if (window.capturedThumbnailBlob) {
-        formData.append('thumbnailBlob', window.capturedThumbnailBlob, 'thumbnail.jpg');
-        console.log('📝 Added captured thumbnail blob');
+        formData.append('thumbnail', window.capturedThumbnailBlob, 'thumbnail.jpg');
+        console.log('📝 Added captured thumbnail blob:', window.capturedThumbnailBlob.size, 'bytes');
+    } else {
+        console.log('⚠️ No thumbnail blob available');
     }
     
     console.log('📝 FormData prepared successfully');
@@ -1100,53 +1267,80 @@ function renderYouTubePlayer(container, videoData) {
     
     console.log('🎬 Rendering YouTube player for ID:', videoId);
     
+    // Use HTML5 video with YouTube video source (via youtube-dl or proxy)
+    // For direct access, we'll use a proxy video element approach
     container.innerHTML = `
-        <iframe 
-            width="100%" 
-            height="300" 
-            src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1" 
-            frameborder="0" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-            allowfullscreen
-            style="border-radius: 8px;">
-        </iframe>
+        <div class="youtube-player-wrapper" style="position: relative; width: 100%; height: 300px; background: #000; border-radius: 8px;">
+            <video 
+                id="youtubeProxyVideo"
+                class="video-js" 
+                controls 
+                preload="metadata"
+                crossorigin="anonymous"
+                poster="https://img.youtube.com/vi/${videoId}/maxresdefault.jpg"
+                style="width: 100%; height: 100%; border-radius: 8px; display: none;">
+                <!-- Fallback to iframe if video source doesn't work -->
+            </video>
+            <iframe 
+                id="youtubeIframePlayer"
+                width="100%" 
+                height="100%" 
+                src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&enablejsapi=1" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen
+                style="border-radius: 8px; display: block;">
+            </iframe>
+        </div>
     `;
+    
+    // Store video ID for frame capture fallback
+    container.dataset.youtubeId = videoId;
+    container.dataset.videoType = 'youtube';
 }
 
 function renderVimeoPlayer(container, videoData) {
-    console.log('🎬 renderVimeoPlayer called with:', videoData);
+    console.log('renderVimeoPlayer called with:', videoData);
     const videoId = extractVideoId(videoData.video_link, 'vimeo');
-    console.log('🎬 Extracted Vimeo ID:', videoId, 'from URL:', videoData.video_link);
-    
+    console.log('Extracted Vimeo ID:', videoId, 'from URL:', videoData.video_link);
+
     if (!videoId) {
-        console.error('❌ Failed to extract Vimeo ID from URL:', videoData.video_link);
+        console.error('Failed to extract Vimeo ID from URL:', videoData.video_link);
         throw new Error('Invalid Vimeo URL');
     }
-    
-    console.log('🎬 Rendering Vimeo player for ID:', videoId);
-    
+
+    console.log('Rendering Vimeo player for ID:', videoId);
+
     container.innerHTML = `
-        <iframe 
-            width="100%" 
-            height="300" 
-            src="https://player.vimeo.com/video/${videoId}" 
-            frameborder="0" 
-            allow="autoplay; fullscreen; picture-in-picture" 
-            allowfullscreen
-            style="border-radius: 8px;">
-        </iframe>
+        <div class="vimeo-player-wrapper" style="position: relative; width: 100%; height: 300px; background: #000; border-radius: 8px;">
+            <iframe 
+                id="vimeoIframePlayer"
+                width="100%" 
+                height="100%" 
+                src="https://player.vimeo.com/video/${videoId}" 
+                frameborder="0" 
+                allow="autoplay; fullscreen; picture-in-picture" 
+                allowfullscreen
+                style="border-radius: 8px;">
+            </iframe>
+        </div>
     `;
+
+    // Store video ID for frame capture fallback
+    container.dataset.vimeoId = videoId;
+    container.dataset.videoType = 'vimeo';
 }
 
 function renderDirectVideoPlayer(container, videoData) {
-    console.log('🎬 Rendering direct video player for:', videoData.video_link);
-    
+    console.log('Rendering direct video player for:', videoData.video_link);
+
     container.innerHTML = `
         <video 
             width="100%" 
             height="300" 
             controls 
             preload="metadata"
+            crossorigin="anonymous"
             style="border-radius: 8px; background: #000;"
             onloadedmetadata="console.log('🎬 Video metadata loaded')"
             onerror="console.error('🎬 Video load error')">
@@ -1207,25 +1401,66 @@ function showVideoLoadError(message) {
     }
 }
 
+function updateCaptureButtonVisibility() {
+    console.log('🎬 Updating capture button visibility');
+    const generateBtn = document.getElementById('generateThumbnailBtn');
+    if (!generateBtn) {
+        console.log('🎬 Capture button not found in DOM');
+        return;
+    }
+    
+    let shouldShow = true;
+    let reason = 'default visible';
+    
+    // Hide for Google Drive (can't preview/capture before upload)
+    if (currentSource === 'googledrive') {
+        shouldShow = false;
+        reason = 'Google Drive - no preview available';
+    }
+    // Hide in edit mode if embedded video without capture permission
+    else if (window.editVideoData && window.editVideoData.can_capture === false) {
+        shouldShow = false;
+        reason = 'edit mode without capture permission';
+    }
+    // Show for YouTube/Vimeo (user can try, CORS errors will be handled)
+    
+    // Apply visibility
+    if (shouldShow) {
+        generateBtn.style.display = 'block';
+        console.log('✅ Capture button shown:', reason);
+    } else {
+        generateBtn.style.display = 'none';
+        console.log('❌ Capture button hidden:', reason);
+    }
+    
+    // Note: The captureVideoFrame() function will show appropriate error messages
+    // for embedded videos (YouTube, Vimeo) that can't be captured due to CORS
+}
+
 function showBulkUploadInterface() {
     console.log('📦 Showing bulk upload interface for', selectedFiles.length, 'files');
     
-    // Hide step 1, show bulk interface
-    const step1 = document.getElementById('step1');
-    const step2 = document.getElementById('step2');
-    const bulkStep2 = document.getElementById('bulkStep2');
-    
-    if (step1) {
-        step1.style.display = 'none';
-        console.log('✅ Step 1 hidden');
-    }
-    if (step2) {
-        step2.style.display = 'none';
-        console.log('✅ Step 2 hidden');
-    }
-    if (bulkStep2) {
-        bulkStep2.style.display = 'block';
-        console.log('✅ Bulk interface shown');
+    // Check if Pro version's bulk upload is available
+    if (typeof generateBulkList === 'function') {
+        console.log('✅ Using Pro version bulk upload (generateBulkList)');
+        
+        // Hide step 1, show bulk step 2
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const bulkStep2 = document.getElementById('bulkStep2');
+        
+        if (step1) {
+            step1.style.display = 'none';
+            console.log('✅ Step 1 hidden');
+        }
+        if (step2) {
+            step2.style.display = 'none';
+            console.log('✅ Step 2 hidden');
+        }
+        if (bulkStep2) {
+            bulkStep2.style.display = 'block';
+            console.log('✅ Bulk interface shown (Pro)');
+        }
         
         // Update file count
         const fileCountElement = document.getElementById('bulkFileCount');
@@ -1240,7 +1475,60 @@ function showBulkUploadInterface() {
             console.log('✅ Button text updated to "Upload All Files"');
         }
         
-        // Populate file list
+        // Change back button to "< Back" for bulk upload
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><polyline points="15,18 9,12 15,6"></polyline></svg> Back';
+            backBtn.onclick = goBackToStep1;
+            console.log('✅ Back button changed to "< Back" (bulk mode)');
+        }
+        
+        // Use Pro version's bulk list generator
+        generateBulkList(selectedFiles);
+        return;
+    }
+    
+    // Fallback to basic bulk upload interface (if Pro not loaded)
+    console.log('⚠️ Pro version not available, using basic bulk upload');
+    
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const bulkStep2 = document.getElementById('bulkStep2');
+    
+    if (step1) {
+        step1.style.display = 'none';
+        console.log('✅ Step 1 hidden');
+    }
+    if (step2) {
+        step2.style.display = 'none';
+        console.log('✅ Step 2 hidden');
+    }
+    if (bulkStep2) {
+        bulkStep2.style.display = 'block';
+        console.log('✅ Bulk interface shown (basic)');
+        
+        // Update file count
+        const fileCountElement = document.getElementById('bulkFileCount');
+        if (fileCountElement) {
+            fileCountElement.textContent = `${selectedFiles.length} files selected`;
+        }
+        
+        // Update button text
+        const nextBtnText = document.getElementById('nextBtnText');
+        if (nextBtnText) {
+            nextBtnText.textContent = 'Upload All Files';
+            console.log('✅ Button text updated to "Upload All Files"');
+        }
+        
+        // Change back button to "< Back" for bulk upload (basic)
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><polyline points="15,18 9,12 15,6"></polyline></svg> Back';
+            backBtn.onclick = goBackToStep1;
+            console.log('✅ Back button changed to "< Back" (basic bulk mode)');
+        }
+        
+        // Populate basic file list
         populateBulkFileList();
     } else {
         console.error('❌ bulkStep2 element not found');
@@ -1276,9 +1564,23 @@ function createBulkFileCard(file, index) {
     // Store the selected file globally
     selectedFiles[index] = file;
     console.log('📁 File selected:', file.name, 'Size:', formatFileSize(file.size));
+    
+    // Create card HTML
+    card.innerHTML = `
+        <div class="file-preview">
+            <div class="file-icon">🎬</div>
+            <div class="file-status">
+                <span class="status-text">Ready</span>
+            </div>
+        </div>
+        <div class="file-details">
+            <div class="file-name">${file.name}</div>
+            <div class="file-size">${formatFileSize(file.size)}</div>
+        </div>
+    `;
+    
+    return card;
 }
-
-// showUploadProgress function moved to consolidated version below
 
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
@@ -1315,6 +1617,14 @@ function removeFileFromBulk(index) {
         
         if (step1) step1.style.display = 'block';
         if (bulkStep2) bulkStep2.style.display = 'none';
+        
+        // Reset back button to "Cancel"
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.textContent = 'Cancel';
+            backBtn.onclick = handleDiscardAndClose;
+            console.log('✅ Back button reset to "Cancel" (bulk cleanup)');
+        }
         
         // Reset upload type
         currentUploadType = null;
@@ -1472,25 +1782,20 @@ function handleNextButtonClick() {
     }
 }
 
-function proceedToNextStep() {
+async function proceedToNextStep() {
     console.log('➡️ Proceeding to next step, type:', currentUploadType);
     
     if (currentUploadType === 'file') {
         proceedToStep2();
     } else if (currentUploadType === 'import') {
-        // Store the URL for platform imports
-        const urlInput = document.getElementById('urlInput');
-        if (urlInput && urlInput.value.trim()) {
-            window.importedVideoUrl = urlInput.value.trim();
-            console.log('🔗 Stored imported video URL:', window.importedVideoUrl);
-        }
-        
-        // For platform imports, go to Step 2 to allow editing details
-        proceedToStep2();
+        // Validate and check for duplicates before proceeding
+        await validateAndProceedToStep2ForImport();
     }
 }
 
-function processPlatformImport() {
+// This function is only for Step 1 -> Step 2 transition
+// The actual upload is handled by window.processPlatformImport from ionuploaderpro.js
+async function validateAndProceedToStep2ForImport() {
     const urlInput = document.getElementById('urlInput');
     if (!urlInput) return;
     
@@ -1500,7 +1805,38 @@ function processPlatformImport() {
         return;
     }
     
-    console.log('🔗 Processing platform import:', currentSource, url);
+    console.log('🔗 Validating platform URL:', currentSource, url);
+    
+    // Show loading indicator
+    const nextBtn = document.getElementById('nextBtn');
+    const nextBtnText = document.getElementById('nextBtnText');
+    const originalBtnText = nextBtnText?.textContent || 'Next';
+    
+    if (nextBtnText) nextBtnText.textContent = 'Checking...';
+    if (nextBtn) nextBtn.disabled = true;
+    
+    // Check for duplicate video before proceeding
+    console.log('🔍 Checking for duplicate video...');
+    try {
+        const duplicateCheck = await checkDuplicateVideo(url, currentSource);
+        
+        // Restore button
+        if (nextBtnText) nextBtnText.textContent = originalBtnText;
+        if (nextBtn) nextBtn.disabled = false;
+        
+        if (duplicateCheck.exists) {
+            console.log('⚠️ Duplicate video detected:', duplicateCheck);
+            showCustomAlert('Duplicate Video', duplicateCheck.message);
+            return; // Stop here, don't proceed to Step 2
+        }
+        console.log('✅ No duplicate found, proceeding...');
+    } catch (error) {
+        console.warn('⚠️ Duplicate check failed, proceeding anyway:', error);
+        // Restore button even on error
+        if (nextBtnText) nextBtnText.textContent = originalBtnText;
+        if (nextBtn) nextBtn.disabled = false;
+        // If duplicate check fails, we'll let them proceed and catch it on the backend
+    }
     
     // Store the URL for later use
     window.importedVideoUrl = url;
@@ -1509,9 +1845,9 @@ function processPlatformImport() {
     proceedToStep2();
 }
 
-// Extract YouTube ID from URL
+// Extract YouTube ID from URL (supports regular videos and Shorts)
 function extractYouTubeId(url) {
-    const match = url.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    const match = url.match(/(?:youtube\.com\/(?:watch\?.*v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     return match ? match[1] : null;
 }
 
@@ -1520,7 +1856,7 @@ function extractVideoId(url, platform) {
     console.log('🎯 Extracting video ID from:', url, 'platform:', platform);
     
     const patterns = {
-        youtube: /(?:youtube\.com\/watch\?.*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+        youtube: /(?:youtube\.com\/(?:watch\?.*v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
         vimeo: /vimeo\.com\/(?:channels\/[^\/]+\/|groups\/[^\/]+\/videos\/|album\/[^\/]+\/video\/|video\/|)(\d+)/,
         muvi: /(?:embed\.muvi\.com\/embed\/)([a-zA-Z0-9]+)/,
         wistia: /(?:wistia\.(?:com|net)\/(?:medias|embed)\/|wi\.st\/)([a-zA-Z0-9]+)/,
@@ -1540,23 +1876,6 @@ function extractVideoId(url, platform) {
     return videoId;
 }
 
-// URL validation for different platforms (DUPLICATE - REMOVE THIS ONE)
-function validatePlatformUrlDuplicate(url, platform) {
-    const patterns = {
-        youtube: /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11}/,
-        vimeo: /^(https?:\/\/)?(www\.)?vimeo\.com\/(?:channels\/[^\/]+\/|groups\/[^\/]+\/videos\/|album\/[^\/]+\/video\/|video\/|)?\d+/,
-        muvi: /^https?:\/\/embed\.muvi\.com\/embed\/[a-zA-Z0-9]+/,
-        wistia: /^https?:\/\/[a-zA-Z0-9]+\.wistia\.com\/medias\/[a-zA-Z0-9]+/,
-        loom: /^https?:\/\/www\.loom\.com\/share\/[a-zA-Z0-9]+/
-    };
-    
-    if (!patterns[platform]) {
-        return false;
-    }
-    
-    return patterns[platform].test(url);
-}
-
 // Get placeholder text for URL input based on platform
 function getPlaceholderForSource(source) {
     const placeholders = {
@@ -1569,18 +1888,76 @@ function getPlaceholderForSource(source) {
     return placeholders[source] || 'Enter video URL...';
 }
 
-// Generate YouTube thumbnail
+// Generate YouTube thumbnail with fallback
 function generateYouTubeThumbnail(videoId) {
-    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-    updateThumbnailPreview(thumbnailUrl);
-    console.log('🖼️ YouTube thumbnail generated:', thumbnailUrl);
+    // Try different quality levels in order
+    const qualities = ['maxresdefault', 'sddefault', 'hqdefault', 'mqdefault'];
+    let currentIndex = 0;
+    
+    function tryNextQuality() {
+        if (currentIndex >= qualities.length) {
+            console.error('❌ All YouTube thumbnail qualities failed');
+            return;
+        }
+        
+        const quality = qualities[currentIndex];
+        const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/${quality}.jpg`;
+        
+        // Test if the thumbnail exists and convert to blob
+        fetch(thumbnailUrl, { mode: 'cors' })
+            .then(response => {
+                if (!response.ok) throw new Error('Thumbnail not found');
+                return response.blob();
+            })
+            .then(blob => {
+                console.log(`✅ YouTube thumbnail found (${quality}):`, thumbnailUrl);
+                
+                // CRITICAL: Store the blob for upload
+                window.capturedThumbnailBlob = blob;
+                console.log('✅ YouTube thumbnail blob stored:', blob.size, 'bytes');
+                
+                // Update preview
+                const url = URL.createObjectURL(blob);
+                updateThumbnailPreview(url);
+            })
+            .catch(error => {
+                console.log(`⚠️ YouTube thumbnail not found (${quality}), trying next...`);
+                currentIndex++;
+                tryNextQuality();
+            });
+    }
+    
+    tryNextQuality();
 }
 
 // Generate Vimeo thumbnail
 function generateVimeoThumbnail(videoId) {
     const thumbnailUrl = `https://vumbnail.com/${videoId}.jpg`;
-    updateThumbnailPreview(thumbnailUrl);
-    console.log('🖼️ Vimeo thumbnail generated:', thumbnailUrl);
+    
+    // Fetch and convert to blob for upload
+    fetch(thumbnailUrl, { mode: 'cors' })
+        .then(response => {
+            if (!response.ok) throw new Error('Vimeo thumbnail not found');
+            return response.blob();
+        })
+        .then(blob => {
+            console.log('✅ Vimeo thumbnail fetched:', blob.size, 'bytes');
+            
+            // CRITICAL: Store the blob for upload
+            window.capturedThumbnailBlob = blob;
+            console.log('✅ Vimeo thumbnail blob stored');
+            
+            // Update preview
+            const url = URL.createObjectURL(blob);
+            updateThumbnailPreview(url);
+        })
+        .catch(error => {
+            console.error('❌ Vimeo thumbnail fetch failed:', error);
+            // Fallback: just show the URL (won't upload)
+            updateThumbnailPreview(thumbnailUrl);
+        });
+    
+    console.log('🖼️ Vimeo thumbnail requested:', thumbnailUrl);
 }
 
 // Setup imported video preview
@@ -1647,12 +2024,21 @@ function setupImportedVideoPreview(container, videoUrl) {
 // Main upload function
 function startUpload() {
     console.log('📤 Starting upload process');
+    console.log('   currentUploadType:', currentUploadType);
+    console.log('   currentSource:', currentSource);
+    console.log('   selectedFile:', selectedFile);
     
     if (currentUploadType === 'import') {
         // Import from external source - use Pro functionality
         const urlInput = document.getElementById('urlInput');
-        if (urlInput && urlInput.value.trim() && currentSource) {
-            console.log('📥 Processing platform import:', currentSource, urlInput.value.trim());
+        const url = urlInput?.value?.trim();
+        
+        console.log('📥 Import mode detected');
+        console.log('   URL:', url);
+        console.log('   Source:', currentSource);
+        
+        if (url && currentSource) {
+            console.log('✅ Valid import data, processing...');
             
             // Collect form metadata for platform import
             const metadata = {
@@ -1661,26 +2047,32 @@ function startUpload() {
                 category: document.getElementById('videoCategory')?.value || 'General',
                 tags: document.getElementById('videoTags')?.value?.split(',').map(t => t.trim()).filter(t => t) || [],
                 visibility: document.getElementById('videoVisibility')?.value || 'public',
-                badges: document.getElementById('badgeInput')?.value || '',
+                badges: document.getElementById('videoBadges')?.value || '',
                 thumbnailBlob: window.capturedThumbnailBlob || null
             };
             
+            console.log('📦 Metadata prepared:', metadata);
+            
             // Call the Pro import function
-            if (window.processPlatformImport) {
+            if (typeof window.processPlatformImport === 'function') {
+                console.log('✅ Calling window.processPlatformImport...');
                 window.processPlatformImport(metadata);
             } else {
-                console.error('❌ Platform import functionality not available');
+                console.error('❌ window.processPlatformImport is not a function:', typeof window.processPlatformImport);
                 alert('Platform import functionality not available. Please check if Pro features are loaded.');
             }
         } else {
-            console.error('❌ No import URL or source available');
+            console.error('❌ Missing import data:', { url, currentSource });
             alert('Please enter a valid URL for platform import');
         }
     } else if (selectedFile) {
         // Upload local file
+        console.log('📤 Starting file upload for:', selectedFile.name);
         startFileUpload();
     } else {
         console.error('❌ No file or import URL available');
+        console.error('   currentUploadType:', currentUploadType);
+        console.error('   selectedFile:', selectedFile);
         alert('Please select a file or import URL first');
     }
 }
@@ -1693,13 +2085,317 @@ function startFileUpload() {
         return;
     }
     
+    // Handle Google Drive files specially
+    if (selectedFile.source === 'googledrive') {
+        console.log('📂 Google Drive file detected, uploading via Drive API');
+        startGoogleDriveUpload();
+        return;
+    }
+    
+    console.log('📊 File size:', selectedFile.size, 'bytes (', formatFileSize(selectedFile.size), ')');
+    
+    // CRITICAL DEBUG: Check thumbnail status at upload time
+    console.log('🔍 THUMBNAIL DEBUG AT UPLOAD:');
+    console.log('  - capturedThumbnailBlob exists:', !!window.capturedThumbnailBlob);
+    if (window.capturedThumbnailBlob) {
+        console.log('  - Thumbnail size:', window.capturedThumbnailBlob.size, 'bytes');
+        console.log('  - Thumbnail type:', window.capturedThumbnailBlob.type);
+        console.log('  - Thumbnail source:', window.customThumbnailSource);
+    } else {
+        console.error('  ❌ NO THUMBNAIL BLOB FOUND - This will use auto-generated thumbnail!');
+    }
+    
     // Get form data
     const title = document.getElementById('videoTitle')?.value || selectedFile.name.replace(/\.[^/.]+$/, "");
     const description = document.getElementById('videoDescription')?.value || '';
     const category = document.getElementById('videoCategory')?.value || 'General';
     const tags = document.getElementById('videoTags')?.value || '';
     const visibility = document.getElementById('videoVisibility')?.value || 'public';
-    const badges = document.getElementById('badgeInput')?.value || '';
+    const badges = document.getElementById('videoBadges')?.value || '';
+    
+    // Prepare metadata
+    const metadata = {
+        title: title,
+        description: description,
+        category: category,
+        tags: tags,
+        visibility: visibility,
+        badges: badges,
+        thumbnail: window.capturedThumbnailBlob || null
+    };
+    
+    // Check file size - use R2MultipartUploader for large files (>100MB)
+    const LARGE_FILE_THRESHOLD = 100 * 1024 * 1024; // 100MB
+    
+    if (selectedFile.size > LARGE_FILE_THRESHOLD && typeof window.R2MultipartUploader !== 'undefined') {
+        console.log('🚀 Using R2 Multipart Upload for large file (', formatFileSize(selectedFile.size), ')');
+        startR2MultipartUpload(selectedFile, metadata);
+    } else {
+        console.log('📤 Using regular upload for file (', formatFileSize(selectedFile.size), ')');
+        startRegularUpload(selectedFile, metadata);
+    }
+}
+
+/**
+ * Start Google Drive Upload
+ * Sends file ID and access token to backend, which downloads from Google Drive
+ */
+function startGoogleDriveUpload() {
+    console.log('📂 Starting Google Drive upload...');
+    console.log('   File ID:', selectedFile.id);
+    console.log('   File name:', selectedFile.name);
+    
+    // Get form data
+    const title = document.getElementById('videoTitle')?.value || selectedFile.name.replace(/\.[^/.]+$/, "");
+    const description = document.getElementById('videoDescription')?.value || '';
+    const category = document.getElementById('videoCategory')?.value || 'General';
+    const tags = document.getElementById('videoTags')?.value || '';
+    const visibility = document.getElementById('videoVisibility')?.value || 'public';
+    const badges = document.getElementById('videoBadges')?.value || '';
+    
+    // Get selected channels
+    const selectedChannels = window.channelSelector ? window.channelSelector.getSelectedChannels() : [];
+    const channelIds = selectedChannels.map(ch => ch.channel_id || ch.id).join(',');
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('action', 'import_google_drive'); // Tell backend this is a Google Drive import
+    formData.append('google_drive_file_id', selectedFile.id);
+    formData.append('google_drive_file_name', selectedFile.name);
+    formData.append('google_drive_access_token', accessToken || '');
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('category', category);
+    formData.append('tags', tags);
+    formData.append('visibility', visibility);
+    formData.append('badges', badges);
+    formData.append('channels', channelIds);
+    formData.append('source', 'googledrive');
+    
+    // Add thumbnail if available
+    if (window.capturedThumbnailBlob) {
+        formData.append('thumbnail', window.capturedThumbnailBlob, 'thumbnail.jpg');
+        console.log('✅ Custom thumbnail added to upload');
+    }
+    
+    // Show progress
+    const progressContainer = document.getElementById('uploadProgressContainer');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const statusText = document.getElementById('uploadStatusText');
+    const percentageText = document.getElementById('uploadPercentageText');
+    
+    if (progressContainer) progressContainer.style.display = 'block';
+    if (statusText) statusText.textContent = 'Importing from Google Drive...';
+    if (percentageText) percentageText.textContent = '0%';
+    if (progressBar) progressBar.style.width = '0%';
+    
+    // Update button state
+    setUploadButtonState('uploading');
+    
+    // Send request with XMLHttpRequest for real-time progress tracking
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            console.log(`📊 Google Drive upload progress: ${percentComplete.toFixed(1)}%`);
+            
+            if (progressBar) {
+                progressBar.style.width = percentComplete + '%';
+            }
+            if (statusText) {
+                statusText.textContent = 'Importing from Google Drive...';
+            }
+            if (percentageText) {
+                percentageText.textContent = `${percentComplete.toFixed(0)}%`;
+            }
+        }
+    });
+    
+    // Handle successful completion
+    xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                console.log('✅ Google Drive upload response:', data);
+                
+                if (data.success) {
+                    // Show success celebration with full data object
+                    if (typeof showCelebrationDialog === 'function') {
+                        showCelebrationDialog(data);
+                    } else {
+                        alert('Video imported successfully from Google Drive!');
+                        window.location.reload();
+                    }
+                } else {
+                    // Check if error is related to authentication
+                    if (data.error && (data.error.includes('403') || data.error.includes('Forbidden') || data.error.includes('authentication'))) {
+                        const reauth = confirm(
+                            'Your Google Drive session has expired.\n\n' +
+                            'Click OK to reconnect and try again.'
+                        );
+                        
+                        if (reauth) {
+                            // Clear progress UI
+                            setUploadButtonState('normal');
+                            if (progressContainer) progressContainer.style.display = 'none';
+                            
+                            // Trigger re-authentication
+                            if (typeof window.addNewGoogleDrive === 'function') {
+                                window.addNewGoogleDrive();
+                            } else {
+                                alert('Please reconnect your Google Drive from the import menu and try again.');
+                            }
+                        } else {
+                            setUploadButtonState('normal');
+                            if (progressContainer) progressContainer.style.display = 'none';
+                        }
+                        return;
+                    }
+                    
+                    // Show regular error message
+                    alert('Failed to import from Google Drive: ' + (data.error || 'Unknown error'));
+                    setUploadButtonState('normal');
+                    if (progressContainer) progressContainer.style.display = 'none';
+                }
+            } catch (parseError) {
+                console.error('❌ Failed to parse response:', parseError);
+                console.error('Response text:', xhr.responseText);
+                alert('Upload Error: Failed to parse server response');
+                setUploadButtonState('normal');
+                if (progressContainer) progressContainer.style.display = 'none';
+            }
+        } else if (xhr.status === 403) {
+            console.warn('⚠️ Google Drive token expired (403 Forbidden)');
+            
+            const reauth = confirm(
+                'Your Google Drive session has expired.\n\n' +
+                'Click OK to reconnect and try again.'
+            );
+            
+            if (reauth) {
+                // Clear progress UI
+                setUploadButtonState('normal');
+                if (progressContainer) progressContainer.style.display = 'none';
+                
+                // Trigger re-authentication
+                if (typeof window.addNewGoogleDrive === 'function') {
+                    window.addNewGoogleDrive();
+                } else {
+                    alert('Please reconnect your Google Drive from the import menu and try again.');
+                }
+            } else {
+                setUploadButtonState('normal');
+                if (progressContainer) progressContainer.style.display = 'none';
+            }
+        } else {
+            console.error('❌ Google Drive upload failed:', xhr.status, xhr.statusText);
+            alert(`Upload Error: ${xhr.status} ${xhr.statusText}`);
+            setUploadButtonState('normal');
+            if (progressContainer) progressContainer.style.display = 'none';
+        }
+    });
+    
+    // Handle network errors
+    xhr.addEventListener('error', () => {
+        console.error('❌ Network error during Google Drive upload');
+        alert('Upload Error: Network error occurred');
+        setUploadButtonState('normal');
+        if (progressContainer) progressContainer.style.display = 'none';
+    });
+    
+    // Handle upload abort
+    xhr.addEventListener('abort', () => {
+        console.warn('⚠️ Google Drive upload aborted');
+        alert('Upload was cancelled');
+        setUploadButtonState('normal');
+        if (progressContainer) progressContainer.style.display = 'none';
+    });
+    
+    // Send the request
+    xhr.open('POST', './ionuploadvideos.php');
+    xhr.send(formData);
+}
+
+/**
+ * Start R2 Multipart Upload for large files (>100MB)
+ */
+function startR2MultipartUpload(file, metadata) {
+    console.log('🚀 Initializing R2 Multipart Upload...');
+    
+    // Show progress bar
+    const progressContainer = document.getElementById('uploadProgressContainer');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const progressText = document.getElementById('uploadProgressText');
+    const percentageText = document.getElementById('uploadPercentageText');
+    
+    if (progressContainer) progressContainer.style.display = 'flex';
+    if (progressBar) progressBar.style.width = '0%';
+    if (progressText) progressText.textContent = 'Initializing multipart upload...';
+    if (percentageText) percentageText.textContent = '0%';
+    
+    // Create R2 Multipart Uploader instance
+    const uploader = new window.R2MultipartUploader({
+        partSize: 100 * 1024 * 1024, // 100MB chunks
+        maxConcurrentUploads: 3,
+        maxRetries: 3,
+        endpoint: './ionuploadermultipart.php', // CRITICAL: Multipart upload backend handler
+        
+        onProgress: (progressData) => {
+            const percentage = Math.round(progressData.percentage);
+            console.log(`📊 Upload progress: ${percentage}% (${formatFileSize(progressData.loaded)} / ${formatFileSize(progressData.total)})`);
+            
+            if (progressBar) progressBar.style.width = percentage + '%';
+            if (percentageText) percentageText.textContent = percentage + '%';
+            
+            // Calculate speed and ETA
+            const speed = progressData.speed || 0;
+            const timeRemaining = progressData.timeRemaining || 0;
+            
+            let statusText = `Uploading... ${percentage}%`;
+            if (speed > 0) {
+                statusText += ` • ${formatFileSize(speed)}/s`;
+            }
+            if (timeRemaining > 0 && timeRemaining < 3600) {
+                statusText += ` • ${Math.round(timeRemaining / 60)}m remaining`;
+            }
+            
+            if (progressText) progressText.textContent = statusText;
+        },
+        
+        onPartProgress: (partData) => {
+            console.log(`📦 Part ${partData.partNumber}/${partData.totalParts} uploaded (${partData.completedParts} completed)`);
+        },
+        
+        onSuccess: (result) => {
+            console.log('✅ R2 Multipart Upload successful!', result);
+            hideUploadProgress();
+            showUploadSuccess(result);
+        },
+        
+        onError: (error) => {
+            console.error('❌ R2 Multipart Upload failed:', error);
+            hideUploadProgress();
+            showCustomAlert('Upload Error', error.message || 'Upload failed. Please try again.');
+        }
+    });
+    
+    // Start the upload
+    uploader.upload(file, metadata)
+        .then(result => {
+            console.log('🎉 Upload completed successfully:', result);
+        })
+        .catch(error => {
+            console.error('❌ Upload error:', error);
+        });
+}
+
+/**
+ * Start regular upload for smaller files (<=100MB)
+ */
+function startRegularUpload(file, metadata) {
+    console.log('📤 Starting regular upload...');
     
     // Show progress bar
     const progressContainer = document.getElementById('uploadProgressContainer');
@@ -1712,66 +2408,105 @@ function startFileUpload() {
     
     // Create form data
     const formData = new FormData();
-    formData.append('video', selectedFile);
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('category', category);
-    formData.append('tags', tags);
-    formData.append('visibility', visibility);
-    formData.append('badges', badges);
+    formData.append('action', 'upload');
+    formData.append('video', file);
+    formData.append('title', metadata.title);
+    formData.append('description', metadata.description);
+    formData.append('category', metadata.category);
+    formData.append('tags', metadata.tags);
+    formData.append('visibility', metadata.visibility);
+    formData.append('badges', metadata.badges);
     
     // Add thumbnail if available
-    if (window.capturedThumbnailBlob) {
-        formData.append('thumbnail', window.capturedThumbnailBlob, 'thumbnail.jpg');
+    if (metadata.thumbnail) {
+        formData.append('thumbnail', metadata.thumbnail, 'thumbnail.jpg');
+        console.log('✅ THUMBNAIL ADDED TO FORMDATA:', metadata.thumbnail.size, 'bytes');
+    } else {
+        console.error('⚠️⚠️⚠️ NO THUMBNAIL - BACKEND WILL GENERATE DEFAULT! ⚠️⚠️⚠️');
     }
     
-    // Upload file
-    fetch('./ionuploadvideos.php', {
-        method: 'POST',
-        body: formData,
-        credentials: 'same-origin'
-    })
-    .then(response => {
-        console.log('💾 Response status:', response.status);
+    // Upload file using XMLHttpRequest for progress tracking
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            console.log(`📊 Upload progress: ${percentComplete.toFixed(1)}%`);
+            showUploadProgress(percentComplete, 'Uploading...', e.loaded, e.total);
+        }
+    });
+    
+    // Handle completion
+    xhr.addEventListener('load', () => {
+        console.log('💾 Response status:', xhr.status);
         
-        // First get the raw response text to debug
-        return response.text().then(text => {
-            console.log('💾 Raw response text:', text);
-            console.log('💾 Response length:', text.length);
+        const responseText = xhr.responseText;
+        console.log('💾 Raw response text:', responseText);
+        console.log('💾 Response length:', responseText.length);
+        
+        if (!responseText || responseText.trim() === '') {
+            hideUploadProgress();
+            showCustomAlert('Upload Error', 'Server returned empty response');
+            return;
+        }
+        
+        // Check if it looks like JSON
+        if (!responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
+            console.error('❌ Server response is not JSON:', responseText.substring(0, 500));
+            hideUploadProgress();
+            showCustomAlert('Upload Error', 'Server returned non-JSON response: ' + responseText.substring(0, 200));
+            return;
+        }
+        
+        try {
+            const data = JSON.parse(responseText);
+        console.log('📦 Server response data:', data);
             
-            if (!text || text.trim() === '') {
-                throw new Error('Server returned empty response');
-            }
-            
-            // Check if it looks like JSON
-            if (!text.trim().startsWith('{') && !text.trim().startsWith('[')) {
-                console.error('❌ Server response is not JSON:', text.substring(0, 500));
-                throw new Error('Server returned non-JSON response: ' + text.substring(0, 200));
-            }
-            
-            try {
-                return JSON.parse(text);
-            } catch (parseError) {
-                console.error('❌ JSON parse error:', parseError);
-                console.error('❌ Failed to parse:', text.substring(0, 500));
-                throw new Error('Invalid JSON response: ' + parseError.message);
-            }
-        });
-    })
-    .then(data => {
         if (data.success) {
             console.log('✅ Upload successful');
-            hideProgress();
+                showUploadProgress(100, 'Complete!', 1, 1);
+                setTimeout(() => {
+                    hideUploadProgress();
             showUploadSuccess(data);
+                }, 500);
         } else {
-            throw new Error(data.error || 'Upload failed');
+            // Show detailed error information
+            let errorMsg = data.error || 'Upload failed';
+            if (data.debug_info) {
+                errorMsg += '\n\nDebug Info:\n' + JSON.stringify(data.debug_info, null, 2);
+            }
+            if (data.trace) {
+                console.error('Server trace:', data.trace);
+            }
+                hideUploadProgress();
+                showCustomAlert('Upload Error', errorMsg);
+            }
+        } catch (parseError) {
+            console.error('❌ JSON parse error:', parseError);
+            console.error('❌ Failed to parse:', responseText.substring(0, 500));
+            hideUploadProgress();
+            showCustomAlert('Upload Error', 'Invalid JSON response: ' + parseError.message);
         }
-    })
-    .catch(error => {
-        console.error('❌ Upload failed:', error);
-        hideProgress();
-        alert('Upload failed: ' + error.message);
     });
+    
+    // Handle errors
+    xhr.addEventListener('error', () => {
+        console.error('❌ Upload failed: Network error');
+        hideUploadProgress();
+        showCustomAlert('Upload Error', 'Network error occurred during upload');
+    });
+    
+    // Handle abort
+    xhr.addEventListener('abort', () => {
+        console.log('⚠️ Upload aborted');
+        hideUploadProgress();
+        showCustomAlert('Upload Cancelled', 'Upload was cancelled');
+    });
+    
+    // Send request
+    xhr.open('POST', './ionuploadvideos.php');
+    xhr.send(formData);
 }
 
 function startImportProcess() {
@@ -1783,7 +2518,7 @@ function startImportProcess() {
     const category = document.getElementById('videoCategory')?.value || 'General';
     const tags = document.getElementById('videoTags')?.value || '';
     const visibility = document.getElementById('videoVisibility')?.value || 'public';
-    const badges = document.getElementById('badgeInput')?.value || '';
+    const badges = document.getElementById('videoBadges')?.value || '';
     
     // Show progress
     showProgress(0, 'Importing video...');
@@ -1950,16 +2685,19 @@ function showUploadSuccess(data) {
                 }
             }, 500);
         }
+        
+        // DON'T auto-reload! Let the user close the celebration dialog manually
+        // The closeModal() and viewAllVideos() functions in celebration-dialog.js handle navigation
     } else {
         // Fallback to simple alert
         alert(data.message || 'Upload successful!');
-    }
     
-    // Close modal and refresh parent
+        // Only auto-reload for non-celebration success (shouldn't happen normally)
     if (window.parent) {
         window.parent.location.reload();
     } else {
         window.location.href = './creators.php';
+        }
     }
 }
 
@@ -2026,7 +2764,8 @@ async function uploadFilesSequentially(files, index) {
 async function uploadSingleFile(file) {
     // Use the existing upload logic but for a single file
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('action', 'upload');
+    formData.append('video', file);
     formData.append('title', file.name.replace(/\.[^/.]+$/, "")); // Remove extension
     formData.append('description', '');
     formData.append('category', 'General');
@@ -2118,11 +2857,19 @@ document.addEventListener('DOMContentLoaded', function() {
     setupCharacterCounters();
     
     // Setup platform buttons (source buttons)
-    document.querySelectorAll('.source-btn').forEach(btn => {
+    const sourceButtons = document.querySelectorAll('.source-btn');
+    console.log(`📺 Found ${sourceButtons.length} source buttons`);
+    sourceButtons.forEach(btn => {
+        console.log(`  - Source button: ${btn.dataset.source}`);
         btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const source = e.target.closest('.source-btn').dataset.source;
-            if (source) {
+            console.log(`🎯 Source button clicked: ${source}`);
+            if (source && source !== 'googledrive') {
                 selectPlatform(source);
+            } else if (source === 'googledrive') {
+                console.log('🔵 Google Drive button clicked (handled separately)');
             }
         });
     });
@@ -2142,10 +2889,8 @@ document.addEventListener('DOMContentLoaded', function() {
         deleteBtn.addEventListener('click', handleDeleteVideo);
     }
     
-    const backBtn = document.getElementById('backBtn');
-    if (backBtn) {
-        backBtn.addEventListener('click', handleDiscardAndClose);
-    }
+    // NOTE: Back button click handler is set dynamically in proceedToStep2() and goBackToStep1()
+    // Don't set a static handler here as it conflicts with the dynamic behavior
     
     const updateBtn = document.getElementById('updateBtn');
     if (updateBtn) {
@@ -2266,10 +3011,8 @@ function setupThumbnailHandlers() {
     // Capture Frame button
     const generateThumbnailBtn = document.getElementById('generateThumbnailBtn');
     if (generateThumbnailBtn) {
-        generateThumbnailBtn.addEventListener('click', captureVideoFrame);
-        
-        // Update button visibility and text based on context
-        updateCaptureButtonVisibility();
+        generateThumbnailBtn.addEventListener('click', generateThumbnail);
+        console.log('✅ Capture Frame button handler attached');
     }
     
     // Thumbnail container click
@@ -2294,9 +3037,21 @@ function handleThumbnailUpload(event) {
         return;
     }
     
+    console.log('🖼️ CUSTOM THUMBNAIL UPLOAD STARTING');
+    console.log('  - Previous thumbnail source:', window.customThumbnailSource);
+    console.log('  - Previous thumbnail size:', window.capturedThumbnailBlob?.size || 'none');
+    
+    // CRITICAL FIX: Store the blob AND show preview
+    window.capturedThumbnailBlob = file;
+    window.customThumbnailSource = 'upload'; // Track that this is user-uploaded
+    console.log('✅ Thumbnail blob stored:', file.name, file.size, 'bytes');
+    console.log('✅ Custom thumbnail source set to: upload');
+    
     const reader = new FileReader();
     reader.onload = function(e) {
         updateThumbnailPreview(e.target.result);
+        showThumbnailConfirmation('Custom thumbnail uploaded', 'custom');
+        console.log('✅ Custom thumbnail preview updated and badge shown');
     };
     reader.readAsDataURL(file);
 }
@@ -2326,8 +3081,7 @@ function showThumbnailUrlDialog() {
                 const url = urlInput?.value?.trim();
                 if (url) {
                     console.log('🖼️ Applying thumbnail URL:', url);
-                    updateThumbnailPreview(url);
-                    overlay.style.display = 'none';
+                    applyThumbnailFromUrl(url, applyBtn, overlay);
                 } else {
                     alert('Please enter a valid URL');
                 }
@@ -2364,259 +3118,293 @@ function showThumbnailUrlDialog() {
     }
 }
 
-function updateCaptureButtonVisibility() {
-    const generateThumbnailBtn = document.getElementById('generateThumbnailBtn');
-    if (!generateThumbnailBtn) return;
+// Simple function to generate thumbnail from current video frame
+function generateThumbnail() {
+    console.log('🎬 Generating thumbnail from current video frame');
     
-    // Show for uploaded files, edit mode, or imported videos
-    const hasVideoData = window.editVideoData || selectedFile || 
-                        (currentUploadType === 'import' && window.importedVideoUrl) ||
-                        window.currentVideoData;
-    
-    if (hasVideoData) {
-        generateThumbnailBtn.style.display = 'inline-block';
-        console.log('🎬 Capture Frame button shown');
-        
-        // Update button text based on video type
-        if (window.editVideoData && (window.editVideoData.source === 'youtube' || window.editVideoData.source === 'vimeo')) {
-            generateThumbnailBtn.innerHTML = '🎬 Update Thumbnail';
-            generateThumbnailBtn.title = 'Update thumbnail (uses platform default for YouTube/Vimeo)';
-        } else if (currentUploadType === 'import' && (currentSource === 'youtube' || currentSource === 'vimeo')) {
-            generateThumbnailBtn.innerHTML = '🎬 Update Thumbnail';
-            generateThumbnailBtn.title = 'Update thumbnail (uses platform default for YouTube/Vimeo)';
-        } else {
-            generateThumbnailBtn.innerHTML = '🎬 Capture Frame';
-            generateThumbnailBtn.title = 'Capture current video frame as thumbnail';
-        }
-    } else {
-        generateThumbnailBtn.style.display = 'none';
-    }
-}
-
-function captureVideoFrame() {
-    console.log('🎬 Capturing video frame');
-    
-    // Debug: Check what video elements exist
-    const videoPlayerContainer = document.getElementById('videoPlayerContainer');
-    console.log('🎬 Video player container:', videoPlayerContainer);
-    
-    if (videoPlayerContainer) {
-        console.log('🎬 Container innerHTML:', videoPlayerContainer.innerHTML.substring(0, 200));
-    }
-    
-    // Try multiple approaches for different video types
-    const videoElement = document.querySelector('#videoPlayerContainer video, video');
-    const iframe = document.querySelector('#videoPlayerContainer iframe, iframe[src*="youtube"], iframe[src*="vimeo"]');
-    
-    console.log('🎬 Found video element:', videoElement);
-    console.log('🎬 Found iframe:', iframe);
-    
-    if (videoElement) {
-        // Check if video is loaded and ready
-        if (videoElement.readyState < 2) {
-            console.log('🎬 Video not ready, waiting for metadata...');
-            videoElement.addEventListener('loadedmetadata', () => {
-                console.log('🎬 Video metadata loaded, retrying capture');
-                setTimeout(() => captureVideoFrameFromElement(videoElement), 100);
-            }, { once: true });
-            
-            // Also try to load if not already loading
-            if (videoElement.readyState === 0) {
-                videoElement.load();
-            }
-            return;
-        }
-        
-        captureVideoFrameFromElement(videoElement);
-    } else if (iframe) {
-        console.log('🎬 Iframe detected, trying alternative capture');
-        tryAlternativeCapture();
-    } else {
-        console.log('🎬 No video element found, trying alternative capture');
-        tryAlternativeCapture();
-    }
-}
-
-function captureVideoFrameFromElement(videoElement) {
-    try {
-        console.log('🎬 Attempting HTML5 video capture');
-        console.log('🎬 Video dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
-        console.log('🎬 Video readyState:', videoElement.readyState);
-        console.log('🎬 Video currentTime:', videoElement.currentTime);
-        
-        // Ensure video has dimensions
-        if (!videoElement.videoWidth || !videoElement.videoHeight) {
-            throw new Error('Video dimensions not available');
-        }
-        
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        canvas.width = videoElement.videoWidth;
-        canvas.height = videoElement.videoHeight;
-        
-        // Draw the current frame
-        ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-        
-        // Convert to blob and update preview
-        canvas.toBlob((blob) => {
-            if (blob) {
-                const url = URL.createObjectURL(blob);
-                updateThumbnailPreview(url);
-                window.capturedThumbnailBlob = blob;
-                console.log('🎬 HTML5 video frame captured successfully');
-                
-                // Show success message
-                const successMsg = document.createElement('div');
-                successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; z-index: 10000; font-size: 14px;';
-                successMsg.textContent = '✅ Frame captured successfully!';
-                document.body.appendChild(successMsg);
-                setTimeout(() => successMsg.remove(), 3000);
-            } else {
-                throw new Error('Failed to create blob from canvas');
-            }
-        }, 'image/jpeg', 0.8);
-    } catch (error) {
-        console.error('🎬 HTML5 video capture failed:', error);
-        alert('Failed to capture frame: ' + error.message + '\n\nTry playing the video first, then pause at the desired frame and try again.');
-    }
-}
-
-function tryAlternativeCapture() {
-    console.log('🎬 Trying alternative frame capture methods');
-    
-    // For YouTube/Vimeo videos, try to get thumbnail from video data
-    if (window.editVideoData && window.editVideoData.thumbnail) {
-        console.log('🎬 Using existing video thumbnail');
-        updateThumbnailPreview(window.editVideoData.thumbnail);
-        
-        // Update button state to show success
-        const captureBtn = document.getElementById('generateThumbnailBtn');
-        if (captureBtn) {
-            captureBtn.innerHTML = '✅ Thumbnail Updated';
-            captureBtn.style.background = '#10b981';
-            setTimeout(() => {
-                captureBtn.innerHTML = '🎬 Capture Frame';
-                captureBtn.style.background = '';
-            }, 2000);
-        }
-        
-        // Show user feedback
-        alert('For YouTube/Vimeo videos, the existing video thumbnail has been used.\n\nTo use a custom thumbnail, upload the video file directly instead of importing from a platform.');
+    const playerContainer = document.getElementById('videoPlayerContainer');
+    if (!playerContainer) {
+        alert('Video player not found. Please load a video first.');
         return;
     }
     
-    // For newly imported videos (not edit mode), check importedVideoUrl
-    if (currentUploadType === 'import' && window.importedVideoUrl) {
-        const videoUrl = window.importedVideoUrl;
-        console.log('🎬 Trying to generate thumbnail from imported URL:', videoUrl);
-        
-        if (currentSource === 'youtube') {
-            const videoId = extractVideoId(videoUrl, 'youtube');
-            if (videoId) {
-                const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-                console.log('🎬 Using YouTube thumbnail (import):', thumbnailUrl);
-                updateThumbnailPreview(thumbnailUrl);
-                
-                const captureBtn = document.getElementById('generateThumbnailBtn');
-                if (captureBtn) {
-                    captureBtn.innerHTML = '✅ Thumbnail Updated';
-                    captureBtn.style.background = '#10b981';
-                    setTimeout(() => {
-                        captureBtn.innerHTML = '🎬 Update Thumbnail';
-                        captureBtn.style.background = '';
-                    }, 2000);
-                }
-                
-                alert('YouTube thumbnail has been updated!');
+    const video = playerContainer.querySelector('video');
+    if (video) {
+        try {
+            if (video.readyState < 2) {
+                alert('Video is still loading. Please wait and try again.');
                 return;
             }
-        } else if (currentSource === 'vimeo') {
-            const videoId = extractVideoId(videoUrl, 'vimeo');
-            if (videoId) {
-                const thumbnailUrl = `https://vumbnail.com/${videoId}.jpg`;
-                console.log('🎬 Using Vimeo thumbnail (import):', thumbnailUrl);
-                updateThumbnailPreview(thumbnailUrl);
-                
-                const captureBtn = document.getElementById('generateThumbnailBtn');
-                if (captureBtn) {
-                    captureBtn.innerHTML = '✅ Thumbnail Updated';
-                    captureBtn.style.background = '#10b981';
-                    setTimeout(() => {
-                        captureBtn.innerHTML = '🎬 Update Thumbnail';
-                        captureBtn.style.background = '';
-                    }, 2000);
-                }
-                
-                alert('Vimeo thumbnail has been updated!');
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth || video.clientWidth;
+            canvas.height = video.videoHeight || video.clientHeight;
+            
+            if (canvas.width === 0 || canvas.height === 0) {
+                alert('Unable to determine video dimensions. Please try again when video is fully loaded.');
                 return;
             }
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            let dataURL;
+            try {
+                dataURL = canvas.toDataURL('image/jpeg', 0.8);
+            } catch (e) {
+                if (e.name === 'SecurityError') {
+                    console.error('❌ CORS error capturing frame:', e);
+                    alert('Cannot capture frame from this video source due to security restrictions.\n\nFor YouTube/Vimeo videos, the platform auto-generates a thumbnail. You can also:\n• Upload a custom image\n• Use a URL to an image');
+                    return;
+    } else {
+                    throw e;
+                }
+            }
+            
+            const thumbnailPreview = document.getElementById('thumbnailPreview');
+            const thumbnailPlaceholder = document.getElementById('thumbnailPlaceholder');
+            
+            if (thumbnailPreview) {
+                thumbnailPreview.src = dataURL;
+                thumbnailPreview.style.display = 'block';
+            }
+            
+            if (thumbnailPlaceholder) {
+                thumbnailPlaceholder.style.display = 'none';
+            }
+            
+            // Store the blob for upload
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    window.capturedThumbnailBlob = blob;
+                    window.customThumbnailSource = 'frame';
+                    console.log('✅ Thumbnail captured:', blob.size, 'bytes');
+                    
+                    // Show confirmation
+                    showThumbnailConfirmation('Frame captured', 'custom');
+                }
+            }, 'image/jpeg', 0.8);
+            
+            // Show success feedback (removed undefined showUploadStatus call)
+            setTimeout(() => {
+                const uploadStatus = document.getElementById('uploadStatus');
+                if (uploadStatus) uploadStatus.style.display = 'none';
+            }, 2000);
+            
+        } catch (error) {
+            console.error('❌ Error generating thumbnail:', error);
+            alert('Failed to generate thumbnail: ' + error.message);
+        }
+    } else {
+        const iframe = playerContainer.querySelector('iframe');
+        if (iframe) {
+            alert('Thumbnail capture is not available for embedded videos (YouTube, Vimeo, etc.).\n\nPlease use "Upload Custom" or "From URL" to set a thumbnail.');
+        } else {
+            alert('No video found to capture frame from. Please load a video first.');
         }
     }
-    
-    // Try to generate thumbnail from video URL if it's a supported platform (edit mode)
-    if (window.editVideoData && window.editVideoData.video_link) {
-        const videoUrl = window.editVideoData.video_link;
-        console.log('🎬 Trying to generate thumbnail from URL:', videoUrl);
-        
-        if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-            const videoId = extractVideoId(videoUrl, 'youtube');
-            if (videoId) {
-                const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-                console.log('🎬 Using YouTube thumbnail:', thumbnailUrl);
-                updateThumbnailPreview(thumbnailUrl);
-                
-                // Update button state to show success
-                const captureBtn = document.getElementById('generateThumbnailBtn');
-                if (captureBtn) {
-                    captureBtn.innerHTML = '✅ Thumbnail Updated';
-                    captureBtn.style.background = '#10b981';
-                    setTimeout(() => {
-                        captureBtn.innerHTML = '🎬 Capture Frame';
-                        captureBtn.style.background = '';
-                    }, 2000);
-                }
-                
-                alert('YouTube thumbnail has been updated!\n\nNote: For platform videos, you cannot capture custom frames. The video\'s default thumbnail is used.');
-                return;
-            }
-        } else if (videoUrl.includes('vimeo.com')) {
-            const videoId = extractVideoId(videoUrl, 'vimeo');
-            if (videoId) {
-                const thumbnailUrl = `https://vumbnail.com/${videoId}.jpg`;
-                console.log('🎬 Using Vimeo thumbnail:', thumbnailUrl);
-                updateThumbnailPreview(thumbnailUrl);
-                
-                // Update button state to show success
-                const captureBtn = document.getElementById('generateThumbnailBtn');
-                if (captureBtn) {
-                    captureBtn.innerHTML = '✅ Thumbnail Updated';
-                    captureBtn.style.background = '#10b981';
-                    setTimeout(() => {
-                        captureBtn.innerHTML = '🎬 Update Thumbnail';
-                        captureBtn.style.background = '';
-                    }, 2000);
-                }
-                
-                alert('Vimeo thumbnail has been updated!\n\nNote: For platform videos, you cannot capture custom frames. The video\'s default thumbnail is used.');
-                return;
-            }
-        }
+}
+
+function applyThumbnailFromUrl(url, applyBtn, overlay) {
+    // Validate URL
+    if (!url || !url.startsWith('http')) {
+        alert('Please enter a valid HTTP/HTTPS URL');
+        return;
     }
     
-    // Fallback: show helpful message with options
-    const message = 'Frame capture is not available for this video type.\n\n' +
-                   'Available options:\n' +
-                   '• Upload a custom thumbnail image\n' +
-                   '• Use "Thumbnail from URL" to specify an image URL\n' +
-                   '• For YouTube videos, thumbnails are automatically generated\n\n' +
-                   'Would you like to upload a custom thumbnail instead?';
+    // Disable button and show loading state
+    const originalText = applyBtn.textContent;
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Loading...';
     
-    if (confirm(message)) {
-        // Trigger the custom thumbnail upload
-        const thumbnailInput = document.getElementById('thumbnailInput');
-        if (thumbnailInput) {
-            thumbnailInput.click();
+    console.log('🖼️ Fetching thumbnail from URL:', url);
+    
+    // Use fetch API to get the image (better CORS handling)
+    fetch(url, {
+        mode: 'cors',
+        cache: 'no-cache'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        console.log('✅ Thumbnail fetched successfully:', blob.size, 'bytes');
+        
+        // Validate it's an image
+        if (!blob.type.startsWith('image/')) {
+            throw new Error('URL does not point to a valid image');
+        }
+        
+        // Create object URL for preview
+        const blobUrl = URL.createObjectURL(blob);
+        updateThumbnailPreview(blobUrl);
+        
+        // Store the blob for upload
+                window.capturedThumbnailBlob = blob;
+        window.customThumbnailUrl = url;
+        window.customThumbnailSource = 'url';
+        
+        // Close dialog
+        overlay.style.display = 'none';
+                
+                // Show success message
+        showThumbnailConfirmation('Thumbnail loaded from URL', 'custom');
+                const successMsg = document.createElement('div');
+                successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; z-index: 10000; font-size: 14px;';
+        successMsg.textContent = '✅ Thumbnail loaded successfully!';
+                document.body.appendChild(successMsg);
+                setTimeout(() => successMsg.remove(), 3000);
+        
+        // Re-enable button
+        applyBtn.disabled = false;
+        applyBtn.textContent = originalText;
+    })
+    .catch(error => {
+        console.error('❌ Failed to fetch thumbnail:', error);
+        
+        // Try fallback with Image element (for CORS-enabled images)
+        console.log('🔄 Trying fallback approach with crossOrigin...');
+        
+        const testImg = new Image();
+        testImg.crossOrigin = 'anonymous';
+        
+        testImg.onload = function() {
+            console.log('✅ Fallback: Image loaded via crossOrigin');
+            
+            // Convert to blob via canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = testImg.naturalWidth;
+            canvas.height = testImg.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            
+            try {
+                ctx.drawImage(testImg, 0, 0);
+                
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const blobUrl = URL.createObjectURL(blob);
+                        updateThumbnailPreview(blobUrl);
+                        
+                        window.capturedThumbnailBlob = blob;
+                        window.customThumbnailUrl = url;
+                        window.customThumbnailSource = 'url';
+                        
+                        overlay.style.display = 'none';
+                        showThumbnailConfirmation('Thumbnail loaded from URL', 'custom');
+                        
+                        const successMsg = document.createElement('div');
+                        successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; z-index: 10000; font-size: 14px;';
+                        successMsg.textContent = '✅ Thumbnail loaded successfully!';
+                        document.body.appendChild(successMsg);
+                        setTimeout(() => successMsg.remove(), 3000);
+                    } else {
+                        alert('Failed to convert image to blob. Please try uploading the image file directly.');
+                    }
+                    
+                    applyBtn.disabled = false;
+                    applyBtn.textContent = originalText;
+                }, 'image/jpeg', 0.9);
+            } catch (e) {
+                console.error('Canvas tainted by CORS:', e);
+                alert('CORS Error: Cannot load image from this URL.\n\nPlease:\n1. Download the image and upload it directly\n2. Use an image from the same domain\n3. Use a CORS-enabled CDN');
+                
+                applyBtn.disabled = false;
+                applyBtn.textContent = originalText;
+                overlay.style.display = 'none';
+            }
+        };
+        
+        testImg.onerror = function() {
+            console.error('❌ Fallback also failed');
+            alert('Failed to load image from URL.\n\nError: ' + error.message + '\n\nPlease:\n1. Check if the URL is correct\n2. Download the image and upload it directly\n3. Try a different image host');
+            
+            applyBtn.disabled = false;
+            applyBtn.textContent = originalText;
+            overlay.style.display = 'none';
+        };
+        
+        testImg.src = url;
+    });
+}
+
+function showThumbnailConfirmation(message, type = 'auto') {
+    // Add a visual badge on the thumbnail preview
+    const preview = document.getElementById('thumbnailPreview');
+    const container = preview ? preview.parentElement : document.querySelector('.thumbnail-section');
+    
+    if (container) {
+        // Remove any existing badge
+        const existingBadge = container.querySelector('.custom-thumbnail-badge');
+        if (existingBadge) {
+            existingBadge.remove();
+        }
+        
+        // Determine badge colors based on type
+        const isCustom = (type === 'custom' || message.includes('Custom') || message.includes('Frame') || message.includes('URL'));
+        const bgGradient = isCustom 
+            ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' // Green for custom
+            : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'; // Blue for auto
+        
+        // Add new badge
+        const badge = document.createElement('div');
+        badge.className = 'custom-thumbnail-badge';
+        badge.dataset.type = isCustom ? 'custom' : 'auto';
+        badge.innerHTML = `<span>✓</span> ${message}`;
+        badge.style.cssText = `
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: ${bgGradient};
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+            z-index: 10;
+            animation: slideInBadge 0.3s ease;
+        `;
+        
+        // Add animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInBadge {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        if (!document.getElementById('badge-animation-style')) {
+            style.id = 'badge-animation-style';
+            document.head.appendChild(style);
+        }
+        
+        // Position container relatively if not already
+        if (container.style.position !== 'relative' && container.style.position !== 'absolute') {
+            container.style.position = 'relative';
+        }
+        
+        container.appendChild(badge);
+        console.log('✅ Thumbnail confirmation badge added:', message, '(type:', type, ')');
+        
+        // Auto-hide badge after 3 seconds ONLY for custom thumbnails
+        if (isCustom) {
+            setTimeout(() => {
+                if (badge && badge.parentElement) {
+                    badge.style.transition = 'opacity 0.3s ease';
+                    badge.style.opacity = '0';
+                    setTimeout(() => {
+                        badge.remove();
+                        console.log('✅ Custom thumbnail badge auto-hidden');
+                    }, 300);
+                }
+            }, 3000);
         }
     }
 }
@@ -2682,19 +3470,37 @@ function updateThumbnailPreview(src) {
 }
 
 function generateAutoThumbnail() {
-    console.log('🖼️ Generating auto thumbnail');
+    console.log('🖼️ ========== GENERATE AUTO THUMBNAIL CALLED ==========');
+    console.log('🖼️ Current thumbnail state:');
+    console.log('  - capturedThumbnailBlob exists:', !!window.capturedThumbnailBlob);
+    console.log('  - customThumbnailSource:', window.customThumbnailSource || 'none');
+    if (window.capturedThumbnailBlob) {
+        console.log('  - Existing thumbnail size:', window.capturedThumbnailBlob.size, 'bytes');
+    }
+    
+    // CRITICAL: Don't overwrite user's custom thumbnail!
+    if (window.capturedThumbnailBlob) {
+        console.log('✅ Custom thumbnail already exists, skipping auto-generation');
+        console.log('📸 Thumbnail source:', window.customThumbnailSource);
+        console.log('📸 Thumbnail size:', window.capturedThumbnailBlob.size, 'bytes');
+        console.log('🖼️ ========== AUTO THUMBNAIL SKIPPED ==========');
+        return;
+    }
     
     if (!selectedFile) {
         console.log('🖼️ No file selected for thumbnail generation');
+        console.log('🖼️ ========== AUTO THUMBNAIL ABORTED (no file) ==========');
         return;
     }
     
     if (!selectedFile.type.startsWith('video/')) {
         console.log('🖼️ Selected file is not a video:', selectedFile.type);
+        console.log('🖼️ ========== AUTO THUMBNAIL ABORTED (not video) ==========');
         return;
     }
     
     console.log('🖼️ Creating video element for thumbnail generation');
+    console.log('🖼️ Video file:', selectedFile.name, selectedFile.size, 'bytes');
     
     // For video files, we can generate a thumbnail
     const video = document.createElement('video');
@@ -2750,11 +3556,13 @@ function generateAutoThumbnail() {
                     
                     updateThumbnailPreview(url);
                     window.capturedThumbnailBlob = blob;
+                    window.customThumbnailSource = 'auto'; // Track that this is auto-generated
                     
                     // Store the URL to prevent it from being revoked
                     window.currentThumbnailUrl = url;
                     
                     console.log('🖼️ Auto thumbnail generated successfully');
+                    showThumbnailConfirmation('Auto-generated from video', 'auto');
                 } else {
                     console.error('❌ Failed to generate thumbnail blob');
                 }
@@ -2867,7 +3675,7 @@ function setupCharacterCounters() {
         console.log('📊 Title character counter initialized');
     }
     
-    // Description counter (0/2000)
+    // Description counter (0/3000)
     const descInput = document.getElementById('videoDescription');
     const descCount = document.getElementById('descCount');
     
@@ -2879,9 +3687,9 @@ function setupCharacterCounters() {
             
             // Add visual feedback
             const charCountSpan = descCount.parentElement;
-            if (currentLength > 1800) {
+            if (currentLength > 2700) { // 90% of 3000
                 charCountSpan.style.color = '#ef4444'; // Red warning
-            } else if (currentLength > 1500) {
+            } else if (currentLength > 2250) { // 75% of 3000
                 charCountSpan.style.color = '#f59e0b'; // Orange warning
             } else {
                 charCountSpan.style.color = '#6b7280'; // Default gray
@@ -2903,20 +3711,56 @@ function setupCharacterCounters() {
 function showUploadProgress(percentage, message, uploadedBytes, totalBytes) {
     const progressContainer = document.getElementById('uploadProgressContainer');
     const progressBar = document.getElementById('uploadProgressBar');
-    const progressText = document.getElementById('uploadProgressText');
+    const statusText = document.getElementById('uploadStatusText');
+    const percentageText = document.getElementById('uploadPercentageText');
     
     if (progressContainer) {
         progressContainer.style.display = 'flex';
     }
     
+    // Update progress bar width and color based on percentage
     if (progressBar) {
         progressBar.style.width = percentage + '%';
+        
+        // Change progress bar color based on progress
+        if (percentage < 30) {
+            progressBar.style.background = 'linear-gradient(90deg, #3b82f6, #2563eb)'; // blue
+        } else if (percentage < 70) {
+            progressBar.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)'; // amber
+        } else if (percentage < 100) {
+            progressBar.style.background = 'linear-gradient(90deg, #22c55e, #16a34a)'; // green
+        } else {
+            progressBar.style.background = 'linear-gradient(90deg, #10b981, #059669)'; // emerald
+        }
     }
-    
-    if (progressText) {
-        const uploadedMB = (uploadedBytes / (1024 * 1024)).toFixed(1);
-        const totalMB = (totalBytes / (1024 * 1024)).toFixed(1);
-        progressText.textContent = `${message} ${Math.round(percentage)}% (${uploadedMB}MB / ${totalMB}MB)`;
+
+    if (statusText) {
+        statusText.textContent = message || 'Uploading...';
+        // Color code based on progress
+        if (percentage < 30) {
+            statusText.style.color = '#3b82f6'; // blue
+        } else if (percentage < 70) {
+            statusText.style.color = '#f59e0b'; // amber
+        } else if (percentage < 100) {
+            statusText.style.color = '#22c55e'; // green
+        } else {
+            statusText.style.color = '#10b981'; // emerald
+            statusText.textContent = 'Complete!';
+        }
+    }
+
+    if (percentageText) {
+        percentageText.textContent = Math.round(percentage) + '%';
+        // Color code based on progress
+        if (percentage < 30) {
+            percentageText.style.color = '#2563eb'; // blue-600
+        } else if (percentage < 70) {
+            percentageText.style.color = '#d97706'; // amber-600
+        } else if (percentage < 100) {
+            percentageText.style.color = '#16a34a'; // green-600
+        } else {
+            percentageText.style.color = '#059669'; // emerald-600
+        }
     }
     
     console.log(`📊 Upload progress: ${percentage}% - ${message}`);
@@ -2929,12 +3773,8 @@ function hideUploadProgress() {
     }
 }
 
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
+// Expose critical functions to global scope for ionuploaderpro.js
+window.checkNextButton = checkNextButton;
+window.proceedToStep2 = proceedToStep2;
 
 console.log('✅ ION Uploader Core loaded successfully');

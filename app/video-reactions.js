@@ -288,8 +288,16 @@ class VideoReactions {
     }
 }
 
-// Initialize global instance
+// Initialize global instance (with both names for compatibility)
 window.videoReactions = new VideoReactions();
+window.VideoReactions = VideoReactions; // Export class constructor
+window.IONVideoReactions = VideoReactions; // COMPATIBILITY: Also export as IONVideoReactions for legacy code
+
+console.log('✅ VideoReactions loaded and exported as:', {
+    videoReactions: typeof window.videoReactions,
+    VideoReactions: typeof window.VideoReactions,
+    IONVideoReactions: typeof window.IONVideoReactions
+});
 
 // Auto-initialize on DOMContentLoaded
 if (document.readyState === 'loading') {

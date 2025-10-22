@@ -167,6 +167,13 @@ class VideoAdIntegration {
     }
     
     /**
+     * Get ad configuration
+     */
+    public function getAdConfig(): array {
+        return $this->adManager->getAdConfig();
+    }
+    
+    /**
      * Generate complete ad integration for a video player
      */
     public function getCompleteIntegration(string $playerId, array $playerOptions = [], array $videoData = []): array {
