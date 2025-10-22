@@ -212,8 +212,8 @@ const IONShopsMenu = () => {
               </Button>
             )}
             <h2 className="text-base md:text-lg font-bold whitespace-nowrap truncate">
-              <span className="text-primary">ION</span>{" "}
-              <span className="text-foreground">MALL</span>
+              <span className="text-foreground">MALL OF </span>
+              <span className="text-primary">CHAMPIONS</span>
             </h2>
           </div>
 
