@@ -19,6 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Load database connection
 require_once __DIR__ . '/../config/database.php';
 
+// Start session for menu authentication
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Helper functions
 function extractDomain($url)
 {
@@ -365,26 +370,9 @@ if (isset($_GET['ajax']) || isset($_GET['json'])) {
 </head>
 
 <body>
-    <!-- Navigation Header -->
-    <nav class="nav-header">
-        <div class="nav-container">
-            <a href="/">
-                <img src="https://iblog.bz/assets/ion-logo.png" alt="ION Network" class="logo" onerror="this.style.display='none'">
-            </a>
-
-            <div class="nav-links">
-                <a href="/local">ION LOCAL</a>
-                <a href="/networks">ION NETWORKS</a>
-                <a href="/initiatives">ION INITIATIVES</a>
-                <a href="/connect">CONNECT. IONS</a>
-            </div>
-
-            <div class="nav-actions">
-                <a href="/upload" class="btn btn-upload">UPLOAD</a>
-                <a href="/signin" class="btn btn-signin">SIGN ION</a>
-            </div>
-        </div>
-    </nav>
+    <!-- ION Navbar -->
+    <?php $ION_NAVBAR_BASE_URL = '/menu/'; ?>
+    <?php require_once __DIR__ . '/../menu/ion-navbar-embed.php'; ?>
 
     <!-- Main Content -->
     <main class="main-container">
