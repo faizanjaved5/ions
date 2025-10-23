@@ -28,7 +28,7 @@ $ION_USER_MENU = [
             "menuItems" => [
                 [
                     "label" => "View Profile",
-                    "link" => "/@".$_SESSION['user_handle'],
+                    "link" => isset($_SESSION['user_handle']) ? "/@".$_SESSION['user_handle'] : "",
                     "icon" => "User"
                 ],
                 [
