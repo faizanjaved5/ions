@@ -141,21 +141,30 @@ $current_preferences = $wpdb->get_var($wpdb->prepare("SELECT preferences FROM IO
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Test UI Preferences - ION Directory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 1200px;
+            /* max-width: 1200px; */
             margin: 0 auto;
-            padding: 20px;
+            /* padding: 20px; */
             line-height: 1.6;
+            background: #0a0e1a;
+            color: #e5e7eb;
+        }
+        
+        h1, h2, h3 {
+            color: #f59e0b;
         }
         
         .preference-card {
-            border: 1px solid #ddd;
+            border: 1px solid #2d3748;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            background: #f9f9f9;
+            background: #1a1f2e;
         }
         
         .preference-preview {
@@ -185,8 +194,12 @@ $current_preferences = $wpdb->get_var($wpdb->prepare("SELECT preferences FROM IO
         }
         
         .current-preferences {
-            background: #e6f3ff;
-            border-color: #0066cc;
+            background: #1e293b;
+            border-color: #f59e0b;
+        }
+        
+        .current-preferences pre {
+            color: #d1d5db;
         }
         
         .success {
@@ -213,20 +226,39 @@ $current_preferences = $wpdb->get_var($wpdb->prepare("SELECT preferences FROM IO
         }
         
         button {
-            background: #0066cc;
-            color: white;
+            background: #f59e0b;
+            color: #0a0e1a;
             padding: 10px 20px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-weight: 600;
         }
         
         button:hover {
-            background: #0052a3;
+            background: #d97706;
+        }
+        
+        a {
+            color: #f59e0b;
+            text-decoration: none;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        .content-wrapper {
+            margin-top: 80px;
         }
     </style>
 </head>
 <body>
+    <!-- ION Navbar -->
+    <?php $ION_NAVBAR_BASE_URL = '/menu/'; ?>
+    <?php require_once __DIR__ . '/../menu/ion-navbar-embed.php'; ?>
+    
+    <div class="content-wrapper">
     <h1>UI Preferences Test Tool</h1>
     <p>Test different UI customization options for the ION Directory. Select a preset or create your own custom preferences.</p>
     
@@ -295,6 +327,7 @@ $current_preferences = $wpdb->get_var($wpdb->prepare("SELECT preferences FROM IO
             <li><strong>ButtonColor:</strong> Hex color for buttons and accent elements</li>
             <li><strong>DefaultMode:</strong> "LightMode" or "DarkMode"</li>
         </ul>
+    </div>
     </div>
     
 </body>
