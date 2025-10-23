@@ -100,6 +100,23 @@ try {
         // Update session
         if (isset($update_data['fullname'])) {
             $_SESSION['fullname'] = $update_data['fullname'];
+            $_SESSION['user_name'] = $update_data['fullname'];
+        }
+        if (isset($update_data['photo_url'])) {
+            $_SESSION['photo_url'] = $update_data['photo_url'];
+        } else {
+            // If no explicit photo set, ensure a consistent fallback stays in session
+            try {
+                $user = $db->get_row("SELECT fullname, email, photo_url FROM IONEERS WHERE user_id = ?", $user_id);
+                if ($user) {
+                    $display_name = trim($user->fullname ?? '');
+                    $fallback_name = $display_name !== '' ? $display_name : ($user->email ?? '');
+                    $avatar_fallback = 'https://i0.wp.com/ui-avatars.com/api/?name=' . urlencode($fallback_name) . '&size=256';
+                    $_SESSION['photo_url'] = !empty($user->photo_url) ? $user->photo_url : $avatar_fallback;
+                }
+            } catch (Exception $e) {
+                // ignore session avatar refresh failure
+            }
         }
         
         echo json_encode(['success' => true, 'message' => 'Profile updated successfully']);

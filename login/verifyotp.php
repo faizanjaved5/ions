@@ -187,6 +187,22 @@ try {
         // ignore handle fetch failure
     }
 
+    // Set session avatar from DB value with fallback
+    try {
+        $user_row = $db->get_row("SELECT fullname, photo_url, email FROM IONEERS WHERE user_id = ?", $row->user_id);
+        if ($user_row) {
+            $display_name = trim($user_row->fullname ?? '');
+            $fallback_name = $display_name !== '' ? $display_name : ($email ?: ($user_row->email ?? ''));
+            $avatar_fallback = 'https://i0.wp.com/ui-avatars.com/api/?name=' . urlencode($fallback_name) . '&size=256';
+            $_SESSION['photo_url'] = !empty($user_row->photo_url) ? $user_row->photo_url : $avatar_fallback;
+            if (empty($_SESSION['user_name'])) {
+                $_SESSION['user_name'] = $display_name !== '' ? $display_name : ($user_row->email ?? '');
+            }
+        }
+    } catch (Exception $e) {
+        // ignore avatar set failure
+    }
+
     // Clear any error messages
     unset($_SESSION['otp_error']);
     unset($_SESSION['pending_email']);
