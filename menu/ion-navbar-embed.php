@@ -7,12 +7,12 @@ $ION_USER_MENU = [
             "email" => isset($_SESSION['user_email']) ? $_SESSION['user_email'] : '',
             "avatar" => isset($_SESSION['photo_url']) ? $_SESSION['photo_url'] : '',
             "notifications" => [                
-                [
-                    "id" => 1,
-                    "message" => "Your video 'Introduction to ION' has reached 1,000 views",
-                    "time" => "2 hours ago",
-                    "read" => false
-                ],              
+                // [
+                //     "id" => 1,
+                //     "message" => "Your video 'Introduction to ION' has reached 1,000 views",
+                //     "time" => "2 hours ago",
+                //     "read" => false
+                // ],              
                 // [
                 //     "id" => 2,
                 //     "message" => "New comment on your post",
