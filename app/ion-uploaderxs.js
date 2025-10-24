@@ -1126,7 +1126,33 @@ window.processPlatformImport = async function(metadata) {
 // Google Drive configuration (should be set in ionuploader.php)
 const CLIENT_ID = window.GOOGLE_CLIENT_ID || '';
 const API_KEY = window.GOOGLE_API_KEY || '';
-const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+// ============================================
+// FEATURE FLAG: Google Drive Download Method
+// ============================================
+const DRIVE_DOWNLOAD_METHOD = 'fetch'; // Using fetch with Token Client session tokens
+// ============================================
+
+// ============================================
+// DRIVE.FILE SCOPE STRATEGY (Current Implementation)
+// ============================================
+// 
+// With drive.file scope, Google ONLY grants access to files during an active OAuth session.
+// This means we CANNOT use stored tokens - each Picker session requires a FRESH token.
+//
+// IMPLEMENTATION:
+// 1. User clicks Connect → Token Client popup (NOT OAuth redirect)
+// 2. User grants permission → Immediate fresh token
+// 3. Token used to show Picker → Files selected in THIS session are accessible
+// 4. File downloaded using the SAME fresh token → Success!
+//
+// KEY DIFFERENCES vs OAuth Redirect Flow:
+// ✅ Token Client (popup) → Works with drive.file
+// ❌ OAuth redirect → Stored tokens don't work with drive.file for Picker files
+//
+// LIMITATION: User must re-authenticate each time (no persistent refresh tokens)
+// FUTURE: Once drive.readonly is approved, switch to OAuth redirect for persistent access
 
 // Global variables for Google Drive
 let accessToken = null;
@@ -1239,16 +1265,20 @@ function initializeGoogleDriveHover() {
     if (googleDriveWrapperInitialized) return;
     
     const wrapper = document.querySelector('.gd-wrapper');
+    const dropdown = document.getElementById('googleDriveDropdown');
+    
     if (!wrapper) {
         console.warn('⚠️ Google Drive wrapper not found');
         return;
     }
     
     // Track mouse leaving the entire Google Drive area (button + dropdown)
-    wrapper.addEventListener('mouseleave', function() {
+    wrapper.addEventListener('mouseleave', function(e) {
+        // Only hide if we're actually leaving the wrapper area
+        // (not just moving between button and dropdown)
         dropdownHideTimeout = setTimeout(() => {
             hideGoogleDriveDropdown();
-        }, 300); // 300ms delay before hiding
+        }, 500); // 500ms delay before hiding (increased for better UX)
     });
     
     // Cancel hide timeout when mouse enters the area
@@ -1259,13 +1289,31 @@ function initializeGoogleDriveHover() {
         }
     });
     
+    // Extra safeguard: Cancel hide when directly hovering dropdown
+    if (dropdown) {
+        dropdown.addEventListener('mouseenter', function() {
+            if (dropdownHideTimeout) {
+                clearTimeout(dropdownHideTimeout);
+                dropdownHideTimeout = null;
+            }
+        });
+        
+        dropdown.addEventListener('mouseleave', function() {
+            // Only start hide timer if we're leaving to outside the wrapper
+            dropdownHideTimeout = setTimeout(() => {
+                hideGoogleDriveDropdown();
+            }, 500);
+        });
+    }
+    
     googleDriveWrapperInitialized = true;
     console.log('✅ Google Drive hover behavior initialized');
 }
 
 function showGoogleDriveDropdown() {
     const dropdown = document.getElementById('googleDriveDropdown');
-    if (!dropdown) return;
+    const wrapper = document.querySelector('.gd-wrapper');
+    if (!dropdown || !wrapper) return;
     
     // Clear any pending hide timeout
     if (dropdownHideTimeout) {
@@ -1273,7 +1321,9 @@ function showGoogleDriveDropdown() {
         dropdownHideTimeout = null;
     }
     
-    dropdown.style.display = 'block';
+    // Use class instead of inline style to allow CSS hover to work
+    wrapper.classList.add('open');
+    dropdown.classList.add('visible');
     console.log('✅ Google Drive dropdown shown');
     
     // Initialize hover behavior if not already done
@@ -1282,10 +1332,18 @@ function showGoogleDriveDropdown() {
 
 function hideGoogleDriveDropdown() {
     const dropdown = document.getElementById('googleDriveDropdown');
-    if (dropdown) {
-        dropdown.style.display = 'none';
-        console.log('✅ Google Drive dropdown hidden');
+    const wrapper = document.querySelector('.gd-wrapper');
+    if (!dropdown || !wrapper) return;
+    
+    // Safety check: Don't hide if mouse is currently over the wrapper
+    if (wrapper.matches(':hover')) {
+        console.log('⚠️ Prevented hide - mouse still over wrapper');
+        return;
     }
+    
+    wrapper.classList.remove('open');
+    dropdown.classList.remove('visible');
+    console.log('✅ Google Drive dropdown hidden');
 }
 
 // ============================================
@@ -1293,30 +1351,36 @@ function hideGoogleDriveDropdown() {
 // ============================================
 
 /**
- * Opens OAuth popup to connect Google Drive
- * Uses authorization code flow to obtain refresh tokens
+ * Request Google Drive access using Token Client (in-session authentication)
+ * This approach works with drive.file scope for Picker-selected files
  */
 function addNewGoogleDrive() {
-    console.log('🔑 Opening Google Drive OAuth window...');
+    console.log('🔑 Requesting Google Drive access via Token Client...');
     hideGoogleDriveDropdown();
     
-    const width = 600;
-    const height = 700;
-    const left = (screen.width - width) / 2;
-    const top = (screen.height - height) / 2;
-    
-    const popup = window.open(
-        '/login/google-drive-oauth.php',
-        'Google Drive Authentication',
-        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
-    );
-    
-    if (!popup) {
-        alert('Please allow popups for this site to connect Google Drive.');
+    if (!tokenClient) {
+        console.warn('⚠️ Token client not initialized yet, loading APIs...');
+        loadGoogleAPIs();
+        
+        // Wait a bit and try again
+        setTimeout(() => {
+            if (tokenClient) {
+                console.log('✅ Token client ready, requesting access...');
+                tokenClient.requestAccessToken({ prompt: 'select_account' });
+            } else {
+                console.error('❌ Token client still not initialized after loading');
+                alert('Google Drive is still loading. Please wait a moment and try again.');
+            }
+        }, 2000);
         return;
     }
     
-    console.log('✅ OAuth popup opened');
+    // Request access token via popup (no redirect)
+    // This creates a token that's valid for Picker-selected file access
+    console.log('📋 Opening Google consent popup...');
+    tokenClient.requestAccessToken({ prompt: 'select_account' });
+    
+    console.log('✅ Token request initiated');
 }
 
 // Listen for OAuth success message from popup
@@ -1328,11 +1392,14 @@ window.addEventListener('message', (event) => {
         console.log('✅ Google Drive connected message received:', event.data.email);
         console.log('🔄 Has refresh token:', event.data.hasRefreshToken);
         console.log('📍 Message received in window:', window.location.href);
+        console.log('📧 Email from OAuth:', event.data.email);
+        console.log('👤 Session user_id:', window.currentUserId || 'UNKNOWN');
         
-        // CRITICAL: Wait 1 second for database write to complete before fetching token
-        console.log('⏳ Waiting 1 second for database write to complete...');
+        // CRITICAL: Wait 2 seconds for database write to complete before fetching token
+        console.log('⏳ Waiting 2 seconds for database write to complete...');
         setTimeout(() => {
             console.log('✅ Wait complete, fetching access token from server');
+            console.log('📧 Fetching for email:', event.data.email);
             
             // Fetch the access token from the server
             fetchGoogleDriveAccessToken(event.data.email).then(result => {
@@ -1354,15 +1421,25 @@ window.addEventListener('message', (event) => {
                 }, 500);
             } else {
                 console.error('❌ Failed to fetch access token from server:', result.error);
+                console.error('📧 Email that was used:', event.data.email);
+                console.error('👤 Check PHP error logs for database INSERT/UPDATE status');
+                
                 alert('Connected successfully, but failed to fetch access token.\n\n' + 
                       'Error: ' + result.error + '\n\n' +
-                      'Please check the browser console (F12) for details.');
+                      'This usually means:\n' +
+                      '1. Database write didn\'t complete\n' +
+                      '2. Table "IONGoogleDriveTokens" doesn\'t exist\n' +
+                      '3. Session user_id mismatch\n\n' +
+                      'Please check:\n' +
+                      '- PHP error logs for database errors\n' +
+                      '- Browser console (F12) for details\n' +
+                      '- Database table exists and has correct schema');
             }
         }).catch(error => {
             console.error('❌ Error in OAuth success handler:', error);
             alert('Connected successfully, but an error occurred:\n\n' + error.message + '\n\nPlease check the browser console and refresh the page.');
         });
-        }, 1000); // Wait 1 second for database write to complete
+        }, 2000); // Wait 2 seconds for database write to complete
     }
 });
 
@@ -1392,6 +1469,9 @@ if (window.self === window.top) {
 async function fetchGoogleDriveAccessToken(email) {
     try {
         console.log('🔑 Fetching access token for:', email);
+        console.log('🔑 Email type:', typeof email);
+        console.log('🔑 Email length:', email ? email.length : 'NULL');
+        console.log('🔑 Encoded email:', encodeURIComponent(email));
         
         const response = await fetch('/api/get-google-drive-token.php', {
             method: 'POST',
@@ -1563,8 +1643,27 @@ function selectDrive(email) {
     console.log('📂 Selecting drive:', email);
     hideGoogleDriveDropdown();
     
-    // Use the new auto-refresh flow
-    loadGoogleAPIsAndShowPicker(email);
+    // With drive.file scope, we need a fresh token for each Picker session
+    // Request new token via Token Client
+    if (!tokenClient) {
+        console.warn('⚠️ Token client not initialized yet, loading APIs...');
+        loadGoogleAPIs();
+        
+        // Wait a bit and try again
+        setTimeout(() => {
+            if (tokenClient) {
+                console.log('✅ Token client ready, requesting fresh token...');
+                tokenClient.requestAccessToken({ hint: email, prompt: '' });
+            } else {
+                console.error('❌ Token client still not initialized after loading');
+                alert('Google Drive is still loading. Please wait a moment and try again.');
+            }
+        }, 2000);
+        return;
+    }
+    
+    console.log('🔑 Requesting fresh token for Picker session...');
+    tokenClient.requestAccessToken({ hint: email, prompt: '' });
 }
 
 function clearAllConnections() {
@@ -1585,12 +1684,30 @@ function loadGoogleAPIs() {
         return;
     }
 
-    if (typeof google !== 'undefined' && google.accounts && typeof gapi !== 'undefined' && google.picker) {
+    // Check if APIs are fully loaded
+    if (typeof google !== 'undefined' && google.accounts && typeof gapi !== 'undefined' && gapi.client) {
         console.log('✅ Google APIs already loaded, initializing auth...');
         initializeGoogleAuth();
         return;
     }
     
+    // If scripts are loading (from ionuploads.php), wait for them
+    if (window.googleApisLoading) {
+        console.log('⏳ Google APIs already loading, waiting...');
+        return;
+    }
+    
+    // Check if gapi exists but client not loaded yet (scripts loaded, but gapi.load not called)
+    if (typeof gapi !== 'undefined' && typeof google !== 'undefined' && google.accounts) {
+        console.log('✅ Scripts loaded, initializing client:picker...');
+        gapi.load('client:picker', () => {
+            console.log('✅ Client:picker loaded, initializing auth...');
+            initializeGoogleAuth();
+        });
+        return;
+    }
+    
+    console.log('📚 Scripts not loaded yet, creating script tags...');
     window.googleApisLoading = true;
     
     const gisScript = document.createElement('script');
@@ -1813,43 +1930,321 @@ async function showPicker() {
 
 function pickerCallback(data) {
     console.log('📂 Picker callback:', data);
+    console.log('🔑 Current accessToken when file selected:', accessToken ? 'Present (length: ' + accessToken.length + ')' : 'MISSING');
+    console.log('🔑 Token preview:', accessToken ? accessToken.substring(0, 50) + '...' : 'N/A');
     
     if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
         const doc = data[google.picker.Response.DOCUMENTS][0];
         const fileId = doc[google.picker.Document.ID];
         const fileName = doc[google.picker.Document.NAME];
         const fileUrl = doc[google.picker.Document.URL];
+        const mimeType = doc[google.picker.Document.MIME_TYPE] || 'video/mp4';
         
-        console.log('✅ File selected:', fileName, fileId);
+        console.log('✅ File selected via Picker:', fileName);
+        console.log('📄 File ID:', fileId);
+        console.log('📄 MIME Type:', mimeType);
+        console.log('📄 File URL:', fileUrl);
+        console.log('🔐 About to attempt download with Picker session token');
         
-        // Store selected file info
-        selectedFile = {
-            id: fileId,
-            name: fileName,
-            url: fileUrl,
-            source: 'googledrive'
-        };
+        // IMPORTANT: With drive.file scope, the file should be accessible because
+        // the user just "opened" it through the official Google Picker.
+        // We MUST use the SAME token that was used to show the Picker.
         
-        // Set current upload type and source
-        currentUploadType = 'file';
-        currentSource = 'googledrive';
+        console.log('⬇️ Downloading file from Google Drive using Picker session token...');
+        downloadGoogleDriveFile(fileId, fileName, mimeType);
         
-        // Proceed to Step 2
-        if (typeof window.proceedToStep2 === 'function') {
-            window.proceedToStep2();
-        } else if (typeof proceedToStep2 === 'function') {
-            proceedToStep2();
-        } else {
-            console.error('❌ proceedToStep2 function not found');
-        }
     } else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
         console.log('📂 Picker cancelled');
     }
 }
 
+/**
+ * Download Google Drive file using current session access token
+ * This works with drive.file scope during the active Picker session
+ */
+async function downloadGoogleDriveFile(fileId, fileName, mimeType) {
+    try {
+        console.log('📥 Fetching file from Google Drive API...');
+        console.log('   File ID:', fileId);
+        console.log('   File Name:', fileName);
+        console.log('   MIME Type:', mimeType);
+        console.log('   Access Token:', accessToken ? 'Available (length: ' + accessToken.length + ')' : 'Missing');
+        
+        if (!accessToken) {
+            throw new Error('No access token available');
+        }
+        
+        // Show loading indicator
+        const uploadZone = document.getElementById('uploadZone');
+        if (uploadZone) {
+            uploadZone.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div class="spinner" style="margin: 0 auto 20px;"></div>
+                    <p style="color: #94a3b8; font-size: 14px;">Downloading from Google Drive...</p>
+                    <p style="color: #64748b; font-size: 12px; margin-top: 8px;">${fileName}</p>
+                </div>
+            `;
+        }
+        
+        // Choose download method based on feature flag
+        console.log('🔍 Download method:', DRIVE_DOWNLOAD_METHOD);
+        console.log('📄 File ID:', fileId);
+        console.log('🔑 Token preview:', accessToken ? accessToken.substring(0, 20) + '...' : 'MISSING');
+        
+        let useGapiClient = false;
+        
+        // Determine which method to use
+        if (DRIVE_DOWNLOAD_METHOD === 'gapi') {
+            // Try to use gapi.client (better for drive.file scope)
+            if (typeof gapi === 'undefined' || !gapi.client) {
+                console.warn('⚠️ gapi.client requested but not available - falling back to fetch');
+                useGapiClient = false;
+            } else {
+                useGapiClient = true;
+                
+                // Load Drive API client if not already loaded
+                if (!gapi.client.drive) {
+                    console.log('⚙️ Loading gapi.client.drive...');
+                    try {
+                        await gapi.client.load('drive', 'v3');
+                        console.log('✅ gapi.client.drive loaded successfully');
+                    } catch (error) {
+                        console.error('❌ Failed to load gapi.client.drive:', error);
+                        console.error('❌ Full error object:', error);
+                        useGapiClient = false;
+                    }
+                } else {
+                    console.log('✅ gapi.client.drive already loaded');
+                }
+            }
+        } else {
+            // Use fetch method with fresh OAuth token from Token Client
+            console.log('📡 Using fetch method with Token Client session token');
+            useGapiClient = false;
+        }
+        
+        let metadata;
+        
+        if (useGapiClient) {
+            // METHOD 1: Use gapi.client (Picker-aware, recommended for drive.file scope)
+            console.log('🔍 Method 1: Using gapi.client.drive.files.get...');
+            
+            // CRITICAL: Set access token for gapi.client
+            console.log('🔑 Setting access token for gapi.client...');
+            gapi.client.setToken({ access_token: accessToken });
+            console.log('✅ Token set for gapi.client');
+            
+            try {
+                const metadataResponse = await gapi.client.drive.files.get({
+                    fileId: fileId,
+                    fields: 'id,name,mimeType,size'
+                });
+                metadata = metadataResponse.result;
+                console.log('✅ gapi.client metadata retrieved:', metadata);
+            } catch (error) {
+                console.error('❌ gapi.client metadata failed');
+                console.error('❌ Error object:', error);
+                console.error('❌ Error status:', error.status);
+                console.error('❌ Error result:', error.result);
+                console.error('❌ Error message:', error.message);
+                
+                // Try to extract detailed error info
+                const errorCode = error.status || error.code;
+                const errorMessage = error.result?.error?.message || 
+                                   error.body ? JSON.parse(error.body).error?.message : 
+                                   error.message || 'Unknown error';
+                const errorDetails = error.result?.error?.errors || [];
+                
+                console.error('❌ Parsed - Code:', errorCode, 'Message:', errorMessage);
+                console.error('❌ Error details array:', errorDetails);
+                
+                if (errorCode === 404) {
+                    throw new Error(
+                        `File not accessible (404) with drive.file scope.\n\n` +
+                        `LIMITATION: drive.file only grants access to:\n` +
+                        `• Files created by this app\n` +
+                        `• Files opened during current OAuth session\n\n` +
+                        `The Picker-selected file cannot be accessed with stored tokens.\n\n` +
+                        `SOLUTION: drive.readonly scope (pending Google approval)\n` +
+                        `WORKAROUND: Upload file directly or use URL import`
+                    );
+                } else if (errorCode === 403) {
+                    throw new Error(`Access forbidden (403): ${errorMessage}\n\nCheck: Drive API enabled, OAuth scope sufficient`);
+                } else if (errorCode === 401) {
+                    throw new Error(`Authentication failed (401): ${errorMessage}\n\nTry reconnecting Google Drive`);
+                } else {
+                    throw new Error(`Drive API Error (${errorCode || 'UNKNOWN'}): ${errorMessage}`);
+                }
+            }
+        } else {
+            // METHOD 2: Direct fetch (Works with OAuth token from Picker session)
+            console.log('🔍 Method 2: Using direct fetch API with OAuth token');
+            
+            const metadataResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,mimeType,size`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            
+            console.log('📊 Fetch metadata status:', metadataResponse.status);
+            console.log('📊 Response headers:', Object.fromEntries(metadataResponse.headers.entries()));
+            
+            if (!metadataResponse.ok) {
+                const errorText = await metadataResponse.text();
+                console.error('❌ Fetch metadata failed:', errorText);
+                
+                let errorDetails;
+                try {
+                    errorDetails = JSON.parse(errorText);
+                    console.error('❌ Parsed error:', errorDetails);
+                } catch (e) {
+                    console.error('❌ Could not parse error response');
+                }
+                
+                if (metadataResponse.status === 404) {
+                    throw new Error(
+                        `File not found (404).\n\n` +
+                        `Possible causes:\n` +
+                        `• File ID is incorrect\n` +
+                        `• File has been deleted\n` +
+                        `• OAuth session has expired\n\n` +
+                        `Please try selecting the file again through Google Drive.`
+                    );
+                } else if (metadataResponse.status === 403) {
+                    throw new Error(`Access forbidden (403): ${errorDetails?.error?.message || 'Check OAuth scope'}`);
+                } else if (metadataResponse.status === 401) {
+                    throw new Error(`Authentication failed (401): Token may be expired`);
+                } else {
+                    throw new Error(`HTTP ${metadataResponse.status}: ${errorDetails?.error?.message || 'Failed to access file'}`);
+                }
+            }
+            
+            metadata = await metadataResponse.json();
+            console.log('✅ Fetch metadata retrieved:', metadata);
+        }
+        
+        // Now download the actual file content
+        console.log('⬇️ Step 2: Downloading file content...');
+        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+        
+        console.log('📊 Download response status:', response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Download failed:', errorText);
+            
+            let errorMessage = `Failed to download file (${response.status})`;
+            try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.error?.message || errorMessage;
+            } catch (e) {
+                // Keep default message
+            }
+            
+            throw new Error(`Download failed: ${errorMessage}\n\nPlease try again or upload the file directly.`);
+        }
+        
+        console.log('✅ File downloaded successfully');
+        
+        // Convert response to Blob
+        const blob = await response.blob();
+        console.log('📦 Blob created:', blob.size, 'bytes');
+        
+        // Create File object from Blob
+        const file = new File([blob], fileName, { type: mimeType });
+        console.log('📁 File object created:', file.name, file.size, 'bytes');
+        
+        // Store as selectedFile (like a regular upload)
+        selectedFile = file;
+        currentUploadType = 'file';
+        currentSource = 'upload'; // Treat as regular upload (not 'googledrive')
+        
+        // Update UI to show file selected
+        if (uploadZone) {
+            uploadZone.innerHTML = `
+                <div style="text-align: center; padding: 30px;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-bottom: 20px;">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    <p style="color: #10b981; font-weight: 600; font-size: 16px; margin-bottom: 8px;">File Downloaded!</p>
+                    <p style="color: #94a3b8; font-size: 14px;">${fileName}</p>
+                    <p style="color: #64748b; font-size: 12px; margin-top: 8px;">${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+            `;
+        }
+        
+        // Proceed to Step 2
+        setTimeout(() => {
+            if (typeof window.proceedToStep2 === 'function') {
+                window.proceedToStep2();
+            } else if (typeof proceedToStep2 === 'function') {
+                proceedToStep2();
+            } else {
+                console.error('❌ proceedToStep2 function not found');
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ Failed to download Google Drive file:', error);
+        
+        // Show error message
+        const uploadZone = document.getElementById('uploadZone');
+        if (uploadZone) {
+            uploadZone.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" style="margin-bottom: 20px;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                    <p style="color: #ef4444; font-weight: 600; font-size: 16px; margin-bottom: 8px;">Download Failed</p>
+                    <p style="color: #94a3b8; font-size: 14px;">${error.message}</p>
+                    <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">Try Again</button>
+                </div>
+            `;
+        }
+        
+        alert('Failed to download file from Google Drive: ' + error.message);
+    }
+}
+
 // Expose showGoogleDrivePicker to global scope
-window.showGoogleDrivePicker = function() {
-    showPicker();
+// This is called when Google Drive button is clicked from ionuploads.js
+window.showGoogleDrivePicker = function(isArrowClick = false) {
+    console.log('💾 showGoogleDrivePicker called (global function)');
+    console.log('🔍 Arrow clicked:', isArrowClick);
+    
+    const connections = getStoredConnections();
+    console.log('🔍 Stored connections:', connections.length);
+    
+    // SMART BEHAVIOR:
+    // 1. If arrow clicked → Always show dropdown
+    // 2. If 0 connections → Open OAuth
+    // 3. If 1 connection → Open picker directly
+    // 4. If 2+ connections → Show dropdown
+    
+    if (isArrowClick) {
+        // Arrow clicked - always show dropdown (even if 0 connections)
+        console.log('▼ Arrow clicked - showing dropdown');
+        showGoogleDriveDropdown();
+    } else if (connections.length === 0) {
+        // No connections - open OAuth
+        console.log('➕ No connections - opening OAuth');
+        addNewGoogleDrive();
+    } else if (connections.length === 1) {
+        // 1 connection - open picker directly
+        console.log('📂 One connection - opening picker directly');
+        selectDrive(connections[0].email);
+    } else {
+        // Multiple connections - show dropdown
+        console.log('📋 Multiple connections - showing dropdown');
+        showGoogleDriveDropdown();
+    }
 };
 
 // Initialize on DOM load
@@ -1857,6 +2252,28 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🔄 Initializing Google Drive connections...');
     updateConnectedDrivesUI();
     initializeGoogleDriveHover(); // Initialize hover behavior
+    
+    // Initialize Google APIs and Token Client (with retry for async script loading)
+    console.log('🔄 Loading Google APIs for Token Client...');
+    
+    // Try immediately
+    loadGoogleAPIs();
+    
+    // If not loaded yet (scripts still loading), retry after 1 second
+    setTimeout(() => {
+        if (!tokenClient) {
+            console.log('🔄 Retrying Google API initialization...');
+            loadGoogleAPIs();
+        }
+    }, 1000);
+    
+    // Final retry after 3 seconds
+    setTimeout(() => {
+        if (!tokenClient) {
+            console.log('🔄 Final retry for Google API initialization...');
+            loadGoogleAPIs();
+        }
+    }, 3000);
 });
 
 console.log('✅ ION Uploader Pro initialized with FULL Feature Set!');

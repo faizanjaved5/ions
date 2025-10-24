@@ -32,11 +32,11 @@ if (session_status() === PHP_SESSION_NONE) {
 $config = require __DIR__ . '/../config/config.php';
 
 // Google Drive OAuth credentials - Use the Google Drive client (configured in Console)
-$clientId = $config['google_drive_clientid'] ?? '';
+$clientId     = $config['google_drive_clientid'] ?? '';
 $clientSecret = $config['google_drive_secretid'] ?? '';
 
 // Use the EXISTING registered redirect URI (matches Google Console configuration)
-$redirectUri = $config['google_redirect_uri'] ?? 'https://iblog.bz/login/google-oauth.php';
+$redirectUri  = $config['google_redirect_uri'] ?? 'https://iblog.bz/login/google-oauth.php';
 
 // Verify credentials are configured
 if (empty($clientId) || empty($clientSecret)) {
@@ -90,7 +90,7 @@ if (!isset($_GET['code'])) {
         'redirect_uri' => $redirectUri,
         'response_type' => 'code',
         'scope' => implode(' ', [
-            'https://www.googleapis.com/auth/drive.readonly',  // Read-only access to Drive
+            'https://www.googleapis.com/auth/drive.file',     // Non-sensitive: Only files created by app
             'https://www.googleapis.com/auth/userinfo.email',  // Get user email
             'https://www.googleapis.com/auth/userinfo.profile' // Get user profile
         ]),

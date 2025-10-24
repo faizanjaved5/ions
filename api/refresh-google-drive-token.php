@@ -60,10 +60,10 @@ try {
     
     error_log('🔄 Refresh Google Drive token: User ID=' . $userId . ', Email=' . $email);
     
-    // Load configuration - FIX: Use correct config keys
+    // Load configuration - FIX: Use correct config keys for Google Drive
     $config = require __DIR__ . '/../config/config.php';
-    $clientId = $config['google_client_id'] ?? '';
-    $clientSecret = $config['google_client_secret'] ?? '';
+    $clientId = $config['google_drive_clientid'] ?? '';      // ✅ Google Drive client ID
+    $clientSecret = $config['google_drive_secretid'] ?? '';  // ✅ Google Drive client secret
     
     if (empty($clientId) || empty($clientSecret)) {
         throw new Exception('Google Drive OAuth credentials not configured');

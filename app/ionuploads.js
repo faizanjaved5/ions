@@ -16,6 +16,11 @@ let currentView = 'grid'; // grid/list toggle for bulk
 let uploadQueue = [];
 let currentUploadIndex = 0;
 
+// CSV Bulk Import State
+let csvImportMode = false;
+let csvData = [];
+let csvFileName = '';
+
 // Upload cancellation tracking
 let uploadInProgress = false;
 let currentUploadController = null; // AbortController for fetch API cancellation
@@ -122,6 +127,869 @@ function getMediaTypeDisplay(file) {
 }
 
 // ============================================
+// CSV BULK IMPORT MODULE
+// ============================================
+
+/**
+ * Check if file is a CSV
+ */
+function isCSVFile(file) {
+    const isCSV = file.name.toLowerCase().endsWith('.csv') || file.type === 'text/csv';
+    console.log(`📊 CSV Check: ${file.name} - isCSV: ${isCSV}, type: ${file.type}`);
+    return isCSV;
+}
+
+/**
+ * Parse CSV file content
+ */
+async function parseCSVFile(file) {
+    console.log('📊 Parsing CSV file:', file.name);
+    
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const content = e.target.result;
+                const rows = parseCSVContent(content);
+                console.log(`📊 CSV parsed: ${rows.length} rows found`);
+                resolve(rows);
+            } catch (error) {
+                console.error('❌ CSV parsing error:', error);
+                reject(error);
+            }
+        };
+        
+        reader.onerror = function() {
+            reject(new Error('Failed to read CSV file'));
+        };
+        
+        reader.readAsText(file);
+    });
+}
+
+/**
+ * Normalize column name for flexible matching
+ * Makes case-insensitive and removes spaces, dashes, underscores
+ */
+function normalizeColumnName(name) {
+    return name.toLowerCase().replace(/[\s\-_]/g, '');
+}
+
+/**
+ * Map normalized column name to canonical field name
+ */
+function getCanonicalFieldName(normalizedName) {
+    const mapping = {
+        'importurl': 'ImportURL',
+        'importtitle': 'ImportTitle',
+        'ioneer': 'IONEER',
+        'ionnetwork': 'ION Network',
+        'ionchannels': 'ION Channels',
+        'visibility': 'Visibility',
+        'thumbnail': 'Thumbnail',
+        'thumbnailurl': 'ThumbnailURL'
+    };
+    
+    return mapping[normalizedName] || null;
+}
+
+/**
+ * Parse CSV content string into array of objects
+ * Simple CSV parser that handles quoted fields
+ * Now supports case-insensitive headers with flexible formatting
+ */
+function parseCSVContent(content) {
+    const lines = content.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+        throw new Error('CSV must have at least a header row and one data row');
+    }
+    
+    // Parse header row
+    const rawHeaders = parseCSVLine(lines[0]);
+    console.log('📊 CSV Headers (raw):', rawHeaders);
+    
+    // Normalize headers and create mapping
+    const headerMapping = [];
+    rawHeaders.forEach((rawHeader, index) => {
+        const normalized = normalizeColumnName(rawHeader.trim());
+        const canonical = getCanonicalFieldName(normalized);
+        
+        if (canonical) {
+            headerMapping.push({ index, canonical, raw: rawHeader.trim() });
+            console.log(`📊 Mapped "${rawHeader.trim()}" → "${canonical}"`);
+        } else {
+            console.warn(`⚠️ Unknown column: "${rawHeader.trim()}" (normalized: "${normalized}")`);
+        }
+    });
+    
+    // Parse data rows
+    const data = [];
+    for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        if (values.length === 0 || values.every(v => !v)) continue; // Skip empty rows
+        
+        const row = {};
+        headerMapping.forEach(({ index, canonical }) => {
+            row[canonical] = values[index] ? values[index].trim() : '';
+        });
+        
+        data.push(row);
+    }
+    
+    console.log(`📊 Parsed ${data.length} data rows with normalized column names`);
+    return data;
+}
+
+/**
+ * Parse a single CSV line handling quoted fields
+ */
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const nextChar = line[i + 1];
+        
+        if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+                // Escaped quote
+                current += '"';
+                i++; // Skip next quote
+            } else {
+                // Toggle quote mode
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            // Field separator
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    
+    // Add last field
+    result.push(current);
+    
+    return result;
+}
+
+/**
+ * Validate CSV row structure
+ */
+function validateCSVRow(row, index) {
+    const errors = [];
+    const warnings = [];
+    
+    // Check required field: ImportURL
+    if (!row.ImportURL || !row.ImportURL.trim()) {
+        errors.push(`Row ${index + 1}: ImportURL is required`);
+    } else {
+        // Validate URL format
+        const url = row.ImportURL.trim().toLowerCase();
+        const validPlatforms = ['youtube.com', 'youtu.be', 'vimeo.com', 'muvi.com', 'loom.com', 'rumble.com', 'wistia.com'];
+        const isValidPlatform = validPlatforms.some(platform => url.includes(platform));
+        
+        if (!isValidPlatform) {
+            errors.push(`Row ${index + 1}: ImportURL must be from YouTube, Vimeo, Muvi, Loom, Rumble, or Wistia`);
+        }
+    }
+    
+    // Check ImportTitle length if provided
+    if (row.ImportTitle && row.ImportTitle.length > 100) {
+        warnings.push(`Row ${index + 1}: ImportTitle exceeds 100 characters (will be truncated)`);
+    }
+    
+    // Validate IONEER format (strip @ if present)
+    if (row.IONEER) {
+        const ioneer = row.IONEER.trim();
+        if (ioneer.startsWith('@')) {
+            row.IONEER = ioneer.substring(1); // Strip @
+        }
+    }
+    
+    // Validate Visibility values
+    if (row.Visibility) {
+        const validVisibility = ['Public', 'Private', 'Unlisted'];
+        if (!validVisibility.includes(row.Visibility)) {
+            warnings.push(`Row ${index + 1}: Invalid Visibility "${row.Visibility}", will default to Public`);
+            row.Visibility = 'Public';
+        }
+    } else {
+        row.Visibility = 'Public'; // Default
+    }
+    
+    return {
+        valid: errors.length === 0,
+        errors,
+        warnings,
+        row
+    };
+}
+
+/**
+ * Validate entire CSV data
+ */
+function validateCSVData(data) {
+    console.log('📊 Validating CSV data...');
+    
+    const results = data.map((row, index) => validateCSVRow(row, index));
+    
+    const validRows = results.filter(r => r.valid);
+    const invalidRows = results.filter(r => !r.valid);
+    const allWarnings = results.flatMap(r => r.warnings);
+    
+    console.log(`📊 Validation complete: ${validRows.length} valid, ${invalidRows.length} invalid`);
+    
+    return {
+        valid: invalidRows.length === 0,
+        validRows: validRows.map(r => r.row),
+        invalidRows: invalidRows.map(r => ({ row: r.row, errors: r.errors })),
+        warnings: allWarnings,
+        totalRows: data.length
+    };
+}
+
+/**
+ * Handle CSV file import
+ */
+async function handleCSVImport(file) {
+    console.log('📊 Starting CSV import for:', file.name);
+    
+    try {
+        // Parse CSV file
+        const parsedData = await parseCSVFile(file);
+        
+        // Validate CSV data
+        const validation = validateCSVData(parsedData);
+        
+        if (validation.invalidRows.length > 0) {
+            // Show validation errors
+            showCSVValidationErrors(validation);
+            return;
+        }
+        
+        // Store CSV data globally
+        csvImportMode = true;
+        csvData = validation.validRows;
+        csvFileName = file.name;
+        bulkMode = false; // CSV import is different from bulk file upload
+        
+        console.log(`📊 CSV validated: ${csvData.length} valid videos to import`);
+        
+        // SECURITY CHECK: Warn regular users if IONEER column is present
+        const hasIONEERColumn = validation.validRows.some(row => row.IONEER && row.IONEER.trim());
+        const isAdminOrOwner = typeof userRole !== 'undefined' && 
+            ['Owner', 'Admin', 'Administrator', 'Super Admin'].includes(userRole);
+        
+        if (hasIONEERColumn && !isAdminOrOwner) {
+            console.warn('🔒 IONEER column detected but user is not Admin/Owner - values will be ignored');
+            alert('⚠️ Security Notice:\n\nYour CSV contains an "IONEER" column, but only Admins and Owners can assign videos to other users.\n\nAll imported videos will be assigned to YOUR profile instead.');
+        }
+        
+        // Show CSV preview in Step 1
+        showCSVPreview(file, validation);
+        
+        // Enable next button
+        checkNextButton();
+        
+        // Auto-proceed to CSV Step 2 after a moment
+        setTimeout(() => {
+            proceedToCSVStep2();
+        }, 800);
+        
+    } catch (error) {
+        console.error('❌ CSV import error:', error);
+        alert(`CSV Import Error:\n\n${error.message}\n\nPlease check your CSV file format.`);
+    }
+}
+
+/**
+ * Show CSV validation errors
+ */
+function showCSVValidationErrors(validation) {
+    const errorMessages = validation.invalidRows.map(item => {
+        return item.errors.join('\n');
+    }).join('\n\n');
+    
+    alert(`CSV Validation Failed:\n\n${errorMessages}\n\nPlease fix these errors and try again.`);
+}
+
+/**
+ * Show CSV preview in Step 1
+ */
+function showCSVPreview(file, validation) {
+    console.log('📊 Showing CSV preview');
+    
+    const uploadZone = document.getElementById('uploadZone');
+    if (!uploadZone) return;
+    
+    const fileSize = (file.size / 1024).toFixed(2);
+    const warningsHTML = validation.warnings.length > 0 
+        ? `<div style="margin-top: 12px; padding: 10px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 6px;">
+            <div style="color: #f59e0b; font-size: 13px; font-weight: 600; margin-bottom: 6px;">⚠️ Warnings:</div>
+            <div style="color: #fbbf24; font-size: 12px; line-height: 1.6;">${validation.warnings.join('<br>')}</div>
+           </div>`
+        : '';
+    
+    uploadZone.innerHTML = `
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" style="margin-bottom: 12px;">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+        </svg>
+        <h3 style="color: #10b981; margin: 0 0 8px 0; font-size: 20px;">📊 CSV File Detected!</h3>
+        <p style="color: #e2e8f0; margin: 0 0 8px 0; font-size: 15px; font-weight: 500;">${file.name}</p>
+        <p style="color: #94a3b8; font-size: 13px; margin: 0 0 12px 0;">
+            ${fileSize} KB &bull; ${validation.validRows.length} video${validation.validRows.length !== 1 ? 's' : ''} to import
+        </p>
+        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: rgba(59, 130, 246, 0.15); border-radius: 8px; margin-bottom: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span style="color: #3b82f6; font-size: 14px; font-weight: 600;">Bulk Import Mode</span>
+        </div>
+        ${warningsHTML}
+        <p style="color: #64748b; font-size: 12px; margin: 12px 0 0 0;">
+            Click "Next" to review and import videos
+        </p>
+    `;
+}
+
+/**
+ * Proceed to CSV Step 2
+ */
+function proceedToCSVStep2() {
+    console.log('📊 Proceeding to CSV Step 2');
+    
+    // Hide Step 1 and bulkStep2
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const bulkStep2 = document.getElementById('bulkStep2');
+    const csvStep2 = document.getElementById('csvStep2');
+    
+    if (step1) step1.style.display = 'none';
+    if (step2) step2.style.display = 'none';
+    if (bulkStep2) bulkStep2.style.display = 'none';
+    
+    // Show CSV Step 2
+    if (csvStep2) {
+        csvStep2.style.display = 'block';
+        console.log('✅ CSV Step 2 visible');
+    }
+    
+    // Update footer buttons
+    const closeBtn = document.getElementById('closeBtn');
+    const backBtn = document.getElementById('backBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const nextBtnText = document.getElementById('nextBtnText');
+    
+    if (closeBtn) closeBtn.style.display = 'none';
+    if (backBtn) backBtn.style.display = 'flex';
+    if (nextBtn) {
+        nextBtn.style.display = 'flex';
+        nextBtn.disabled = false;
+    }
+    if (nextBtnText) nextBtnText.textContent = 'Import All Videos';
+    
+    // Populate CSV Step 2 UI
+    populateCSVStep2();
+}
+
+/**
+ * Populate CSV Step 2 with data
+ */
+function populateCSVStep2() {
+    console.log('📊 Populating CSV Step 2 with', csvData.length, 'videos');
+    
+    // Update header info
+    const csvFileNameDisplay = document.getElementById('csvFileNameDisplay');
+    const csvTotalCount = document.getElementById('csvTotalCount');
+    const csvImportCount = document.getElementById('csvImportCount');
+    
+    if (csvFileNameDisplay) csvFileNameDisplay.textContent = csvFileName;
+    if (csvTotalCount) csvTotalCount.textContent = csvData.length;
+    if (csvImportCount) csvImportCount.textContent = csvData.length;
+    
+    // Populate import list
+    const csvImportList = document.getElementById('csvImportList');
+    if (!csvImportList) {
+        console.error('❌ csvImportList element not found');
+        return;
+    }
+    
+    csvImportList.innerHTML = csvData.map((row, index) => createCSVImportCard(row, index)).join('');
+    
+    // Setup character counters for title inputs
+    csvData.forEach((row, index) => {
+        const titleInput = document.getElementById(`csvTitle_${index}`);
+        const titleCount = document.getElementById(`csvTitleCount_${index}`);
+        
+        if (titleInput && titleCount) {
+            const updateCharCount = () => {
+                const currentLength = titleInput.value.length;
+                titleCount.textContent = currentLength;
+                
+                // Color feedback
+                const charCountSpan = titleCount.parentElement;
+                if (currentLength > 90) {
+                    charCountSpan.style.color = '#ef4444'; // Red warning
+                } else if (currentLength > 70) {
+                    charCountSpan.style.color = '#f59e0b'; // Orange warning
+                } else {
+                    charCountSpan.style.color = '#94a3b8'; // Default gray
+                }
+            };
+            
+            titleInput.addEventListener('input', updateCharCount);
+            titleInput.addEventListener('keyup', updateCharCount);
+            titleInput.addEventListener('paste', () => setTimeout(updateCharCount, 10));
+            
+            updateCharCount();
+        }
+    });
+    
+    console.log('✅ CSV import list populated with character counters');
+    
+    // Fetch thumbnails for all CSV rows
+    fetchCSVThumbnails();
+}
+
+/**
+ * Fetch thumbnails for CSV import rows
+ */
+async function fetchCSVThumbnails() {
+    console.log('🖼️ Fetching thumbnails for CSV imports...');
+    
+    for (let index = 0; index < csvData.length; index++) {
+        const row = csvData[index];
+        const url = row.ImportURL;
+        const thumbnailURL = row.ThumbnailURL || row.Thumbnail; // Support both column names
+        
+        try {
+            let thumbnailUrl = null;
+            
+            // Try ThumbnailURL first if provided
+            if (thumbnailURL && thumbnailURL.trim()) {
+                console.log(`🖼️ [${index}] Fetching custom thumbnail from:`, thumbnailURL);
+                thumbnailUrl = await fetchThumbnailFromURL(thumbnailURL, index);
+            }
+            
+            // If no custom thumbnail or fetch failed, get from platform
+            if (!thumbnailUrl) {
+                console.log(`🖼️ [${index}] Fetching thumbnail from platform for:`, url);
+                thumbnailUrl = await fetchPlatformThumbnail(url, index);
+            }
+            
+            if (thumbnailUrl) {
+                updateCSVThumbnail(index, thumbnailUrl);
+                // Store the thumbnail URL with the CSV row data
+                csvData[index].fetchedThumbnailUrl = thumbnailUrl;
+            }
+        } catch (error) {
+            console.error(`❌ Failed to fetch thumbnail for row ${index}:`, error);
+        }
+    }
+    
+    console.log('✅ CSV thumbnail fetching complete');
+}
+
+/**
+ * Fetch thumbnail from custom URL
+ */
+async function fetchThumbnailFromURL(thumbnailURL, index) {
+    try {
+        // Test if the URL is accessible by trying to load it as an image
+        const img = new Image();
+        
+        return new Promise((resolve, reject) => {
+            img.onload = () => {
+                console.log(`✅ [${index}] Custom thumbnail loaded successfully`);
+                resolve(thumbnailURL);
+            };
+            
+            img.onerror = () => {
+                console.warn(`⚠️ [${index}] Custom thumbnail failed to load, will try platform`);
+                resolve(null); // Return null to trigger platform fallback
+            };
+            
+            // Set timeout for loading
+            setTimeout(() => {
+                console.warn(`⚠️ [${index}] Custom thumbnail load timeout`);
+                resolve(null);
+            }, 5000);
+            
+            img.src = thumbnailURL;
+        });
+    } catch (error) {
+        console.error(`❌ [${index}] Error fetching custom thumbnail:`, error);
+        return null;
+    }
+}
+
+/**
+ * Fetch thumbnail from platform (YouTube, Vimeo, etc.)
+ */
+async function fetchPlatformThumbnail(url, index) {
+    const platform = detectPlatform(url);
+    
+    try {
+        if (platform === 'YouTube') {
+            // Extract YouTube video ID
+            const videoId = extractYouTubeId(url);
+            if (videoId) {
+                // Try maxresdefault first, fall back to hqdefault
+                const maxResUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                const hqUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                
+                // Test maxresdefault
+                const isMaxResValid = await testImageUrl(maxResUrl);
+                return isMaxResValid ? maxResUrl : hqUrl;
+            }
+        } else if (platform === 'Vimeo') {
+            // Extract Vimeo video ID and fetch from API
+            const videoId = extractVimeoId(url);
+            if (videoId) {
+                const response = await fetch(`https://vimeo.com/api/v2/video/${videoId}.json`);
+                if (response.ok) {
+                    const data = await response.json();
+                    return data[0]?.thumbnail_large || data[0]?.thumbnail_medium;
+                }
+            }
+        }
+        // Add more platforms as needed
+        
+        return null;
+    } catch (error) {
+        console.error(`❌ [${index}] Error fetching platform thumbnail:`, error);
+        return null;
+    }
+}
+
+/**
+ * Test if an image URL is valid
+ */
+async function testImageUrl(url) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        setTimeout(() => resolve(false), 3000);
+        img.src = url;
+    });
+}
+
+/**
+ * Extract YouTube video ID from URL
+ */
+function extractYouTubeId(url) {
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\?\/]+)/,
+        /youtube\.com\/embed\/([^&\?\/]+)/,
+        /youtube\.com\/v\/([^&\?\/]+)/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    return null;
+}
+
+/**
+ * Extract Vimeo video ID from URL
+ */
+function extractVimeoId(url) {
+    const match = url.match(/vimeo\.com\/(\d+)/);
+    return match ? match[1] : null;
+}
+
+/**
+ * Update CSV thumbnail in UI
+ */
+function updateCSVThumbnail(index, thumbnailUrl) {
+    // Update collapsed view thumbnail
+    const thumbnailImage = document.getElementById(`csvThumbnailImage_${index}`);
+    const thumbnailPlaceholder = document.getElementById(`csvThumbnailPlaceholder_${index}`);
+    
+    if (thumbnailImage && thumbnailUrl) {
+        thumbnailImage.src = thumbnailUrl;
+        thumbnailImage.style.display = 'block';
+        if (thumbnailPlaceholder) {
+            thumbnailPlaceholder.style.display = 'none';
+        }
+    }
+    
+    // Update expanded view thumbnail
+    const expandedImage = document.getElementById(`csvExpandedThumbnailImage_${index}`);
+    const expandedPlaceholder = document.getElementById(`csvExpandedThumbnailPlaceholder_${index}`);
+    
+    if (expandedImage && thumbnailUrl) {
+        expandedImage.src = thumbnailUrl;
+        expandedImage.style.display = 'block';
+        if (expandedPlaceholder) {
+            expandedPlaceholder.style.display = 'none';
+        }
+    }
+    
+    // Update status text
+    const statusText = document.getElementById(`csvThumbnailStatus_${index}`);
+    if (statusText) {
+        statusText.textContent = '✅ Thumbnail loaded';
+        statusText.style.color = '#10b981';
+    }
+    
+    console.log(`✅ [${index}] Thumbnail updated in UI`);
+}
+
+/**
+ * Toggle CSV card expand/collapse
+ */
+function toggleCSVCardExpand(index) {
+    const card = document.querySelector(`[data-csv-index="${index}"]`);
+    if (!card) return;
+    
+    const isExpanded = card.dataset.expanded === 'true';
+    const collapsedView = document.getElementById(`csvCardCollapsed_${index}`);
+    const expandedView = document.getElementById(`csvCardExpanded_${index}`);
+    const expandArrow = document.getElementById(`csvExpandArrow_${index}`);
+    
+    if (isExpanded) {
+        // Collapse
+        card.dataset.expanded = 'false';
+        if (expandedView) expandedView.style.display = 'none';
+        if (expandArrow) expandArrow.textContent = '▼';
+    } else {
+        // Expand
+        card.dataset.expanded = 'true';
+        if (expandedView) expandedView.style.display = 'block';
+        if (expandArrow) expandArrow.textContent = '▲';
+    }
+}
+
+// Make function globally available
+window.toggleCSVCardExpand = toggleCSVCardExpand;
+
+/**
+ * Remove CSV row from import list
+ */
+function removeCSVRow(index) {
+    console.log('📊 Removing CSV row', index);
+    
+    // Remove from csvData array
+    csvData.splice(index, 1);
+    
+    // Update count
+    const csvTotalCount = document.getElementById('csvTotalCount');
+    const csvImportCount = document.getElementById('csvImportCount');
+    if (csvTotalCount) csvTotalCount.textContent = csvData.length;
+    if (csvImportCount) csvImportCount.textContent = csvData.length;
+    
+    // Re-populate list (this will re-index everything correctly)
+    populateCSVStep2();
+    
+    console.log('✅ CSV row removed, list updated');
+}
+
+// Make function globally available
+window.removeCSVRow = removeCSVRow;
+
+/**
+ * Create a CSV import card matching bulk upload UI
+ */
+function createCSVImportCard(row, index) {
+    const url = row.ImportURL || '';
+    const title = row.ImportTitle || extractTitleFromURL(url);
+    const ioneer = row.IONEER || '';
+    const network = row['ION Network'] || '';
+    const channels = row['ION Channels'] || '';
+    const visibility = row.Visibility || 'Public';
+    const thumbnailURL = row.ThumbnailURL || row.Thumbnail || ''; // Support both column names
+    
+    // Determine platform from URL
+    const platform = detectPlatform(url);
+    const platformColor = {
+        'YouTube': '#ff0000',
+        'Vimeo': '#1ab7ea',
+        'Muvi': '#7c3aed',
+        'Loom': '#625df5',
+        'Rumble': '#85c742',
+        'Wistia': '#54bbff'
+    }[platform] || '#64748b';
+    
+    const platformIcon = {
+        'YouTube': '▶',
+        'Vimeo': 'V',
+        'Muvi': 'M',
+        'Loom': 'L',
+        'Rumble': 'R',
+        'Wistia': 'W'
+    }[platform] || '📹';
+    
+    return `
+        <div class="bulk-file-card-improved" data-csv-index="${index}" data-expanded="false">
+            <!-- Collapsed View -->
+            <div class="bulk-card-collapsed" id="csvCardCollapsed_${index}">
+                <div class="bulk-card-left">
+                    <div class="bulk-card-thumbnail" id="csvThumbnail_${index}">
+                        <div class="thumbnail-placeholder" style="background: ${platformColor}; color: white; font-size: 24px;" id="csvThumbnailPlaceholder_${index}">
+                            ${platformIcon}
+                        </div>
+                        <img src="" alt="Thumbnail" class="thumbnail-image" id="csvThumbnailImage_${index}" style="display: none; width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">
+                    </div>
+                </div>
+                
+                <div class="bulk-card-center">
+                    <div class="bulk-card-title-wrapper">
+                        <input type="text" 
+                               class="bulk-card-title-input csv-field-input" 
+                               id="csvTitle_${index}" 
+                               data-csv-index="${index}"
+                               data-csv-field="ImportTitle"
+                               value="${title}"
+                               maxlength="100"
+                               placeholder="Enter video title">
+                        <span class="bulk-card-char-count">
+                            <span id="csvTitleCount_${index}">${title.length}</span>/100
+                        </span>
+                    </div>
+                    <div class="bulk-card-filename">
+                        <span style="color: ${platformColor}; font-weight: 600;">${platform}</span>
+                        ${ioneer ? ` • @${ioneer}` : ''}
+                        ${channels ? ` • ${channels.split(',').length} channel(s)` : ''}
+                    </div>
+                    
+                    <!-- Import progress (shown during import) -->
+                    <div class="bulk-card-progress" id="csvImportProgress_${index}" style="display: none;">
+                        <div class="bulk-card-progress-bar">
+                            <div class="bulk-card-progress-fill" id="csvImportProgressBar_${index}"></div>
+                        </div>
+                        <span class="bulk-card-progress-text" id="csvImportProgressText_${index}">Importing...</span>
+                    </div>
+                </div>
+                
+                <div class="bulk-card-right">
+                    <button type="button" 
+                            class="bulk-card-btn-close" 
+                            onclick="removeCSVRow(${index})"
+                            title="Remove from import">
+                        ✕
+                    </button>
+                    <button type="button" 
+                            class="bulk-card-btn-expand" 
+                            onclick="toggleCSVCardExpand(${index})"
+                            title="Expand details">
+                        <span class="expand-arrow" id="csvExpandArrow_${index}">▼</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Expanded View -->
+            <div class="bulk-card-expanded" id="csvCardExpanded_${index}" style="display: none;">
+                <div class="bulk-expanded-content">
+                    <div class="bulk-expanded-left">
+                        <div class="bulk-expanded-label">Import URL</div>
+                        <input type="text" 
+                               class="csv-field-input" 
+                               data-csv-index="${index}" 
+                               data-csv-field="ImportURL"
+                               value="${url}"
+                               placeholder="https://..."
+                               style="width: 100%; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; font-size: 0.875rem; margin-bottom: 16px;">
+                        
+                        <div class="bulk-expanded-label">ION Network Category</div>
+                        <input type="text" 
+                               class="csv-field-input" 
+                               data-csv-index="${index}" 
+                               data-csv-field="ION Network"
+                               value="${network}" 
+                               placeholder="e.g. AVL on ION, ION Sports Network"
+                               style="width: 100%; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; font-size: 0.875rem;">
+                    </div>
+                    
+                    <div class="bulk-expanded-middle">
+                        <div class="bulk-expanded-label">Video Thumbnail</div>
+                        <div class="bulk-expanded-thumbnail" id="csvExpandedThumbnail_${index}">
+                            <div class="thumbnail-placeholder-large" id="csvExpandedThumbnailPlaceholder_${index}" style="background: ${platformColor}; color: white; font-size: 48px; display: flex; align-items: center; justify-content: center;">
+                                ${platformIcon}
+                            </div>
+                            <img src="" alt="Thumbnail" class="thumbnail-image-large" id="csvExpandedThumbnailImage_${index}" style="display: none; width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">
+                        </div>
+                        <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 8px; text-align: center;" id="csvThumbnailStatus_${index}">
+                            ${thumbnailURL ? 'Fetching custom thumbnail...' : 'Fetching thumbnail from ' + platform + '...'}
+                        </div>
+                    </div>
+                    
+                    <div class="bulk-expanded-right">
+                        <div class="bulk-expanded-label">ION Channels (Comma-separated)</div>
+                        <input type="text" 
+                               class="csv-field-input" 
+                               data-csv-index="${index}" 
+                               data-csv-field="ION Channels"
+                               value="${channels}" 
+                               placeholder="e.g. ion-orlando, ion-manhattan-beach"
+                               style="width: 100%; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; font-size: 0.875rem; margin-bottom: 16px;">
+                        
+                        <div class="bulk-expanded-label">Visibility</div>
+                        <select class="csv-field-input" 
+                                data-csv-index="${index}" 
+                                data-csv-field="Visibility"
+                                style="width: 100%; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; font-size: 0.875rem; margin-bottom: 16px;">
+                            <option value="Public" ${visibility === 'Public' ? 'selected' : ''}>Public</option>
+                            <option value="Private" ${visibility === 'Private' ? 'selected' : ''}>Private</option>
+                            <option value="Unlisted" ${visibility === 'Unlisted' ? 'selected' : ''}>Unlisted</option>
+                        </select>
+                        
+                        ${ioneer ? `
+                        <div class="bulk-expanded-label">Assigned to IONEER</div>
+                        <div style="padding: 10px 14px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; color: #3b82f6; font-weight: 500;">
+                            @${ioneer}
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Extract title from URL (fallback)
+ */
+function extractTitleFromURL(url) {
+    try {
+        const urlObj = new URL(url);
+        const path = urlObj.pathname;
+        const parts = path.split('/').filter(p => p);
+        return parts[parts.length - 1] || 'Imported Video';
+    } catch {
+        return 'Imported Video';
+    }
+}
+
+/**
+ * Detect platform from URL
+ */
+function detectPlatform(url) {
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) return 'YouTube';
+    if (lowerUrl.includes('vimeo.com')) return 'Vimeo';
+    if (lowerUrl.includes('muvi.com')) return 'Muvi';
+    if (lowerUrl.includes('loom.com')) return 'Loom';
+    if (lowerUrl.includes('rumble.com')) return 'Rumble';
+    if (lowerUrl.includes('wistia.com')) return 'Wistia';
+    return 'Unknown';
+}
+
+// ============================================
 // FILE SELECTION HANDLERS
 // ============================================
 function handleFileSelect(event) {
@@ -135,6 +1003,13 @@ function handleFileSelect(event) {
     }
     
     console.log(`📁 Selected ${files.length} file(s):`, files.map(f => f.name));
+    
+    // CHECK FOR CSV FILE - Handle CSV imports separately
+    if (files.length === 1 && isCSVFile(files[0])) {
+        console.log('📊 CSV file detected, switching to CSV import mode');
+        handleCSVImport(files[0]);
+        return;
+    }
     
     // Validate all files
     const validFiles = files.filter(validateMedia);
@@ -838,6 +1713,12 @@ function goBackToStep1() {
     window.customThumbnailSource = null;
     window.importedVideoUrl = null; // CRITICAL: Clear imported URL to prevent stale data
     
+    // Clear CSV import state
+    csvImportMode = false;
+    csvData = [];
+    csvFileName = '';
+    console.log('✅ CSV import state cleared');
+    
     // Clear URL input
     const urlInput = document.getElementById('urlInput');
     if (urlInput) {
@@ -896,6 +1777,7 @@ function goBackToStep1() {
     const step1 = document.getElementById('step1');
     const step2 = document.getElementById('step2');
     const bulkStep2 = document.getElementById('bulkStep2');
+    const csvStep2 = document.getElementById('csvStep2');
     
     // IMPORTANT: Hide step 2 completely
     if (step2) {
@@ -911,6 +1793,12 @@ function goBackToStep1() {
     if (bulkStep2) {
         bulkStep2.style.display = 'none';
         console.log('✅ Bulk Step 2 hidden');
+    }
+    
+    // Also hide CSV step 2 if visible
+    if (csvStep2) {
+        csvStep2.style.display = 'none';
+        console.log('✅ CSV Step 2 hidden');
     }
     
     // Show step 1
@@ -3086,10 +3974,12 @@ function handleNextButtonClick() {
     const step1 = document.getElementById('step1');
     const step2 = document.getElementById('step2');
     const bulkStep2 = document.getElementById('bulkStep2');
+    const csvStep2 = document.getElementById('csvStep2');
     
     const step1Visible = step1 && window.getComputedStyle(step1).display !== 'none';
     const step2Visible = step2 && window.getComputedStyle(step2).display !== 'none';
     const bulkStep2Visible = bulkStep2 && window.getComputedStyle(bulkStep2).display !== 'none';
+    const csvStep2Visible = csvStep2 && window.getComputedStyle(csvStep2).display !== 'none';
     
     console.log('🔘 Button state at click:', {
         text: currentText,
@@ -3120,7 +4010,7 @@ function handleNextButtonClick() {
         console.log('   Button text was:', currentText, '(ignored - Step 1 is visible)');
         console.log('   Step 2 visible:', step2Visible, '(ignored - Step 1 takes priority)');
         proceedToNextStep();
-    } else if (step2Visible || bulkStep2Visible) {
+    } else if (step2Visible || bulkStep2Visible || csvStep2Visible) {
         // We're on step 2 or bulk step 2, start upload/import
         console.log('📤 Starting upload/import (Step 2/Bulk visible, Step 1 NOT visible)');
         console.log('   Button text:', currentText);
@@ -3133,7 +4023,11 @@ function handleNextButtonClick() {
             console.log('🔒 Upload button disabled to prevent double-submission');
         }
         
-        if (bulkStep2Visible || currentText === 'Upload All Files') {
+        if (csvStep2Visible || currentText === 'Import All Videos') {
+            // CSV bulk import mode
+            console.log('📊 Starting CSV bulk import for', csvData.length, 'videos');
+            startCSVImport();
+        } else if (bulkStep2Visible || currentText === 'Upload All Files') {
             // Bulk upload mode
             console.log('📦 Starting bulk upload for', selectedFiles.length, 'files');
             startBulkUpload();
@@ -4885,6 +5779,361 @@ function showBulkUploadError(message) {
 }
 
 // ============================================
+// CSV BULK IMPORT PROCESSOR
+// ============================================
+
+/**
+ * Start CSV bulk import with parallel batch processing
+ */
+async function startCSVImport() {
+    console.log('📊 Starting CSV PARALLEL import for', csvData.length, 'videos');
+    
+    // Collect global settings
+    const globalSettings = {
+        category: document.getElementById('csvGlobalCategory')?.value || '',
+        channels: document.getElementById('csvGlobalChannels')?.value || '',
+        visibility: document.getElementById('csvGlobalVisibility')?.value || ''
+    };
+    
+    console.log('📊 Global settings:', globalSettings);
+    
+    // Update csvData with any user edits from the UI
+    updateCSVDataFromUI();
+    
+    // Validate we have videos to import
+    if (!csvData || csvData.length === 0) {
+        alert('No videos to import!');
+        return;
+    }
+    
+    // Initialize results tracking
+    window.csvImportResults = {
+        total: csvData.length,
+        successful: [],
+        failed: [],
+        current: 0,
+        inProgress: 0
+    };
+    
+    // Show progress UI
+    showCSVImportProgress();
+    
+    // Disable import button during processing
+    const nextBtn = document.getElementById('nextBtn');
+    if (nextBtn) {
+        nextBtn.disabled = true;
+        nextBtn.style.opacity = '0.6';
+    }
+    
+    // PARALLEL BATCH PROCESSING
+    const BATCH_SIZE = 5; // Process 5 videos at a time
+    const batches = [];
+    
+    // Split csvData into batches
+    for (let i = 0; i < csvData.length; i += BATCH_SIZE) {
+        batches.push(csvData.slice(i, i + BATCH_SIZE).map((row, index) => ({
+            row,
+            originalIndex: i + index
+        })));
+    }
+    
+    console.log(`📊 Processing ${csvData.length} videos in ${batches.length} batches of ${BATCH_SIZE}`);
+    
+    // Process each batch
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        console.log(`📦 Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} videos)`);
+        
+        // Process all videos in this batch in parallel
+        const batchPromises = batch.map(async ({ row, originalIndex }) => {
+            const videoIndex = originalIndex + 1; // 1-based for display
+            
+            try {
+                window.csvImportResults.inProgress++;
+                console.log(`📊 [Batch ${batchIndex + 1}] Starting video ${videoIndex}/${csvData.length}:`, row.ImportTitle || row.ImportURL);
+                
+                // Merge row data with global settings
+                const importData = mergeCSVRowWithGlobals(row, globalSettings);
+                
+                // Validate import data
+                if (!importData.url || !importData.url.trim()) {
+                    throw new Error('Missing video URL');
+                }
+                
+                // Import the video with timeout protection
+                const result = await Promise.race([
+                    importCSVVideo(importData, videoIndex),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Import timeout (30s)')), 30000)
+                    )
+                ]);
+                
+                window.csvImportResults.successful.push({
+                    index: videoIndex,
+                    title: row.ImportTitle || 'Video ' + videoIndex,
+                    url: row.ImportURL,
+                    result: result
+                });
+                
+                console.log(`✅ [Batch ${batchIndex + 1}] Video ${videoIndex} imported successfully`);
+                
+            } catch (error) {
+                console.error(`❌ [Batch ${batchIndex + 1}] Failed to import video ${videoIndex}:`, error);
+                
+                window.csvImportResults.failed.push({
+                    index: videoIndex,
+                    title: row.ImportTitle || 'Video ' + videoIndex,
+                    url: row.ImportURL,
+                    error: error.message || 'Unknown error'
+                });
+            } finally {
+                window.csvImportResults.inProgress--;
+                window.csvImportResults.current++;
+                
+                // Update progress after each video completes
+                updateCSVImportProgress();
+            }
+        });
+        
+        // Wait for all videos in this batch to complete before moving to next batch
+        await Promise.allSettled(batchPromises);
+        
+        console.log(`✅ Batch ${batchIndex + 1}/${batches.length} complete`);
+        
+        // Small delay between batches to prevent overwhelming the server
+        if (batchIndex < batches.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    
+    // Re-enable button
+    if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.style.opacity = '1';
+    }
+    
+    console.log('✅ All batches complete!');
+    console.log(`   Successful: ${window.csvImportResults.successful.length}`);
+    console.log(`   Failed: ${window.csvImportResults.failed.length}`);
+    
+    // Show completion dialog
+    showCSVImportComplete();
+}
+
+/**
+ * Update CSV data from UI edits
+ */
+function updateCSVDataFromUI() {
+    console.log('📊 Updating CSV data from UI edits');
+    
+    document.querySelectorAll('.csv-field-input').forEach(input => {
+        const index = parseInt(input.dataset.csvIndex);
+        const field = input.dataset.csvField;
+        const value = input.value.trim();
+        
+        if (csvData[index]) {
+            csvData[index][field] = value;
+        }
+    });
+}
+
+/**
+ * Merge CSV row with global settings
+ */
+function mergeCSVRowWithGlobals(row, globals) {
+    return {
+        url: row.ImportURL,
+        title: row.ImportTitle || '',
+        ioneer: row.IONEER || '',
+        network: row['ION Network'] || globals.category,
+        channels: row['ION Channels'] || globals.channels,
+        visibility: row.Visibility || globals.visibility || 'Public',
+        thumbnailUrl: row.fetchedThumbnailUrl || '' // Include fetched thumbnail URL
+    };
+}
+
+/**
+ * Import a single video from CSV - Direct backend call
+ */
+async function importCSVVideo(data, index) {
+    console.log(`📊 Importing video ${index}:`, data.title || data.url);
+    
+    if (!data.url || !data.url.trim()) {
+        throw new Error('Missing video URL');
+    }
+    
+    // Detect platform from URL
+    const url = data.url.trim();
+    const platform = detectPlatformFromURL(url);
+    
+    if (!platform) {
+        throw new Error(`Unsupported platform for URL: ${url}`);
+    }
+    
+    console.log(`📊 Detected platform: ${platform} for video ${index}`);
+    
+    // Prepare form data for backend
+    const formData = new FormData();
+    formData.append('action', 'platform_import');
+    formData.append('source', platform);
+    formData.append('url', url);
+    formData.append('title', data.title || '');
+    formData.append('description', '');
+    formData.append('category', data.network || 'General');
+    formData.append('tags', '');
+    formData.append('visibility', data.visibility.toLowerCase());
+    formData.append('badges', '');
+    
+    // Add channels if specified
+    if (data.channels) {
+        const channels = data.channels.split(',').map(c => c.trim()).filter(c => c);
+        formData.append('selected_channels', JSON.stringify(channels));
+    }
+    
+    // Add IONEER if specified (assign video to specific user)
+    if (data.ioneer) {
+        formData.append('ioneer', data.ioneer);
+        console.log(`📊 Assigning video ${index} to IONEER: @${data.ioneer}`);
+    }
+    
+    // Add thumbnail URL if available
+    if (data.thumbnailUrl) {
+        formData.append('thumbnail_url', data.thumbnailUrl);
+        console.log(`📊 Including thumbnail URL for video ${index}:`, data.thumbnailUrl);
+    }
+    
+    // Send to backend
+    try {
+        const response = await fetch('/app/ionuploadvideos.php', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log(`✅ Video ${index} imported successfully:`, result);
+            return result;
+        } else {
+            throw new Error(result.error || result.message || 'Import failed');
+        }
+    } catch (error) {
+        console.error(`❌ Import failed for video ${index}:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Detect platform from URL
+ */
+function detectPlatformFromURL(url) {
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.includes('youtube.com') || lowerUrl.includes('youtu.be')) return 'YouTube';
+    if (lowerUrl.includes('vimeo.com')) return 'Vimeo';
+    if (lowerUrl.includes('muvi.com')) return 'Muvi';
+    if (lowerUrl.includes('loom.com')) return 'Loom';
+    if (lowerUrl.includes('rumble.com')) return 'Rumble';
+    if (lowerUrl.includes('wistia.com')) return 'Wistia';
+    return null;
+}
+
+/**
+ * Show CSV import progress UI
+ */
+function showCSVImportProgress() {
+    const bulkProgressContainer = document.getElementById('bulkProgressContainer');
+    if (bulkProgressContainer) {
+        bulkProgressContainer.style.display = 'flex';
+    }
+    
+    const bulkProgressLabel = document.getElementById('bulkProgressLabel');
+    if (bulkProgressLabel) {
+        bulkProgressLabel.textContent = `Importing video 1/${csvData.length}...`;
+    }
+    
+    const bulkProgressBar = document.getElementById('bulkProgressBar');
+    if (bulkProgressBar) {
+        bulkProgressBar.style.width = '0%';
+    }
+}
+
+/**
+ * Update CSV import progress
+ */
+function updateCSVImportProgress() {
+    const results = window.csvImportResults;
+    const progress = Math.round((results.current / results.total) * 100);
+    
+    const bulkProgressLabel = document.getElementById('bulkProgressLabel');
+    if (bulkProgressLabel) {
+        bulkProgressLabel.textContent = `Importing video ${results.current}/${results.total}... (${results.successful.length} successful, ${results.failed.length} failed)`;
+    }
+    
+    const bulkProgressBar = document.getElementById('bulkProgressBar');
+    if (bulkProgressBar) {
+        bulkProgressBar.style.width = `${progress}%`;
+    }
+    
+    const bulkProgressPercentage = document.getElementById('bulkProgressPercentage');
+    if (bulkProgressPercentage) {
+        bulkProgressPercentage.textContent = `${progress}%`;
+    }
+}
+
+/**
+ * Show CSV import completion
+ */
+function showCSVImportComplete() {
+    console.log('✅ CSV import complete');
+    console.log('   Successful:', window.csvImportResults.successful.length);
+    console.log('   Failed:', window.csvImportResults.failed.length);
+    
+    const bulkProgressLabel = document.getElementById('bulkProgressLabel');
+    if (bulkProgressLabel) {
+        bulkProgressLabel.textContent = `Import complete! ${window.csvImportResults.successful.length} successful, ${window.csvImportResults.failed.length} failed`;
+        bulkProgressLabel.style.color = window.csvImportResults.failed.length > 0 ? '#f59e0b' : '#10b981';
+    }
+    
+    // Show celebration dialog
+    showCSVCelebrationDialog();
+}
+
+/**
+ * Show CSV celebration dialog
+ */
+function showCSVCelebrationDialog() {
+    const results = window.csvImportResults;
+    
+    // Build message
+    let message = `Successfully imported ${results.successful.length} out of ${results.total} videos from CSV!`;
+    
+    if (results.failed.length > 0) {
+        message += `\n\n${results.failed.length} videos failed to import:`;
+        results.failed.forEach(item => {
+            message += `\n• ${item.title}: ${item.error}`;
+        });
+    }
+    
+    // Show using custom alert or celebration dialog
+    if (typeof showBulkCelebrationDialog === 'function' && results.failed.length === 0) {
+        // Use bulk celebration dialog for successful imports
+        showBulkCelebrationDialog();
+    } else {
+        // Show simple alert
+        alert(message);
+        
+        // Close uploader and refresh parent
+        setTimeout(() => {
+            closeUploaderAndRefreshParent();
+        }, 1000);
+    }
+}
+
+// ============================================
 // MOBILE RESPONSIVE HELPERS
 // ============================================
 
@@ -6260,9 +7509,16 @@ function generateAutoThumbnail() {
         return;
     }
     
-    if (!selectedFile.type.startsWith('video/')) {
+    if (selectedFile.type && !selectedFile.type.startsWith('video/')) {
         console.log('🖼️ Selected file is not a video:', selectedFile.type);
         console.log('🖼️ ========== AUTO THUMBNAIL ABORTED (not video) ==========');
+        return;
+    }
+    
+    // Skip auto-thumbnail for Google Drive and platform imports (they don't have local files)
+    if (currentSource === 'googledrive' || currentUploadType === 'import') {
+        console.log('🖼️ Skipping auto-thumbnail for', currentSource || 'platform import');
+        console.log('🖼️ ========== AUTO THUMBNAIL SKIPPED (external source) ==========');
         return;
     }
     
@@ -7024,9 +8280,9 @@ function showBulkCelebrationDialog() {
         `;
         
         const shortLink = video.short_link || video.shortlink || '';
-        const videoUrl = shortLink ? `https://iblog.bz/v/${shortLink}` : '';
+        const videoUrl = shortLink ? `${window.location.origin}/v/${shortLink}` : '';
         const title = video.title || video.fileName || `Video ${index + 1}`;
-        const thumbnail = video.thumbnail || 'https://ions.com/assets/default/processing.png';
+        const thumbnail = video.thumbnail || `${window.location.origin}/assets/default/processing.png`;
         
         videoRow.innerHTML = `
             <div style="flex-shrink: 0;">
@@ -7208,8 +8464,14 @@ function setupUploadInterfaceHandlers() {
         // Handle Google Drive separately (has special picker)
         if (platform === 'googledrive') {
             console.log('📁 Google Drive selected - showing picker');
+            
+            // Check if arrow was clicked (show dropdown instead)
+            const isArrowClick = e.target.id === 'googleDriveArrow' || 
+                               e.target.closest('#googleDriveArrow');
+            
             if (typeof showGoogleDrivePicker === 'function') {
-                showGoogleDrivePicker();
+                // Pass arrow click information
+                showGoogleDrivePicker(isArrowClick);
             } else {
                 console.error('❌ Google Drive picker function not found');
                 alert('Google Drive picker is not available. Please use the URL import option.');

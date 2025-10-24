@@ -5,16 +5,12 @@
  * Last updated: 2025-08-03
  * Enhanced: Video.js support for local videos, native players for streaming platforms, video tracking integration
  */
-
-$config = require __DIR__ . '/../config/config.php';      // Load configtracking
-include_once      __DIR__ . '/../menu/menu.php';          // Include menu
-include_once      __DIR__ . '/helper-functions.php';      // Include helper functions (polyfills, etc.)
-
-// require_once      __DIR__ . '/../tracking/tracking.php';  // Include video tracking system
+$config = require __DIR__ . '/../config/config.php'; // Load configtracking
+include_once __DIR__ . '/helper-functions.php'; // Include helper functions (polyfills, etc.)
+// require_once __DIR__ . '/../tracking/tracking.php'; // Include video tracking system
 // Include video tracking system (first try ../tracking/, then city/tracking/ as fallback)
 $__track_main = __DIR__ . '/../tracking/tracking.php';
-$__track_alt  = __DIR__ . '/tracking/tracking.php';
-
+$__track_alt = __DIR__ . '/tracking/tracking.php';
 if (file_exists($__track_main)) {
     require_once $__track_main;
 } elseif (file_exists($__track_alt)) {
@@ -29,7 +25,6 @@ if (file_exists($__track_main)) {
         }
     }
 }
-
 // PDO connection for database (replace $wpdb)
 try {
     $pdo = new PDO("mysql:host={$config['host']};dbname={$config['dbname']};charset={$config['charset']}", $config['username'], $config['password']);
@@ -40,7 +35,6 @@ try {
     echo "<p>Database connection failed. Check config.php for host, dbname, username, password.</p>";
     return;
 }
-
 // Initialize video tracker
 $redis = null;
 if (isset($config['redis_enabled']) && $config['redis_enabled']) {
@@ -55,23 +49,22 @@ if (isset($config['redis_enabled']) && $config['redis_enabled']) {
     }
 }
 $videoTracker = new VideoTracker($pdo, $redis);
-
 // Enhanced search handling function
 function handleSearchRequest($pdo, $city) {
     if (!isset($_GET['search']) || empty(trim($_GET['search']))) {
         return null;
     }
-    
+   
     $query = trim($_GET['search']);
-    
+   
     // Use the centralized search API with better error handling
     $search_api_url = "http://" . $_SERVER['HTTP_HOST'] . "/city/search.php?q=" . urlencode($query) . "&limit=30";
-    
+   
     // Add city context if available
     if ($city && !empty($city->city_name)) {
         $search_api_url .= "&city=" . urlencode($city->slug ?? $city->city_name);
     }
-    
+   
     // Enhanced error handling with timeout and context
     $context = stream_context_create([
         'http' => [
@@ -85,40 +78,40 @@ function handleSearchRequest($pdo, $city) {
             'allow_self_signed' => true
         ]
     ]);
-    
+   
     $search_response = @file_get_contents($search_api_url, false, $context);
-    
+   
     if (!$search_response) {
         error_log("Search API failed for query: $query, URL: $search_api_url");
         return ['error' => 'Search temporarily unavailable'];
     }
-    
+   
     $search_data = json_decode($search_response, true);
     if (!$search_data || isset($search_data['error'])) {
         error_log("Search API returned error: " . ($search_data['error'] ?? 'Invalid JSON response'));
         return ['error' => 'Search failed'];
     }
-    
+   
     // Enhanced local filtering with better matching
     $results = $search_data['results'] ?? [];
     if ($city && !empty($results)) {
         $local_results = [];
         $other_results = [];
-        
+       
         foreach ($results as $result) {
             $is_local = false;
-            
+           
             // Check multiple fields for local relevance
             $text_to_check = strtolower(
-                ($result['title'] ?? '') . ' ' . 
-                ($result['excerpt'] ?? '') . ' ' . 
+                ($result['title'] ?? '') . ' ' .
+                ($result['excerpt'] ?? '') . ' ' .
                 ($result['location'] ?? '') . ' ' .
                 ($result['description'] ?? '')
             );
-            
+           
             $city_name_lower = strtolower($city->city_name ?? '');
             $state_name_lower = strtolower($city->state_name ?? '');
-            
+           
             // Check for city name
             if ($city_name_lower && strpos($text_to_check, $city_name_lower) !== false) {
                 $is_local = true;
@@ -127,18 +120,18 @@ function handleSearchRequest($pdo, $city) {
             elseif ($state_name_lower && strpos($text_to_check, $state_name_lower) !== false) {
                 $is_local = true;
             }
-            
+           
             if ($is_local) {
                 $local_results[] = $result;
             } else {
                 $other_results[] = $result;
             }
         }
-        
+       
         // Combine with local results first, limit total to 30
         $results = array_merge($local_results, array_slice($other_results, 0, 30 - count($local_results)));
     }
-    
+   
     return [
         'query' => $query,
         'results' => $results,
@@ -146,43 +139,44 @@ function handleSearchRequest($pdo, $city) {
         'local_count' => isset($local_results) ? count($local_results) : 0
     ];
 }
-
-// Fetch $city from DB (using table 'IONLocalNetwork')
-$slug = trim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
-echo '<!-- Debug: Slug used for query: ' . htmlspecialchars($slug) . ' -->';
-try {
-    $stmt = $pdo->prepare("SELECT * FROM IONLocalNetwork WHERE slug = :slug LIMIT 1");
-    $stmt->execute([':slug' => $slug]);
-    $city = $stmt->fetch(PDO::FETCH_OBJ);
-    if (!$city) {
-        echo '<!-- Debug: No city found for slug in DB. Check if row exists with slug "' . htmlspecialchars($slug) . '". -->';
-        echo "<p>This ION Channel is not online yet.</p>";
+// Fetch $city: Prefer global from iondynamic.php, fallback to DB query using slug from URI
+if (isset($GLOBALS['ion_city_data'])) {
+    $city = $GLOBALS['ion_city_data'];
+    $slug = $city->slug;
+    echo '<!-- Debug: Using global city data: ' . htmlspecialchars($city->city_name) . ', slug: ' . htmlspecialchars($slug) . ' -->';
+} else {
+    $slug = trim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
+    echo '<!-- Debug: Slug used for query: ' . htmlspecialchars($slug) . ' -->';
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM IONLocalNetwork WHERE slug = :slug LIMIT 1");
+        $stmt->execute([':slug' => $slug]);
+        $city = $stmt->fetch(PDO::FETCH_OBJ);
+        if (!$city) {
+            echo '<!-- Debug: No city found for slug in DB. Check if row exists with slug "' . htmlspecialchars($slug) . '". -->';
+            echo "<p>This ION Channel is not online yet.</p>";
+            return;
+        }
+        echo '<!-- Debug: City fetched successfully: ' . htmlspecialchars($city->city_name) . ' -->';
+    } catch (PDOException $e) {
+        echo '<!-- Debug: City query failed: ' . htmlspecialchars($e->getMessage()) . ' -->';
+        echo "<p>Failed to fetch city data. Check table 'IONLocalNetwork' and columns (e.g., slug, city_name).</p>";
         return;
     }
-    echo '<!-- Debug: City fetched successfully: ' . htmlspecialchars($city->city_name) . ' -->';
-} catch (PDOException $e) {
-    echo '<!-- Debug: City query failed: ' . htmlspecialchars($e->getMessage()) . ' -->';
-    echo "<p>Failed to fetch city data. Check table 'IONLocalNetwork' and columns (e.g., slug, city_name).</p>";
-    return;
 }
-
 // Add JavaScript context for search functionality integration
 echo '<script>';
 echo 'window.currentCitySlug = ' . json_encode($slug) . ';';
 echo 'window.currentCityName = ' . json_encode($city->city_name) . ';';
 echo '</script>';
-
 // Handle search request
 $search_results = handleSearchRequest($pdo, $city);
-
 // Include the CSS file content
 $css_file = __DIR__ . '/ioncity.css';
 $css_content = file_exists($css_file) ? file_get_contents($css_file) : '';
-
 // Enhanced SEO function with search result optimization and tracking
 function ion_custom_seo_output() {
     global $city, $search_results, $videoTracker, $slug;
-    
+   
     // Modify title if search results exist
     if ($search_results && !isset($search_results['error'])) {
         $seo_title = "Search Results for \"{$search_results['query']}\" - ION " . $city->city_name;
@@ -193,10 +187,10 @@ function ion_custom_seo_output() {
     } else {
         $seo_title = esc_html($city->seo_title ?: "{$city->channel_name} - Local Channel for {$city->city_name}, {$city->state_name}");
     }
-    
+   
     $seo_description = esc_html($city->seo_description ?: "Explore videos, events, and updates from {$city->city_name}, {$city->state_name}, {$city->country_name}. Powered by ION.");
     $seo_keywords = esc_html($city->seo_keywords ?: "{$city->city_name}, {$city->state_name}, {$city->country_name}, local events, community news");
-    
+   
     echo "<title>$seo_title</title>\n";
     echo "<meta name='description' content='$seo_description' />\n";
     echo "<meta name='keywords' content='$seo_keywords' />\n";
@@ -223,21 +217,21 @@ function ion_custom_seo_output() {
     echo "<link rel='icon' type='image/png' sizes='192x192' href='https://iblog.bz/assets/icons/android-icon-192x192.png'>\n";
     echo "<link rel='icon' type='image/png' sizes='32x32' href='https://iblog.bz/assets/icons/favicon-32x32.png'>\n";
     echo "<link rel='icon' type='image/png' sizes='96x96' href='https://iblog.bz/assets/icons/favicon-96x96.png'>\n";
-    echo "<link rel='icon' type='image/png' sizes='16x16' href='https://iblog.bz/assets/icons/favicon-16x16.png'>\n";  
+    echo "<link rel='icon' type='image/png' sizes='16x16' href='https://iblog.bz/assets/icons/favicon-16x16.png'>\n";
     echo "<link rel='icon' type='image/x-icon' href='https://iblog.bz/assets/icons/favicon.ico'>\n";
     echo "<link rel='manifest' href='https://iblog.bz/assets/icons/manifest.json'>\n";
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
     echo "<link rel='canonical' href='" . htmlspecialchars($city->page_URL ?: get_permalink(), ENT_QUOTES, 'UTF-8') . "' />\n";
     echo '<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">';
-    
+   
     // Add Video.js CDN links
     echo '<link href="https://vjs.zencdn.net/8.6.1/video-js.css" rel="stylesheet">';
     echo '<script src="https://vjs.zencdn.net/8.6.1/video.min.js"></script>';
-    
+   
     // Output video tracking script with corrected endpoint
     echo str_replace('/api/video-track.php', '/tracking/tracking-api.php', $videoTracker->getTrackingScript($slug, $city->city_name));
-    
+   
     // Google Analytics tracking code
     echo '<!-- Google tag (gtag.js) -->';
     echo '<script async src="https://www.googletagmanager.com/gtag/js?id=G-PXVLDZ9E7H"></script>';
@@ -247,46 +241,44 @@ function ion_custom_seo_output() {
     echo "gtag('js', new Date());";
     echo "gtag('config', 'G-PXVLDZ9E7H');";
     echo '</script>';
-    
+   
     echo "<script type='application/ld+json'>" . json_encode([
         "@context" => "https://schema.org",
         "@type" => "BreadcrumbList",
         "itemListElement" => [
             [
-                "@type"    => "ListItem",
+                "@type" => "ListItem",
                 "position" => 1,
-                "name"     => "Home",
-                "item"     => home_url()
+                "name" => "Home",
+                "item" => home_url()
             ],
             [
-                "@type"    => "ListItem",
+                "@type" => "ListItem",
                 "position" => 2,
-                "name"     => $city->city_name,
-                "item"     => get_permalink()
+                "name" => $city->city_name,
+                "item" => get_permalink()
             ]
         ]
     ]) . "</script>\n";
-
     echo "<script type='application/ld+json'>" . json_encode([
-        "@context"            => "https://schema.org",
-        "@type"               => "Place",
-        "name"                => $city->channel_name ?: $city->city_name,
-        "address"             => [
-            "@type"           => "PostalAddress",
+        "@context" => "https://schema.org",
+        "@type" => "Place",
+        "name" => $city->channel_name ?: $city->city_name,
+        "address" => [
+            "@type" => "PostalAddress",
             "addressLocality" => $city->city_name,
-            "addressRegion"   => $city->state_name,
-            "addressCountry"  => $city->country_name
+            "addressRegion" => $city->state_name,
+            "addressCountry" => $city->country_name
         ],
         "description" => $city->seo_description,
         "url" => get_permalink()
     ]) . "</script>\n";
 }
-
 // Enhanced function to detect video type
 function getVideoType($url) {
     $ext = strtolower(pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
     $local_video_extensions = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'm4v', 'mkv'];
-    
+   
     if (in_array($ext, $local_video_extensions)) {
         return ['type' => 'local', 'format' => $ext];
     } elseif (strpos($url, 'youtube.com') !== false || strpos($url, 'youtu.be') !== false) {
@@ -303,24 +295,20 @@ function getVideoType($url) {
             return ['type' => 'local', 'format' => $ext];
         }
     }
-    
+   
     return ['type' => 'unknown'];
 }
-
 // Basic HTML document structure
 echo '<!DOCTYPE html>';
 echo '<html lang="en">';
 echo '<head>';
 echo '<meta charset="UTF-8">';
 echo '<meta name="viewport" content="width=device-width, initial-scale=1.0">';
-
 // Call SEO function
 ion_custom_seo_output();
-
 // Output CSS styles
 echo '<style>';
 echo $css_content;
-
 // Additional Video.js customization styles
 echo "
 /* Video.js customizations for ION */
@@ -328,7 +316,6 @@ echo "
     width: 100%;
     height: 100%;
 }
-
 .vjs-big-play-button {
     font-size: 3em;
     line-height: 1.5em;
@@ -347,11 +334,9 @@ echo "
     border-radius: 0.3em;
     transition: all 0.4s;
 }
-
 .vjs-big-play-button:hover {
     background-color: rgba(43, 51, 63, 0.9);
 }
-
 .video-js .vjs-control-bar {
     display: flex;
     width: 100%;
@@ -362,11 +347,9 @@ echo "
     height: 3em;
     background-color: rgba(43, 51, 63, 0.7);
 }
-
 .video-js:hover .vjs-control-bar {
     background-color: rgba(43, 51, 63, 0.9);
 }
-
 /* Preview video container */
 .preview-video-container {
     position: absolute;
@@ -376,23 +359,19 @@ echo "
     height: 100%;
     display: none;
 }
-
 .carousel-item:hover .preview-video-container {
     display: block;
 }
-
 .carousel-item:hover .video-thumbnail,
 .carousel-item:hover .play-icon-overlay {
     display: none;
 }
-
 /* Modal video container */
 .video-modal-content .video-js {
     width: 100%;
     height: 100%;
     border-radius: 16px;
 }
-
 /* Responsive video sizing */
 @media (max-width: 768px) {
     .video-modal-content .video-js {
@@ -400,24 +379,29 @@ echo "
     }
 }
 ";
-
 // Hero section styles remain the same
 echo "
+/* Ensure navbar stays above hero slider */
+#ion-navbar-root,
+#ion-navbar-root *,
+nav,
+header nav {
+    z-index: 9999 !important;
+}
 /* Hero section without search */
 .ion-hero {
-    display    : flex;
-    position   : relative;
-    overflow   : hidden;
-    height     : 42vh;
+    display : flex;
+    position : relative;
+    overflow : hidden;
+    height : 42vh;
     min-height : 400px;
-    width      : 100%;
+    width : 100%;
     background-color: #1a1a1a; /* Fallback */
     margin: 0;
     color: white;
-    z-index: 999;
+    z-index: 1;
     box-sizing: border-box;
 }
-
 .slider {
     position: absolute;
     top: 0;
@@ -426,7 +410,6 @@ echo "
     height: 100%;
     margin: 0;
 }
-
 .slide {
     position: absolute;
     top: 0;
@@ -436,17 +419,14 @@ echo "
     opacity: 0;
     transition: opacity 1s ease-in-out;
 }
-
 .slide.active {
     opacity: 1;
 }
-
 .slide img, .slide video, .slide iframe {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
-
 .slide-text {
     position: absolute;
     bottom: 50%;
@@ -459,7 +439,6 @@ echo "
     padding: 2rem;
     border-radius: 0.5rem;
 }
-
 .slide-text h1 {
     font-size: 4.5rem;
     font-weight: 800;
@@ -467,12 +446,10 @@ echo "
     letter-spacing: 2px;
     margin-bottom: 1rem;
 }
-
 .slide-text p {
     font-size: 1.1rem;
     margin-bottom: 1.5rem;
 }
-
 .slide-text .btn {
     padding: 0.75rem 1.5rem;
     background-color: #b28254;
@@ -483,11 +460,9 @@ echo "
     display: inline-block;
     transition: background-color 0.3s ease;
 }
-
 .slide-text .btn:hover {
     background-color: var(--accent-green);
 }
-
 .slider-controls {
     position: absolute;
     top: 50%;
@@ -500,7 +475,6 @@ echo "
     box-sizing: border-box;
     z-index: 11;
 }
-
 .slider-controls button {
     background: rgba(0,0,0,0.5);
     border: 2px solid rgba(255,255,255,0.3);
@@ -513,14 +487,12 @@ echo "
     transition: all 0.3s ease;
     backdrop-filter: blur(5px);
 }
-
 .slider-controls button:hover {
     opacity: 1;
     background: rgba(0,0,0,0.7);
     border-color: rgba(255,255,255,0.6);
     transform: scale(1.1);
 }
-
 /* Static hero fallback styles (when no slider media available) */
 .ion-hero.static {
     background-image: url('" . esc_url($city->image_path ?? '') . "');
@@ -534,7 +506,6 @@ echo "
     text-align: center;
     padding: 2rem;
 }
-
 .ion-hero.static::before {
     content: '';
     position: absolute;
@@ -545,72 +516,131 @@ echo "
     background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55));
     z-index: 0;
 }
-
 .ion-hero.static > * {
     position: relative;
     z-index: 1;
 }
-
 /* Responsive adjustments */
 @media screen and (max-width: 768px) {
     .ion-hero {
         height: 50vh;
     }
-    
+   
     .slide-text {
         padding: 1.5rem;
         bottom: 40%;
     }
-    
+   
     .slide-text h1 {
         font-size: 3rem;
     }
-    
+   
     .slider-controls button {
         font-size: 24px;
         padding: 8px 12px;
     }
 }
-
 @media screen and (max-width: 480px) {
     .ion-hero {
         height: 60vh;
     }
-    
+   
     .slide-text {
         padding: 1rem;
         bottom: 35%;
     }
-    
+   
     .slide-text h1 {
         font-size: 2.5rem;
     }
-    
+   
     .slide-text p {
         font-size: 1rem;
     }
 }
 ";
-
 echo '</style>';
 echo '</head>';
 echo '<body>';
-
+?>
+<!-- ION Navbar (React component loaded via JavaScript) -->
+<link rel="preload" as="style" href="/menu/ion-navbar.css">
+<div id="ion-navbar-root"></div>
+<!-- ION Navbar Embed: script setup -->
+<script>
+    // Minimal globals expected by some libraries
+    window.process = window.process || {
+        env: {
+            NODE_ENV: 'production'
+        }
+    };
+    window.global = window.global || window;
+</script>
+<script src="/menu/ion-navbar.iife.js"></script>
+<script>
+    (function() {
+        if (window.IONNavbar && typeof window.IONNavbar.mount === 'function') {
+            window.IONNavbar.mount('#ion-navbar-root', {
+                useShadowDom: true,
+                cssHref: '/menu/ion-navbar.css'
+            });
+        }
+       
+        // Remove white border line from navbar
+        setTimeout(() => {
+            const navbar = document.getElementById('ion-navbar-root');
+            if (navbar) {
+                try {
+                    if (navbar.shadowRoot) {
+                        const style = document.createElement('style');
+                        style.textContent = `
+                            * { border-top: none !important; border-bottom: none !important; }
+                            nav {
+                                border-top: none !important;
+                                border-bottom: none !important;
+                                z-index: 9999 !important;
+                                position: relative !important;
+                            }
+                            header {
+                                border-top: none !important;
+                                border-bottom: none !important;
+                                z-index: 9999 !important;
+                            }
+                            /* Dropdown menus */
+                            [role="menu"],
+                            .dropdown,
+                            .dropdown-menu,
+                            ul[role="menu"] {
+                                z-index: 10000 !important;
+                                position: relative !important;
+                            }
+                        `;
+                        navbar.shadowRoot.appendChild(style);
+                    }
+                    navbar.style.borderTop = 'none';
+                    navbar.style.borderBottom = 'none';
+                    navbar.style.zIndex = '9999';
+                    navbar.style.position = 'relative';
+                } catch (e) {
+                    console.log('Could not remove navbar border:', e);
+                }
+            }
+        }, 1000);
+    })();
+</script>
+<?php
 // Get image_path from city data and process into media array
 $media_string = $city->image_path ?? '';
 $media_string = trim($media_string, "'\"");
 $media = array_filter(array_map('trim', preg_split('/[ ,\n\r;|]+/', $media_string)));
-
 // Debug for slider
 echo '<!-- Debug: Raw media string from DB: ' . htmlspecialchars($media_string) . ' -->';
 echo '<!-- Debug: Parsed media array count: ' . count($media) . ' -->';
 echo '<!-- Debug: Parsed media array: ' . htmlspecialchars(implode(', ', $media)) . ' -->';
-
 // If no media from database, fall back to static image
 $has_slider_media = !empty($media);
 echo '<!-- Debug: Has slider media: ' . ($has_slider_media ? 'Yes' : 'No') . ' -->';
 ?>
-
 <section class="ion-hero<?= !$has_slider_media ? ' static' : '' ?>">
     <?php if ($has_slider_media): ?>
         <div class="slider">
@@ -620,7 +650,7 @@ echo '<!-- Debug: Has slider media: ' . ($has_slider_media ? 'Yes' : 'No') . ' -
                 $video_info = getVideoType($url);
                 $type = $video_info['type'];
                 $video_id = '';
-                
+               
                 if ($type === 'local') {
                     // Local video file
                     $ext = $video_info['format'];
@@ -640,7 +670,7 @@ echo '<!-- Debug: Has slider media: ' . ($has_slider_media ? 'Yes' : 'No') . ' -
                     // Treat as image
                     $type = 'image';
                 }
-                
+               
                 echo '<!-- Debug: Media item #' . ($index + 1) . ' URL: ' . esc_url($url) . ', Type: ' . $type . ', ID: ' . $video_id . ' -->';
                 ?>
                 <div class="slide <?php if ($index === 0) echo 'active'; ?>">
@@ -655,7 +685,7 @@ echo '<!-- Debug: Has slider media: ' . ($has_slider_media ? 'Yes' : 'No') . ' -
                     <?php elseif ($type === 'vimeo' && $video_id): ?>
                         <iframe src="https://player.vimeo.com/video/<?php echo esc_attr($video_id); ?>?autoplay=1&loop=1&muted=1&background=1&controls=0" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
                     <?php endif; ?>
-                    
+                   
                     <?php // Add text overlay only to the first slide ?>
                     <?php if ($index === 0): ?>
                         <div class="slide-text">
@@ -666,7 +696,6 @@ echo '<!-- Debug: Has slider media: ' . ($has_slider_media ? 'Yes' : 'No') . ' -
                 </div>
             <?php endforeach; ?>
         </div>
-
         <!-- Navigation arrows (only show if multiple slides) -->
         <?php if (count($media) > 1): ?>
             <div class="slider-controls">
@@ -674,18 +703,29 @@ echo '<!-- Debug: Has slider media: ' . ($has_slider_media ? 'Yes' : 'No') . ' -
                 <button class="next" aria-label="Next slide">&gt;</button>
             </div>
         <?php endif; ?>
-        
+       
     <?php else: ?>
         <!-- Static fallback hero content WITHOUT search -->
         <h1>Welcome to <?= esc_html($city->channel_name ?: $city->title) ?></h1>
         <p><?= esc_html($city->description) ?></p>
-        
+       
         <?php if (!empty($city->custom_domain) && $city->status == "Live") : ?>
             <a href="<?= esc_url($city->custom_domain) ?>" class="btn" target="_blank" style="margin-top: 1rem;">Visit this channel →</a>
         <?php endif; ?>
     <?php endif; ?>
 </section>
-
+<?php
+// Include and render ION Featured Videos carousel (only if not searching)
+if (!$search_results) {
+    $carousel_path = __DIR__ . '/../includes/featured-videos.php';
+    if (file_exists($carousel_path)) {
+        require_once $carousel_path;
+        renderFeaturedVideosCarousel($pdo, 'channel', $slug);
+    } else {
+        error_log('ION Featured Videos: Component file not found at ' . $carousel_path);
+    }
+}
+?>
 <?php
 // Search results display section
 if ($search_results): ?>
@@ -719,7 +759,7 @@ if ($search_results): ?>
                     </a>
                 </div>
             </div>
-            
+           
             <?php if (empty($search_results['results'])): ?>
                 <div style="text-align: center; padding: 3rem 2rem; color: #a4b3d0;">
                     <svg style="width: 4rem; height: 4rem; margin-bottom: 1rem; opacity: 0.6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -727,15 +767,15 @@ if ($search_results): ?>
                     </svg>
                     <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem;">No results found</h3>
                     <p style="font-size: 1.1rem;">Try different keywords or browse our content below</p>
-                    
+                   
                     <!-- Enhanced search suggestions -->
                     <div style="margin-top: 2rem; padding: 1.5rem; background: #2d3748; border-radius: 0.5rem; border: 1px solid #4a5568;">
                         <h4 style="color: #fff; margin-bottom: 1rem;">Try searching for:</h4>
                         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
-                            <?php 
+                            <?php
                             $suggestions = ['events', 'news', 'sports', 'entertainment', 'business', 'community'];
                             foreach ($suggestions as $suggestion): ?>
-                                <a href="?search=<?= urlencode($suggestion) ?>" 
+                                <a href="?search=<?= urlencode($suggestion) ?>"
                                    style="padding: 0.5rem 1rem; background: #4a5568; color: #e2e8f0; border-radius: 0.25rem; text-decoration: none; font-size: 0.9rem; transition: all 0.3s ease;">
                                     <?= htmlspecialchars($suggestion) ?>
                                 </a>
@@ -745,41 +785,41 @@ if ($search_results): ?>
                 </div>
             <?php else: ?>
                 <div class="carousel-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; overflow-x: visible;">
-                    <?php 
+                    <?php
                     // Limit to first 12 results for cleaner display
                     $display_results = array_slice($search_results['results'], 0, 12);
-                    foreach ($display_results as $result): 
+                    foreach ($display_results as $result):
                         $thumbnail = $result['thumbnail'] ?? 'https://iblog.bz/assets/ionthumbnail.png';
                         $title = $result['title'] ?? 'Untitled';
                         $source = $result['source'] ?? $result['type'] ?? 'content';
                         $link = $result['link'] ?? '#';
                         $is_local = false;
-                        
+                       
                         // Check if this is a local result
-                        if (isset($result['location']) || 
+                        if (isset($result['location']) ||
                             (isset($result['title']) && stripos($result['title'], $city->city_name) !== false) ||
                             (isset($result['excerpt']) && stripos($result['excerpt'], $city->city_name) !== false)) {
                             $is_local = true;
                         }
-                        
+                       
                         // Determine video info for modal
                         $video_info = getVideoType($link);
                         $video_type = $video_info['type'];
                         $video_id = '';
-                        
+                       
                         if ($video_type === 'youtube' && strpos($link, 'youtube.com') !== false) {
                             preg_match('/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $link, $matches);
                             $video_id = $matches[1] ?? '';
                         }
                     ?>
                         <div class="carousel-item <?= $is_local ? 'local-result' : '' ?>">
-                            <a href="<?= $link !== '#' ? htmlspecialchars($link) : '#' ?>" 
+                            <a href="<?= $link !== '#' ? htmlspecialchars($link) : '#' ?>"
                                <?= $result['type'] === 'video' && $video_type !== 'unknown' ? 'rel="noopener" class="video-thumb" data-video-type="' . htmlspecialchars($video_type) . '" data-video-id="' . htmlspecialchars($video_id) . '" data-video-url="' . htmlspecialchars($link) . '" data-video-title="' . htmlspecialchars($title) . '"' : 'target="_blank" rel="noopener"' ?>>
-                                <img class="video-thumbnail" 
-                                     src="<?= htmlspecialchars($thumbnail) ?>" 
-                                     alt="<?= htmlspecialchars($title) ?>" 
+                                <img class="video-thumbnail"
+                                     src="<?= htmlspecialchars($thumbnail) ?>"
+                                     alt="<?= htmlspecialchars($title) ?>"
                                      onerror="this.onerror=null; this.src='https://iblog.bz/assets/ionthumbnail.png';">
-                                
+                               
                                 <?php if ($result['type'] === 'video'): ?>
                                     <div class="play-icon-overlay">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)">
@@ -787,11 +827,11 @@ if ($search_results): ?>
                                         </svg>
                                     </div>
                                 <?php endif; ?>
-                                
+                               
                                 <div style="position: absolute; top: 0.5rem; right: 0.5rem; background: rgba(31,41,55,0.9); color: <?= $is_local ? '#22c55e' : '#b28254' ?>; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;">
                                     <?= $is_local ? 'LOCAL' : htmlspecialchars($source) ?>
                                 </div>
-                                
+                               
                                 <?php if ($is_local): ?>
                                     <div style="position: absolute; top: 0.5rem; left: 0.5rem; background: rgba(34,197,94,0.9); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600;">
                                         📍 <?= htmlspecialchars($city->city_name) ?>
@@ -809,13 +849,13 @@ if ($search_results): ?>
                         </div>
                     <?php endforeach; ?>
                 </div>
-                
+               
                 <?php if ($search_results['total'] > 12): ?>
                     <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #4a5568;">
                         <p style="color: #a4b3d0; margin-bottom: 1rem;">
                             Showing 12 of <?= $search_results['total'] ?> results
                         </p>
-                        <a href="/search-results.php?q=<?= urlencode($search_results['query']) ?>&city=<?= urlencode($city->slug) ?>" 
+                        <a href="/search-results.php?q=<?= urlencode($search_results['query']) ?>&city=<?= urlencode($city->slug) ?>"
                            style="display: inline-block; padding: 0.75rem 1.5rem; background: #b28254; color: #161821; border-radius: 0.375rem; text-decoration: none; font-weight: 600; transition: all 0.3s ease;">
                             View All Results
                         </a>
@@ -824,31 +864,28 @@ if ($search_results): ?>
             <?php endif; ?>
         </section>
     <?php endif; ?>
-    
+   
     <!-- Enhanced styling for local results -->
     <style>
     .carousel-item.local-result {
         border: 2px solid #22c55e;
         box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
     }
-    
+   
     .carousel-item.local-result:hover {
         transform: translateY(-3px);
         box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
     }
     </style>
-    
-<?php 
+   
+<?php
 // End search results section
 endif;
-
 // Only show regular content categories if we're not displaying search results
 if (!$search_results || isset($search_results['error'])):
-
 // Helper function to get the least used API key and increment its usage
 function get_api_key($query = '') {
     global $youtube_api_keys;
-
     // Collect usage for all keys
     $usages = [];
     $dateToday = date('Y-m-d');
@@ -856,42 +893,34 @@ function get_api_key($query = '') {
         $transientKey = 'yt_usage_' . md5($key) . '_' . $dateToday;
         $usages[$idx] = get_transient($transientKey) ?: 0;
     }
-
     // Sort by usage ascending to pick the least used key
     asort($usages);
     $keyIndexes = array_keys($usages);
     $keyIndex = $keyIndexes[0];
     $apiKey = $youtube_api_keys[$keyIndex];
-
     // Increment usage
     $usageTransientKey = 'yt_usage_' . md5($apiKey) . '_' . $dateToday;
     $usageCount = $usages[$keyIndex] + 1;
     set_transient($usageTransientKey, $usageCount, DAY_IN_SECONDS * 2);
-
     // Log the usage with URL
     $currentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
     $logMessage = "Used YouTube API key $apiKey (usage: $usageCount/15 today) for query: '$query' on URL: $currentUrl";
     error_log($logMessage);
-
     return $apiKey;
 }
-
 // Helper function for YouTube API requests with quota retry logic
 function youtube_api_request($base_url, $params, $context) {
     global $youtube_api_keys;
-
     $tries = 0;
     while ($tries < count($youtube_api_keys)) {
         $apiKey = get_api_key($context);
         $full_params = $params;
         $full_params['key'] = $apiKey;
         $url = $base_url . '?' . http_build_query($full_params);
-
         $response = wp_remote_get($url);
         if (is_wp_error($response)) {
             return $response;
         }
-
         $code = wp_remote_retrieve_response_code($response);
         if ($code != 200) {
             $body = wp_remote_retrieve_body($response);
@@ -906,14 +935,11 @@ function youtube_api_request($base_url, $params, $context) {
             }
             return new WP_Error('api_error', 'YouTube API error', $body);
         }
-
         return $response;
     }
-
     error_log("All YouTube API keys exhausted for context: $context");
     return new WP_Error('quota_exhausted', 'All API keys exhausted');
 }
-
 function fetch_youtube_videos($query, $maxResults = 6) {
     $base_url = 'https://www.googleapis.com/youtube/v3/search';
     $params = [
@@ -927,15 +953,12 @@ function fetch_youtube_videos($query, $maxResults = 6) {
     if (is_wp_error($response)) {
         return [];
     }
-
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
-
     if (empty($data['items'])) {
         error_log("No videos found for query: $query");
         return [];
     }
-
     $videos = [];
     $videoIds = [];
     foreach ($data['items'] as $item) {
@@ -952,7 +975,6 @@ function fetch_youtube_videos($query, $maxResults = 6) {
             'description' => $item['snippet']['description'],
         ];
     }
-
     // Fetch additional details using videos.list
     if ($videoIds) {
         $base_url = 'https://www.googleapis.com/youtube/v3/videos';
@@ -964,7 +986,6 @@ function fetch_youtube_videos($query, $maxResults = 6) {
         if (is_wp_error($response)) {
             return array_values($videos); // Return partial data if details fail
         }
-
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         if (isset($data['items'])) {
@@ -985,7 +1006,6 @@ function fetch_youtube_videos($query, $maxResults = 6) {
                     $categoryIds[] = $videos[$videoId]['categoryId'];
                 }
             }
-
             // Fetch category titles
             $categoryIds = array_unique($categoryIds);
             if ($categoryIds) {
@@ -1012,13 +1032,10 @@ function fetch_youtube_videos($query, $maxResults = 6) {
             }
         }
     }
-
     return array_values($videos);
 }
-
 function fetch_transcript($videoId) {
     $transcript = '';
-
     // List captions
     $base_url = 'https://www.googleapis.com/youtube/v3/captions';
     $params = [
@@ -1029,7 +1046,6 @@ function fetch_transcript($videoId) {
     if (is_wp_error($response)) {
         return $transcript;
     }
-
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
     if (isset($data['items']) && !empty($data['items'])) {
@@ -1044,7 +1060,6 @@ function fetch_transcript($videoId) {
         if (!$captionId) {
             $captionId = $data['items'][0]['id']; // Fallback to first
         }
-
         // Download caption as SRT
         $base_url = 'https://www.googleapis.com/youtube/v3/captions/' . $captionId;
         $params = ['tfmt' => 'srt'];
@@ -1052,14 +1067,11 @@ function fetch_transcript($videoId) {
         if (is_wp_error($response)) {
             return $transcript;
         }
-
         $srt = wp_remote_retrieve_body($response);
         $transcript = parse_srt_to_text($srt);
     }
-
     return $transcript;
 }
-
 function parse_srt_to_text($srt) {
     $text = '';
     $blocks = explode("\n\n", trim($srt));
@@ -1073,7 +1085,6 @@ function parse_srt_to_text($srt) {
     }
     return trim($text);
 }
-
 // Enhanced get_video_info function
 function get_video_info($video) {
     $info = [
@@ -1082,12 +1093,11 @@ function get_video_info($video) {
         'url' => $video['video_link'] ?? 'https://www.youtube.com/watch?v=' . ($video['videoId'] ?? ''),
         'thumbnail' => $video['thumbnail'] ?? '',
     ];
-
     if (!empty($video['video_link'])) {
         $url = $video['video_link'];
         $video_type_info = getVideoType($url);
         $info['type'] = $video_type_info['type'];
-        
+       
         // Check if it's a self-hosted video by URL pattern
         if ($info['type'] === 'unknown' && (strpos($url, '/uploads/') !== false || strpos($url, 'ions.com') !== false)) {
             $ext = strtolower(pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
@@ -1098,7 +1108,7 @@ function get_video_info($video) {
                 $info['id'] = md5($url);
             }
         }
-        
+       
         if ($info['type'] === 'local') {
             $info['format'] = $video_type_info['format'] ?? pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
             $info['id'] = md5($url); // Create unique ID for local videos
@@ -1119,23 +1129,22 @@ function get_video_info($video) {
             $info['id'] = $path_parts[1] ?? end($path_parts);
         }
     }
-
     if (empty($info['thumbnail'])) {
         $info['thumbnail'] = home_url('/assets/ionthumbnail.png');
     }
-
     return $info;
 }
-
 function get_stored_videos($slug, $category, $maxResults) {
     global $pdo;
-    
-    // First, try the new multi-channel approach
+   
+    // FIXED: Use UNION to get videos from BOTH IONLocalBlast (distributed channels)
+    // AND IONLocalVideos.slug (primary channel). This ensures all videos appear
+    // in the carousel regardless of whether they're primary or distributed.
     $stmt = $pdo->prepare("
-        SELECT 
-            v.video_id AS videoId, 
-            v.title, 
-            v.thumbnail, 
+        SELECT
+            v.video_id AS videoId,
+            v.title,
+            v.thumbnail,
             v.video_link,
             v.published_at,
             v.channel_title,
@@ -1147,70 +1156,65 @@ function get_stored_videos($slug, $category, $maxResults) {
             vc.status as channel_status,
             vc.priority
         FROM IONLocalVideos v
-        INNER JOIN IONLocalBlast vc ON v.video_id = vc.video_id
-        WHERE vc.channel_slug = :slug 
+        INNER JOIN IONLocalBlast vc ON v.id = vc.video_id
+        WHERE vc.channel_slug = :slug
         AND vc.category = :category
         AND vc.status = 'active'
         AND (vc.published_at IS NULL OR vc.published_at <= NOW())
         AND (vc.expires_at IS NULL OR vc.expires_at > NOW())
         AND v.status = 'Approved'
         AND v.visibility = 'Public'
-        ORDER BY vc.priority DESC, vc.published_at DESC, v.published_at DESC
+       
+        UNION
+       
+        SELECT
+            video_id AS videoId,
+            title,
+            thumbnail,
+            video_link,
+            published_at,
+            channel_title,
+            description,
+            tags,
+            view_count,
+            NULL as channel_published_at,
+            NULL as channel_expires_at,
+            'active' as channel_status,
+            0 as priority
+        FROM IONLocalVideos
+        WHERE slug = :slug2
+        AND category = :category2
+        AND status = 'Approved'
+        AND visibility = 'Public'
+       
+        ORDER BY priority DESC, channel_published_at DESC, published_at DESC
         LIMIT :maxResults
     ");
-    
+   
     $stmt->bindParam(':slug', $slug, PDO::PARAM_STR);
     $stmt->bindParam(':category', $category, PDO::PARAM_STR);
+    $stmt->bindParam(':slug2', $slug, PDO::PARAM_STR);
+    $stmt->bindParam(':category2', $category, PDO::PARAM_STR);
     $stmt->bindParam(':maxResults', $maxResults, PDO::PARAM_INT);
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_OBJ);
-    
-    // If no results from multi-channel, fall back to original method for backward compatibility
-    if (empty($results)) {
-        $stmt = $pdo->prepare("
-            SELECT 
-                video_id AS videoId, 
-                title, 
-                thumbnail, 
-                video_link,
-                published_at,
-                channel_title,
-                description,
-                tags,
-                view_count
-            FROM IONLocalVideos 
-            WHERE slug = :slug 
-            AND category = :category
-            AND status = 'Approved'
-            AND visibility = 'Public'
-            ORDER BY published_at DESC 
-            LIMIT :maxResults
-        ");
-        
-        $stmt->bindParam(':slug', $slug, PDO::PARAM_STR);
-        $stmt->bindParam(':category', $category, PDO::PARAM_STR);
-        $stmt->bindParam(':maxResults', $maxResults, PDO::PARAM_INT);
-        $stmt->execute();
-        $results = $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-    
+   
     return $results ?: [];
 }
-
 function store_video($slug, $category, $video) {
     global $pdo;
-    
+   
     try {
         $pdo->beginTransaction();
-        
+       
         $published_at = date('Y-m-d H:i:s', strtotime($video['publishedAt']));
-        
+       
         // First, insert/update the video in IONLocalVideos
         $stmt = $pdo->prepare("
             INSERT INTO IONLocalVideos (
-                video_id, title, thumbnail, video_link, published_at, 
-                channel_id, channel_title, description, tags, category_id, 
-                category_title, view_count, transcript, status, visibility, 
+                video_id, title, thumbnail, video_link, published_at,
+                channel_id, channel_title, description, tags, category_id,
+                category_title, view_count, transcript, status, visibility,
                 source, videotype, format, age, geo, upload_status
             ) VALUES (
                 :video_id, :title, :thumbnail, :video_link, :published_at,
@@ -1231,7 +1235,7 @@ function store_video($slug, $category, $video) {
                 view_count = VALUES(view_count),
                 transcript = VALUES(transcript)
         ");
-        
+       
         $stmt->execute([
             ':video_id' => $video['videoId'],
             ':title' => $video['title'],
@@ -1247,11 +1251,11 @@ function store_video($slug, $category, $video) {
             ':view_count' => $video['viewCount'] ?? 0,
             ':transcript' => $video['transcript'] ?? '',
         ]);
-        
+       
         // Then, insert/update the channel assignment in IONLocalBlast
         $stmt = $pdo->prepare("
             INSERT INTO IONLocalBlast (
-                video_id, channel_slug, category, published_at, 
+                video_id, channel_slug, category, published_at,
                 status, priority, added_at
             ) VALUES (
                 :video_id, :channel_slug, :category, :published_at,
@@ -1261,97 +1265,48 @@ function store_video($slug, $category, $video) {
                 status = 'active',
                 priority = GREATEST(priority, VALUES(priority))
         ");
-        
+       
         $stmt->execute([
             ':video_id' => $video['videoId'],
             ':channel_slug' => $slug,
             ':category' => $category,
             ':published_at' => $published_at,
         ]);
-        
+       
         $pdo->commit();
-        
+       
     } catch (Exception $e) {
         $pdo->rollBack();
         error_log("Error storing video {$video['videoId']} for channel {$slug}: " . $e->getMessage());
         throw $e;
     }
 }
-
 // Multi-channel video management functions
-
-/**
- * Add a video to multiple channels
- */
-function add_video_to_channels($video_id, $channels, $category = 'General', $published_at = null, $expires_at = null, $priority = 0) {
-    global $pdo;
-    
-    try {
-        $pdo->beginTransaction();
-        
-        $published_at = $published_at ?: date('Y-m-d H:i:s');
-        
-        foreach ($channels as $channel_slug) {
-            $stmt = $pdo->prepare("
-                INSERT INTO IONLocalBlast (
-                    video_id, channel_slug, category, published_at, expires_at,
-                    status, priority, added_at
-                ) VALUES (
-                    :video_id, :channel_slug, :category, :published_at, :expires_at,
-                    'active', :priority, NOW()
-                ) ON DUPLICATE KEY UPDATE
-                    published_at = VALUES(published_at),
-                    expires_at = VALUES(expires_at),
-                    status = 'active',
-                    priority = GREATEST(priority, VALUES(priority))
-            ");
-            
-            $stmt->execute([
-                ':video_id' => $video_id,
-                ':channel_slug' => $channel_slug,
-                ':category' => $category,
-                ':published_at' => $published_at,
-                ':expires_at' => $expires_at,
-                ':priority' => $priority,
-            ]);
-        }
-        
-        $pdo->commit();
-        return true;
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        error_log("Error adding video {$video_id} to channels: " . $e->getMessage());
-        return false;
-    }
-}
-
 /**
  * Remove a video from a specific channel
  */
 function remove_video_from_channel($video_id, $channel_slug, $category = null) {
     global $pdo;
-    
+   
     $sql = "DELETE FROM IONLocalBlast WHERE video_id = :video_id AND channel_slug = :channel_slug";
     $params = [':video_id' => $video_id, ':channel_slug' => $channel_slug];
-    
+   
     if ($category) {
         $sql .= " AND category = :category";
         $params[':category'] = $category;
     }
-    
+   
     $stmt = $pdo->prepare($sql);
     return $stmt->execute($params);
 }
-
 /**
  * Get all channels where a video is published
  */
 function get_video_channels($video_id) {
     global $pdo;
-    
+   
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             vc.channel_slug,
             vc.category,
             vc.published_at,
@@ -1365,57 +1320,55 @@ function get_video_channels($video_id) {
         WHERE vc.video_id = :video_id
         ORDER BY vc.priority DESC, vc.published_at DESC
     ");
-    
+   
     $stmt->execute([':video_id' => $video_id]);
     return $stmt->fetchAll(PDO::FETCH_OBJ);
 }
-
 /**
  * Update video channel schedule
  */
 function update_video_channel_schedule($video_id, $channel_slug, $category, $published_at = null, $expires_at = null, $priority = null) {
     global $pdo;
-    
+   
     $updates = [];
     $params = [':video_id' => $video_id, ':channel_slug' => $channel_slug, ':category' => $category];
-    
+   
     if ($published_at !== null) {
         $updates[] = "published_at = :published_at";
         $params[':published_at'] = $published_at;
     }
-    
+   
     if ($expires_at !== null) {
         $updates[] = "expires_at = :expires_at";
         $params[':expires_at'] = $expires_at;
     }
-    
+   
     if ($priority !== null) {
         $updates[] = "priority = :priority";
         $params[':priority'] = $priority;
     }
-    
+   
     if (empty($updates)) {
         return false;
     }
-    
-    $sql = "UPDATE IONLocalBlast SET " . implode(', ', $updates) . 
+   
+    $sql = "UPDATE IONLocalBlast SET " . implode(', ', $updates) .
            " WHERE video_id = :video_id AND channel_slug = :channel_slug AND category = :category";
-    
+   
     $stmt = $pdo->prepare($sql);
     return $stmt->execute($params);
 }
-
 /**
  * Get videos scheduled for a specific time range
  */
 function get_scheduled_videos($start_date = null, $end_date = null) {
     global $pdo;
-    
+   
     $start_date = $start_date ?: date('Y-m-d H:i:s');
     $end_date = $end_date ?: date('Y-m-d H:i:s', strtotime('+1 day'));
-    
+   
     $stmt = $pdo->prepare("
-        SELECT 
+        SELECT
             v.video_id,
             v.title,
             v.thumbnail,
@@ -1428,50 +1381,47 @@ function get_scheduled_videos($start_date = null, $end_date = null) {
             n.city_name,
             n.channel_name
         FROM IONLocalVideos v
-        INNER JOIN IONLocalBlast vc ON v.video_id = vc.video_id
+        INNER JOIN IONLocalBlast vc ON v.id = vc.video_id
         LEFT JOIN IONLocalNetwork n ON vc.channel_slug = n.slug
         WHERE vc.published_at BETWEEN :start_date AND :end_date
         AND vc.status = 'scheduled'
         ORDER BY vc.published_at ASC
     ");
-    
+   
     $stmt->execute([':start_date' => $start_date, ':end_date' => $end_date]);
     return $stmt->fetchAll(PDO::FETCH_OBJ);
 }
-
 /**
  * Activate scheduled videos (run this as a cron job)
  */
 function activate_scheduled_videos() {
     global $pdo;
-    
+   
     $stmt = $pdo->prepare("
-        UPDATE IONLocalBlast 
-        SET status = 'active' 
-        WHERE status = 'scheduled' 
+        UPDATE IONLocalBlast
+        SET status = 'active'
+        WHERE status = 'scheduled'
         AND published_at <= NOW()
     ");
-    
+   
     return $stmt->execute();
 }
-
 /**
  * Deactivate expired videos (run this as a cron job)
  */
 function deactivate_expired_videos() {
     global $pdo;
-    
+   
     $stmt = $pdo->prepare("
-        UPDATE IONLocalBlast 
-        SET status = 'expired' 
-        WHERE status = 'active' 
-        AND expires_at IS NOT NULL 
+        UPDATE IONLocalBlast
+        SET status = 'expired'
+        WHERE status = 'active'
+        AND expires_at IS NOT NULL
         AND expires_at <= NOW()
     ");
-    
+   
     return $stmt->execute();
 }
-
 /**
  * Fallback function to fetch content using cURL
  */
@@ -1479,7 +1429,7 @@ function fetch_with_curl($url) {
     if (!function_exists('curl_init')) {
         return false;
     }
-    
+   
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -1488,17 +1438,16 @@ function fetch_with_curl($url) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
     curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
+   
     $result = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    
+   
     return ($httpCode === 200) ? $result : false;
 }
-
 function fetch_google_news_rss($query, $category, $max_items = 5) {
     $url = "https://news.google.com/rss/search?q=" . urlencode($query) . "&hl=en-US&gl=US&ceid=US:en";
-    
+   
     // Create SSL context to handle SSL issues
     $context = stream_context_create([
         'http' => [
@@ -1511,7 +1460,7 @@ function fetch_google_news_rss($query, $category, $max_items = 5) {
             'allow_self_signed' => true
         ]
     ]);
-    
+   
     $rss = @file_get_contents($url, false, $context);
     if (!$rss) {
         // Fallback: try with cURL if file_get_contents fails
@@ -1549,12 +1498,10 @@ function fetch_google_news_rss($query, $category, $max_items = 5) {
     }
     return $items;
 }
-
 // Main content sections - only show if not displaying search results
 $location_query = "{$city->city_name}, {$city->state_name}, {$city->country_name}";
 $categories = ['Sports', 'Entertainment', 'Business', 'Kids', 'Events', 'News'];
 $max_results = 10;
-
 foreach ($categories as $category):
     $videos = get_stored_videos($slug, $category, $max_results);
     if (empty($videos)) {
@@ -1579,25 +1526,31 @@ foreach ($categories as $category):
     <section class="video-carousel">
         <h2>ION <?= esc_html($city->city_name) ?> <?= esc_html($category) ?></h2>
         <div class="carousel-container">
-            <?php foreach ($videos as $video): 
+            <?php foreach ($videos as $video):
                 $video_info = get_video_info((array)$video);
-                
+               
                 $preview_url = '';
                 $preview_type = $video_info['type'];
-                
+               
                 if ($preview_type === 'youtube') {
                     $preview_url = 'https://www.youtube.com/embed/' . esc_attr($video_info['id']) . '?autoplay=1&mute=1&controls=0&loop=1&playlist=' . esc_attr($video_info['id']);
                 } elseif ($preview_type === 'vimeo') {
                     $preview_url = 'https://player.vimeo.com/video/' . esc_attr($video_info['id']) . '?autoplay=1&muted=1&background=1';
+                } elseif ($preview_type === 'wistia') {
+                    $preview_url = 'https://fast.wistia.net/embed/iframe/' . esc_attr($video_info['id']) . '?autoplay=1&muted=1&controls=0';
+                } elseif ($preview_type === 'rumble') {
+                    $preview_url = 'https://rumble.com/embed/v' . esc_attr($video_info['id']) . '/?autoplay=1&muted=1';
+                } elseif ($preview_type === 'muvi') {
+                    $preview_url = 'https://embed.muvi.com/embed/' . esc_attr($video_info['id']) . '?autoplay=1';
                 } elseif ($preview_type === 'local') {
                     // For local videos, we'll handle preview differently
                     $preview_url = $video_info['url'];
                 }
             ?>
                 <div class="carousel-item">
-                    <a href="<?= esc_url($video_info['url']) ?>" rel="noopener" class="video-thumb" 
-                       data-video-type="<?= esc_attr($video_info['type']) ?>" 
-                       data-video-id="<?= esc_attr($video_info['id']) ?>" 
+                    <a href="<?= esc_url($video_info['url']) ?>" rel="noopener" class="video-thumb"
+                       data-video-type="<?= esc_attr($video_info['type']) ?>"
+                       data-video-id="<?= esc_attr($video_info['id']) ?>"
                        data-video-url="<?= esc_attr($video_info['url']) ?>"
                        data-video-title="<?= esc_attr($video->title) ?>"
                        data-video-category="<?= esc_attr($category) ?>"
@@ -1625,16 +1578,13 @@ foreach ($categories as $category):
         </div>
     </section>
 <?php endforeach;
-
 // News section
 $news_cache_key = 'ion_news_' . $slug;
 $all_news_items = get_transient($news_cache_key);
-
 if ($all_news_items === false) {
     $news_categories = ['Sports', 'Entertainment', 'Business', 'News'];
     $all_news_items = [];
     $location_query_news = "{$city->city_name}, {$city->state_name}";
-
     foreach ($news_categories as $category) {
         $query = "$category in $location_query_news";
         $news_items = fetch_google_news_rss($query, $category, 5); // get 5 per category
@@ -1642,27 +1592,24 @@ if ($all_news_items === false) {
             $all_news_items = array_merge($all_news_items, $news_items);
         }
     }
-
     if (!empty($all_news_items)) {
         // Sort all news items by date descending
         usort($all_news_items, function($a, $b) {
             return $b['date'] <=> $a['date'];
         });
-
         // Take top 9 articles overall
         $all_news_items = array_slice($all_news_items, 0, 9);
         set_transient($news_cache_key, $all_news_items, HOUR_IN_SECONDS * 6); // Cache for 6 hours
     }
 }
-
 if (!empty($all_news_items)): ?>
 <section class="ion-news">
     <h2>ION <?= esc_html(strtoupper($city->city_name)) ?> LATEST</h2>
     <p class="news-subtitle">Stay updated with the latest news and developments from <?= esc_html($city->city_name) ?> and the surrounding metro area</p>
     <div class="news-container">
-        <?php 
+        <?php
         $placeholder_image = 'https://ions.com/assets/ionthumbnail.png';
-        foreach ($all_news_items as $item): 
+        foreach ($all_news_items as $item):
             $image_to_display = !empty($item['image']) ? $item['image'] : $placeholder_image;
         ?>
             <div class="news-item">
@@ -1680,10 +1627,8 @@ if (!empty($all_news_items)): ?>
     </div>
 </section>
 <?php endif;
-
 // End regular content (only show when not displaying search results)
 endif; ?>
-
 <section class="ion-metrics">
     <div class="metric-container">
         <div class="metric-card">
@@ -1700,13 +1645,12 @@ endif; ?>
         </div>
         <div class="metric-card">
             <div class="metric-icon-wrapper population-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0zm-6 5a6 6 0 0 0-5.45 3.14a.75.75 0 0 0 1.3.72A4.5 4.5 0 0 1 12 16.5a4.5 4.5 0 0 1 4.15 2.36a.75.75 0 1 0 1.3-.72A6 6 0 0 0 12 15h-2zm9.14-3.55a.75.75 0 0 0-1.06-1.06A6.5 6.5 0 0 0 12 8.5a6.5 6.5 0 0 0-4.08 1.39a.75.75 0 1 0 1.06 1.06A5 5 0 0 1 12 10a5 5 0 0 1 3.08 1.15a.75.75 0 0 0 1.06-1.06A6.5 6.5 0 0 0 20.5 8a.75.75 0 0 0 0-1.5 8 8 0 1 0-8.65 7.92.75.75 0 0 0 1.5-.34A6.5 6.5 0 0 1 12 2.5a6.5 6.5 0 0 1 6.5 6.5c0 1.25-.36 2.41-1 3.45z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0zm-6 5a6 6 0 0 0-5.45 3.14a.75.75 0 0 0 1.3.72A4.5 4.5 0 0 1 12 16.5a4.5 4.5 0 0 1 4.15 2.36a.75.75 0 1 0 1.3-.72A6 6 0 0 0 12 15h-2zm9.14-3.55a.75.75 0 0 0-1.06-1.06A6.5 6.5 0 0 0 12 8.5a6.5 6.5 0 0 0-4.08 1.39a.75.75 0 1 0 1.06 1.06A5 5 0 0 1 12 10a5 5 0 0 1 3.08 1.15a.75.75 0 0 0 1.06-1.06A6.5 6.5 0 0 0 20.5 8a.75.75 0 0 0 0-1.5 8 8 0 1 0-8.65 7.92a.75.75 0 0 0 1.5-.34A6.5 6.5 0 0 1 12 2.5a6.5 6.5 0 0 1 6.5 6.5c0 1.25-.36 2.41-1 3.45z"/></svg>
             </div>
             <div><h4>Population</h4><p><?= esc_html($city->population) ?></p></div>
         </div>
     </div>
 </section>
-
 <section class="info-blocks">
     <div class="info-block blue">
         <h3>AVENUE I</h3>
@@ -1721,7 +1665,6 @@ endif; ?>
         <p>Building bridges in the community through shared stories</p>
     </div>
 </section>
-
 <?php
 // Optional: Display video tracking stats
 $cityStats = $videoTracker->getStats(null, null, $slug);
@@ -1748,7 +1691,6 @@ if (!empty($cityStats)) {
     </div>
 </div>
 <?php } ?>
-
 <!-- Video Modal -->
 <div id="videoModal" class="video-modal">
   <div class="video-modal-content">
@@ -1756,7 +1698,6 @@ if (!empty($cityStats)) {
     <div id="videoContainer"></div>
   </div>
 </div>
-
 <!-- Article Modal -->
 <div id="articleModal" class="article-modal">
     <div class="article-modal-content">
@@ -1764,7 +1705,6 @@ if (!empty($cityStats)) {
         <iframe id="articleIframe" width="100%" height="100%" frameborder="0"></iframe>
     </div>
 </div>
-
 <?php if ($has_slider_media && count($media) > 1): ?>
 <script>
 // Hero Slider JavaScript with Video.js support
@@ -1774,9 +1714,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalSlides = slides.length;
     let slideInterval;
     let heroVideoPlayers = [];
-
     if (totalSlides <= 1) return; // Don't run slider for single slide
-
     // Initialize Video.js for hero slider videos
     slides.forEach((slide, index) => {
         const videoElement = slide.querySelector('video');
@@ -1791,11 +1729,10 @@ document.addEventListener('DOMContentLoaded', function() {
             heroVideoPlayers.push({ index, player });
         }
     });
-
     function showSlide(index) {
         slides.forEach((slide, i) => {
             slide.classList.toggle('active', i === index);
-            
+           
             // Handle Video.js players
             heroVideoPlayers.forEach(({ index: playerIndex, player }) => {
                 if (playerIndex === index) {
@@ -1805,7 +1742,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     player.currentTime(0);
                 }
             });
-            
+           
             // Handle YouTube/Vimeo iframes (pause via postMessage)
             const iframe = slide.querySelector('iframe');
             if (iframe && i !== index) {
@@ -1817,35 +1754,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
     function nextSlide() {
         currentSlide = (currentSlide + 1) % totalSlides;
         showSlide(currentSlide);
     }
-
     function prevSlide() {
         currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
         showSlide(currentSlide);
     }
-
     function startAutoSlide() {
         slideInterval = setInterval(nextSlide, 5000);
     }
-
     function stopAutoSlide() {
         if (slideInterval) {
             clearInterval(slideInterval);
             slideInterval = null;
         }
     }
-
     // Start auto-slide
     startAutoSlide();
-
     // Navigation events
     const nextBtn = document.querySelector('.ion-hero .next');
     const prevBtn = document.querySelector('.ion-hero .prev');
-    
+   
     if (nextBtn) {
         nextBtn.addEventListener('click', () => {
             stopAutoSlide();
@@ -1854,7 +1785,7 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(startAutoSlide, 3000);
         });
     }
-    
+   
     if (prevBtn) {
         prevBtn.addEventListener('click', () => {
             stopAutoSlide();
@@ -1863,27 +1794,24 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(startAutoSlide, 3000);
         });
     }
-
     // Pause auto-slide on hover
     const heroSection = document.querySelector('.ion-hero');
     if (heroSection) {
         heroSection.addEventListener('mouseenter', stopAutoSlide);
         heroSection.addEventListener('mouseleave', startAutoSlide);
     }
-
     // Initial show
     showSlide(currentSlide);
 });
 </script>
 <?php endif; ?>
-
 <script>
 // Enhanced video modal functionality with Video.js support
 document.addEventListener("DOMContentLoaded", function () {
     // Initialize Video.js for preview videos
     const previewVideos = document.querySelectorAll('.preview-video');
     const previewPlayers = new Map();
-    
+   
     previewVideos.forEach(video => {
         const player = videojs(video, {
             autoplay: false,
@@ -1894,57 +1822,91 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         previewPlayers.set(video, player);
     });
-
     // Handle preview on hover
     document.querySelectorAll('.carousel-item').forEach(item => {
         const previewContainer = item.querySelector('.preview-video-container');
         const previewVideo = item.querySelector('.preview-video');
-        
+        const previewIframe = item.querySelector('.preview-iframe');
+        let hoverTimeout = null;
+        let originalIframeSrc = '';
+       
+        // Handle Video.js players (local videos)
         if (previewVideo && previewPlayers.has(previewVideo)) {
             const player = previewPlayers.get(previewVideo);
-            
+           
             item.addEventListener('mouseenter', () => {
-                if (previewContainer) {
-                    player.play();
-                    
-                    // Hide play button overlay when video is playing
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '0';
-                        playIcon.style.pointerEvents = 'none';
+                hoverTimeout = setTimeout(() => {
+                    if (previewContainer) {
+                        player.play().catch(err => console.log('⚠️ Video play failed:', err));
                     }
-                }
+                }, 300); // 300ms delay to avoid loading on quick mouse-overs
             });
-            
+           
             item.addEventListener('mouseleave', () => {
-                if (previewContainer) {
-                    player.pause();
-                    player.currentTime(0);
-                    
-                    // Show play button overlay again when video stops
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '1';
-                        playIcon.style.pointerEvents = 'auto';
-                    }
+                if (hoverTimeout) {
+                    clearTimeout(hoverTimeout);
+                    hoverTimeout = null;
                 }
+               
+                setTimeout(() => {
+                    if (previewContainer) {
+                        player.pause();
+                        player.currentTime(0);
+                    }
+                }, 500); // 500ms delay to avoid stopping if user quickly hovers back
+            });
+        }
+       
+        // CRITICAL FIX: Handle iframes (YouTube, Vimeo, Muvi, etc.)
+        if (previewIframe) {
+            // Store original src on first load
+            if (!originalIframeSrc && previewIframe.src && !previewIframe.src.includes('about:blank')) {
+                originalIframeSrc = previewIframe.src;
+            }
+           
+            item.addEventListener('mouseenter', () => {
+                hoverTimeout = setTimeout(() => {
+                    // If iframe was stopped, restart it
+                    if (previewIframe.src === 'about:blank' || previewIframe.src.includes('about:blank')) {
+                        if (originalIframeSrc) {
+                            console.log('🔄 Restarting stopped iframe on hover');
+                            previewIframe.src = originalIframeSrc;
+                        }
+                    } else if (!originalIframeSrc) {
+                        // First time - store the original src
+                        originalIframeSrc = previewIframe.src;
+                    }
+                }, 300); // 300ms delay
+            });
+           
+            item.addEventListener('mouseleave', () => {
+                if (hoverTimeout) {
+                    clearTimeout(hoverTimeout);
+                    hoverTimeout = null;
+                }
+               
+                // Stop iframe to prevent background audio
+                setTimeout(() => {
+                    if (previewIframe && originalIframeSrc && !previewIframe.src.includes('about:blank')) {
+                        console.log('⏹️ Stopping iframe audio');
+                        previewIframe.src = 'about:blank';
+                    }
+                }, 500); // 500ms delay to avoid stopping if user quickly hovers back
             });
         }
     });
-
     // Video Modal Functions
     const modal = document.getElementById("videoModal");
     const videoContainer = document.getElementById("videoContainer");
     const closeBtn = document.querySelector(".video-close");
     let currentModalPlayer = null;
-
     function openVideoModal(videoType, videoId, videoUrl, videoFormat) {
         // Clear previous content
         videoContainer.innerHTML = '';
-        
+       
         // Normalize video type - treat 'self-hosted' as 'local'
         const normalizedType = (videoType === 'self-hosted' || videoType === 'local') ? 'local' : videoType;
-        
+       
         if (normalizedType === 'local') {
             // Create Video.js player for local videos
             const videoElement = document.createElement('video');
@@ -1953,14 +1915,14 @@ document.addEventListener("DOMContentLoaded", function () {
             videoElement.setAttribute('preload', 'auto');
             videoElement.style.width = '100%';
             videoElement.style.height = '100%';
-            
+           
             const sourceElement = document.createElement('source');
             sourceElement.src = videoUrl;
             sourceElement.type = `video/${videoFormat || 'mp4'}`;
-            
+           
             videoElement.appendChild(sourceElement);
             videoContainer.appendChild(videoElement);
-            
+           
             // Initialize Video.js
             currentModalPlayer = videojs(videoElement, {
                 controls: true,
@@ -1969,7 +1931,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 fluid: true,
                 responsive: true
             });
-            
+           
         } else {
             // Handle streaming platforms
             const iframe = document.createElement('iframe');
@@ -1977,7 +1939,7 @@ document.addEventListener("DOMContentLoaded", function () {
             iframe.setAttribute('height', '100%');
             iframe.setAttribute('frameborder', '0');
             iframe.setAttribute('allowfullscreen', '');
-            
+           
             let videoSrc = '';
             switch (normalizedType) {
                 case "youtube":
@@ -1999,87 +1961,80 @@ document.addEventListener("DOMContentLoaded", function () {
                     window.open(videoUrl, '_blank');
                     return;
             }
-            
+           
             iframe.src = videoSrc;
             videoContainer.appendChild(iframe);
         }
-        
+       
         // Show modal with animation
         modal.classList.add('is-visible');
         document.body.classList.add('modal-open');
     }
-
     function closeVideoModal() {
         modal.classList.remove('is-visible');
         document.body.classList.remove('modal-open');
-        
+       
         // Clean up Video.js player if it exists
         if (currentModalPlayer) {
             currentModalPlayer.dispose();
             currentModalPlayer = null;
         }
-        
+       
         // Clear container
         videoContainer.innerHTML = '';
     }
-
     // Make functions globally available
     window.openVideoModal = openVideoModal;
     window.closeVideoModal = closeVideoModal;
-
     // Enhanced video thumbnail click handlers
     document.querySelectorAll(".video-thumb").forEach(thumb => {
         thumb.addEventListener("click", function (e) {
             e.preventDefault();
             e.stopPropagation();
-            
+           
             const videoType = this.getAttribute("data-video-type");
             const videoId = this.getAttribute("data-video-id");
             const videoUrl = this.getAttribute("data-video-url");
             let videoFormat = this.getAttribute("data-video-format");
-            
+           
             // Handle both 'local' and 'self-hosted' as local videos
             const isLocalVideo = videoType === 'local' || videoType === 'self-hosted';
             const effectiveVideoType = isLocalVideo ? 'local' : videoType;
-            
+           
             // Extract format from URL if not provided
             if (isLocalVideo && !videoFormat && videoUrl) {
                 const urlParts = videoUrl.split('.');
                 videoFormat = urlParts[urlParts.length - 1].toLowerCase();
             }
-            
+           
             console.log('Opening video modal:', {
                 type: effectiveVideoType,
                 id: videoId,
                 url: videoUrl,
                 format: videoFormat
             });
-            
+           
             openVideoModal(effectiveVideoType, videoId, videoUrl, videoFormat);
             return false;
         });
     });
-
     // Modal event listeners
     closeBtn.addEventListener('click', closeVideoModal);
-    
+   
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
             closeVideoModal();
         }
     });
-
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && modal.classList.contains('is-visible')) {
             closeVideoModal();
         }
     });
-
     // Article Modal functionality
     const articleModal = document.getElementById("articleModal");
     const articleIframe = document.getElementById("articleIframe");
     const closeArticleBtn = document.querySelector(".article-close");
-
     document.querySelectorAll(".news-item a").forEach(link => {
         link.addEventListener("click", function (e) {
             e.preventDefault();
@@ -2088,34 +2043,31 @@ document.addEventListener("DOMContentLoaded", function () {
             articleModal.style.display = "block";
         });
     });
-
     closeArticleBtn.onclick = function () {
         articleModal.style.display = "none";
         articleIframe.src = "";
     };
-
     window.onclick = function (event) {
         if (event.target == articleModal) {
             articleModal.style.display = "none";
             articleIframe.src = "";
         }
     };
-    
+   
     // Enhanced search result interactions
     document.querySelectorAll('.carousel-item.local-result').forEach(item => {
         item.addEventListener('mouseenter', function() {
             this.style.transform = 'translateY(-5px) scale(1.02)';
         });
-        
+       
         item.addEventListener('mouseleave', function() {
             this.style.transform = '';
         });
     });
 });
 </script>
-
-<?php 
-include __DIR__ . '/ionfooter.php';  // Include the footer
+<?php
+include __DIR__ . '/ionfooter.php'; // Include the footer
 ?>
 </body>
 </html>

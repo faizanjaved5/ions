@@ -1147,7 +1147,7 @@ function get_stored_videos($slug, $category, $maxResults) {
             vc.status as channel_status,
             vc.priority
         FROM IONLocalVideos v
-        INNER JOIN IONLocalBlast vc ON v.video_id = vc.video_id
+        INNER JOIN IONLocalBlast vc ON v.id = vc.video_id
         WHERE vc.channel_slug = :slug 
         AND vc.category = :category
         AND vc.status = 'active'
@@ -1280,51 +1280,6 @@ function store_video($slug, $category, $video) {
 
 // Multi-channel video management functions
 
-/**
- * Add a video to multiple channels
- */
-function add_video_to_channels($video_id, $channels, $category = 'General', $published_at = null, $expires_at = null, $priority = 0) {
-    global $pdo;
-    
-    try {
-        $pdo->beginTransaction();
-        
-        $published_at = $published_at ?: date('Y-m-d H:i:s');
-        
-        foreach ($channels as $channel_slug) {
-            $stmt = $pdo->prepare("
-                INSERT INTO IONLocalBlast (
-                    video_id, channel_slug, category, published_at, expires_at,
-                    status, priority, added_at
-                ) VALUES (
-                    :video_id, :channel_slug, :category, :published_at, :expires_at,
-                    'active', :priority, NOW()
-                ) ON DUPLICATE KEY UPDATE
-                    published_at = VALUES(published_at),
-                    expires_at = VALUES(expires_at),
-                    status = 'active',
-                    priority = GREATEST(priority, VALUES(priority))
-            ");
-            
-            $stmt->execute([
-                ':video_id' => $video_id,
-                ':channel_slug' => $channel_slug,
-                ':category' => $category,
-                ':published_at' => $published_at,
-                ':expires_at' => $expires_at,
-                ':priority' => $priority,
-            ]);
-        }
-        
-        $pdo->commit();
-        return true;
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        error_log("Error adding video {$video_id} to channels: " . $e->getMessage());
-        return false;
-    }
-}
 
 /**
  * Remove a video from a specific channel
@@ -1428,7 +1383,7 @@ function get_scheduled_videos($start_date = null, $end_date = null) {
             n.city_name,
             n.channel_name
         FROM IONLocalVideos v
-        INNER JOIN IONLocalBlast vc ON v.video_id = vc.video_id
+        INNER JOIN IONLocalBlast vc ON v.id = vc.video_id
         LEFT JOIN IONLocalNetwork n ON vc.channel_slug = n.slug
         WHERE vc.published_at BETWEEN :start_date AND :end_date
         AND vc.status = 'scheduled'
@@ -1906,13 +1861,6 @@ document.addEventListener("DOMContentLoaded", function () {
             item.addEventListener('mouseenter', () => {
                 if (previewContainer) {
                     player.play();
-                    
-                    // Hide play button overlay when video is playing
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '0';
-                        playIcon.style.pointerEvents = 'none';
-                    }
                 }
             });
             
@@ -1920,13 +1868,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (previewContainer) {
                     player.pause();
                     player.currentTime(0);
-                    
-                    // Show play button overlay again when video stops
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '1';
-                        playIcon.style.pointerEvents = 'auto';
-                    }
                 }
             });
         }

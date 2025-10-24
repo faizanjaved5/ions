@@ -1906,13 +1906,6 @@ document.addEventListener("DOMContentLoaded", function () {
             item.addEventListener('mouseenter', () => {
                 if (previewContainer) {
                     player.play();
-                    
-                    // Hide play button overlay when video is playing
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '0';
-                        playIcon.style.pointerEvents = 'none';
-                    }
                 }
             });
             
@@ -1920,13 +1913,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (previewContainer) {
                     player.pause();
                     player.currentTime(0);
-                    
-                    // Show play button overlay again when video stops
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '1';
-                        playIcon.style.pointerEvents = 'auto';
-                    }
                 }
             });
         }

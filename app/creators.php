@@ -961,6 +961,13 @@ $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $per_page = 12; // Videos per page
 $offset = ($page - 1) * $per_page;
 
+// Helper function to build pagination URLs that preserve all GET parameters
+function build_pagination_url($page_num) {
+    $params = $_GET;
+    $params['page'] = $page_num;
+    return '?' . http_build_query($params);
+}
+
 // Fetch video statistics with STRICT role-based security
 if (in_array($user_role, ['Owner', 'Admin'])) {
     // ONLY Owners and Admins see ALL videos - show system-wide stats
@@ -2266,6 +2273,69 @@ error_log("User: $user_email (UID: $user_unique_id), Role: $user_role, Videos: "
     .video-date {
         white-space: nowrap !important;
     }
+    
+    /* Multi-Select Mode Styles */
+    .multi-select-active .carousel-item,
+    .multi-select-active .videos-table tbody tr {
+        transition: all 0.2s ease;
+    }
+    
+    .carousel-item.video-selected,
+    .videos-table tbody tr.video-selected {
+        outline: 3px solid #3b82f6;
+        outline-offset: 2px;
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.3);
+        transform: scale(1.02);
+    }
+    
+    .video-select-checkbox-container {
+        animation: fadeInScale 0.2s ease;
+    }
+    
+    @keyframes fadeInScale {
+        from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    
+    #bulk-actions-toolbar {
+        animation: slideUp 0.3s ease;
+    }
+    
+    @keyframes slideUp {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
+    /* Mobile responsive for bulk actions toolbar */
+    @media (max-width: 768px) {
+        #bulk-actions-toolbar {
+            flex-direction: column;
+            gap: 12px;
+            padding: 12px;
+        }
+        
+        #bulk-actions-toolbar > div {
+            width: 100%;
+            flex-direction: column;
+        }
+        
+        #bulk-actions-toolbar button {
+            width: 100%;
+            justify-content: center;
+        }
+    }
     </style>
     <style>
     :root {
@@ -2491,7 +2561,7 @@ include 'headers.php';
                             $preview_url = 'local:' . htmlspecialchars($video_url, ENT_QUOTES, 'UTF-8');
                         }
                     ?>
-                        <div class="carousel-item">
+                        <div class="carousel-item" data-video-id="<?= htmlspecialchars($video->id, ENT_QUOTES, 'UTF-8') ?>">
                             <a href="#" class="video-thumb" onclick="return openVideoInModal(event, this)"
                                data-video-id="<?= htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') ?>" 
                                data-video-type="<?= htmlspecialchars($video_type, ENT_QUOTES, 'UTF-8') ?>"
@@ -3061,28 +3131,28 @@ include 'headers.php';
                         </div>
                         <div class="pagination-controls">
                             <?php if ($page > 1): ?>
-                                <a href="?page=<?= $page - 1 ?>" class="pagination-btn">← Previous</a>
+                                <a href="<?= build_pagination_url($page - 1) ?>" class="pagination-btn">← Previous</a>
                             <?php endif; ?>
                             <?php
                             $start_page = max(1, $page - 2);
                             $end_page = min($total_pages, $page + 2);
                             if ($start_page > 1): ?>
-                                <a href="?page=1" class="pagination-btn">1</a>
+                                <a href="<?= build_pagination_url(1) ?>" class="pagination-btn">1</a>
                                 <?php if ($start_page > 2): ?>
                                     <span class="pagination-ellipsis">...</span>
                                 <?php endif; ?>
                             <?php endif; ?>
                             <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
-                                <a href="?page=<?= $i ?>" class="pagination-btn <?= $i === $page ? 'active' : '' ?>"><?= $i ?></a>
+                                <a href="<?= build_pagination_url($i) ?>" class="pagination-btn <?= $i === $page ? 'active' : '' ?>"><?= $i ?></a>
                             <?php endfor; ?>
                             <?php if ($end_page < $total_pages): ?>
                                 <?php if ($end_page < $total_pages - 1): ?>
                                     <span class="pagination-ellipsis">...</span>
                                 <?php endif; ?>
-                                <a href="?page=<?= $total_pages ?>" class="pagination-btn"><?= $total_pages ?></a>
+                                <a href="<?= build_pagination_url($total_pages) ?>" class="pagination-btn"><?= $total_pages ?></a>
                             <?php endif; ?>
                             <?php if ($page < $total_pages): ?>
-                                <a href="?page=<?= $page + 1 ?>" class="pagination-btn">Next →</a>
+                                <a href="<?= build_pagination_url($page + 1) ?>" class="pagination-btn">Next →</a>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -3313,6 +3383,13 @@ include 'headers.php';
                     // Show the preview
                     previewContainer.style.display = 'block';
                     previewContainer.style.opacity = '1';
+                    
+                    // Hide play button overlay when video is playing
+                    const playIcon = thumb.querySelector('.play-icon-overlay');
+                    if (playIcon) {
+                        playIcon.style.opacity = '0';
+                        playIcon.style.pointerEvents = 'none';
+                    }
                 }, 300); // 300ms delay to avoid loading on quick mouse-overs
             });
             
@@ -3322,6 +3399,14 @@ include 'headers.php';
                     clearTimeout(hoverTimeout);
                     hoverTimeout = null;
                 }
+                
+                // Show play button overlay again when video stops
+                const playIcon = thumb.querySelector('.play-icon-overlay');
+                if (playIcon) {
+                    playIcon.style.opacity = '1';
+                    playIcon.style.pointerEvents = 'auto';
+                }
+                
                 if (previewContainer) {
                     previewContainer.style.opacity = '0';
                     
@@ -4822,6 +4907,407 @@ include 'headers.php';
             };
             document.addEventListener('keydown', handleEscape);
         }
+
+        // ==================== MULTI-SELECT FUNCTIONALITY ====================
+        // State management for multi-select mode
+        let multiSelectMode = false;
+        let selectedVideos = new Set();
+
+        // Toggle multi-select mode
+        function toggleMultiSelectMode() {
+            multiSelectMode = !multiSelectMode;
+            console.log('📦 Multi-select mode:', multiSelectMode ? 'ENABLED' : 'DISABLED');
+            
+            if (multiSelectMode) {
+                enableMultiSelectMode();
+            } else {
+                disableMultiSelectMode();
+            }
+        }
+
+        // Enable multi-select mode
+        function enableMultiSelectMode() {
+            // Add checkboxes to all video cards (both card view and list view)
+            const videoCards = document.querySelectorAll('.carousel-item');
+            videoCards.forEach(card => {
+                addCheckboxToCard(card);
+            });
+            
+            // Also handle list view rows
+            const listRows = document.querySelectorAll('.videos-table tbody tr[data-video-id]');
+            listRows.forEach(row => {
+                addCheckboxToCard(row);
+            });
+
+            // Show bulk actions toolbar
+            showBulkActionsToolbar();
+
+            // Add visual indication
+            document.body.classList.add('multi-select-active');
+        }
+
+        // Disable multi-select mode
+        function disableMultiSelectMode() {
+            // Remove checkboxes
+            const checkboxes = document.querySelectorAll('.video-select-checkbox-container');
+            checkboxes.forEach(cb => cb.remove());
+
+            // Hide bulk actions toolbar
+            hideBulkActionsToolbar();
+
+            // Clear selections
+            selectedVideos.clear();
+
+            // Remove visual indication
+            document.body.classList.remove('multi-select-active');
+        }
+
+        // Add checkbox to a video card
+        function addCheckboxToCard(card) {
+            const videoId = card.dataset.videoId || card.querySelector('[data-video-id]')?.dataset.videoId;
+            if (!videoId) return;
+
+            // Check if checkbox already exists
+            if (card.querySelector('.video-select-checkbox-container')) return;
+
+            const checkboxContainer = document.createElement('div');
+            checkboxContainer.className = 'video-select-checkbox-container';
+            checkboxContainer.style.cssText = `
+                position: absolute;
+                top: 10px;
+                left: 10px;
+                z-index: 10;
+                background: rgba(0, 0, 0, 0.7);
+                border-radius: 6px;
+                padding: 6px;
+                backdrop-filter: blur(8px);
+            `;
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'video-select-checkbox';
+            checkbox.dataset.videoId = videoId;
+            checkbox.style.cssText = `
+                width: 20px;
+                height: 20px;
+                cursor: pointer;
+                accent-color: #3b82f6;
+            `;
+
+            checkbox.addEventListener('change', function() {
+                const parentCard = card.closest('.carousel-item') || card.closest('tr') || card;
+                if (this.checked) {
+                    selectedVideos.add(videoId);
+                    parentCard.classList.add('video-selected');
+                } else {
+                    selectedVideos.delete(videoId);
+                    parentCard.classList.remove('video-selected');
+                }
+                updateBulkActionsToolbar();
+            });
+
+            checkboxContainer.appendChild(checkbox);
+            card.style.position = 'relative';
+            card.insertBefore(checkboxContainer, card.firstChild);
+        }
+
+        // Show bulk actions toolbar
+        function showBulkActionsToolbar() {
+            // Check if toolbar already exists
+            if (document.getElementById('bulk-actions-toolbar')) return;
+
+            const toolbar = document.createElement('div');
+            toolbar.id = 'bulk-actions-toolbar';
+            toolbar.style.cssText = `
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+                border-top: 2px solid #3b82f6;
+                padding: 16px 20px;
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+            `;
+
+            toolbar.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span style="font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 8px;">
+                        <span style="background: rgba(59, 130, 246, 0.2); padding: 4px 8px; border-radius: 4px; font-size: 12px; border: 1px solid rgba(59, 130, 246, 0.4);">
+                            💡 Ctrl+Click to select
+                        </span>
+                        <span id="selected-count">0</span> video(s) selected
+                    </span>
+                    <button onclick="selectAllVideos()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;" onmouseover="this.style.background='#2563eb'" onmouseout="this.style.background='#3b82f6'">
+                        Select All
+                    </button>
+                    <button onclick="deselectAllVideos()" style="padding: 8px 16px; background: #64748b; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: all 0.2s;" onmouseover="this.style.background='#475569'" onmouseout="this.style.background='#64748b'">
+                        Deselect All
+                    </button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button onclick="bulkReassignCreator()" style="padding: 10px 20px; background: #8b5cf6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.2s;" onmouseover="this.style.background='#7c3aed'" onmouseout="this.style.background='#8b5cf6'">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        Reassign Creator
+                    </button>
+                    <button onclick="toggleMultiSelectMode()" style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='#dc2626'" onmouseout="this.style.background='#ef4444'">
+                        Exit Multi-Select
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(toolbar);
+
+            // Add padding to bottom of page content to prevent overlap
+            const mainContent = document.querySelector('.creator-main-content') || document.body;
+            mainContent.style.paddingBottom = '80px';
+        }
+
+        // Hide bulk actions toolbar
+        function hideBulkActionsToolbar() {
+            const toolbar = document.getElementById('bulk-actions-toolbar');
+            if (toolbar) {
+                toolbar.remove();
+            }
+
+            // Remove padding from main content
+            const mainContent = document.querySelector('.creator-main-content') || document.body;
+            mainContent.style.paddingBottom = '';
+        }
+
+        // Update bulk actions toolbar with current selection count
+        function updateBulkActionsToolbar() {
+            const countElement = document.getElementById('selected-count');
+            if (countElement) {
+                countElement.textContent = selectedVideos.size;
+            }
+        }
+
+        // Select all videos
+        function selectAllVideos() {
+            const checkboxes = document.querySelectorAll('.video-select-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                selectedVideos.add(checkbox.dataset.videoId);
+                const card = checkbox.closest('.carousel-item') || checkbox.closest('tr');
+                if (card) card.classList.add('video-selected');
+            });
+            updateBulkActionsToolbar();
+        }
+
+        // Deselect all videos
+        function deselectAllVideos() {
+            const checkboxes = document.querySelectorAll('.video-select-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const card = checkbox.closest('.carousel-item') || checkbox.closest('tr');
+                if (card) card.classList.remove('video-selected');
+            });
+            selectedVideos.clear();
+            updateBulkActionsToolbar();
+        }
+
+        // Bulk reassign creator
+        async function bulkReassignCreator() {
+            if (selectedVideos.size === 0) {
+                alert('Please select at least one video to reassign.');
+                return;
+            }
+
+            // Get list of creators (you may want to fetch this from the server)
+            const newHandle = prompt(`Reassign ${selectedVideos.size} video(s) to a new creator.\n\nEnter the creator's handle (without @):`);
+            
+            if (!newHandle || newHandle.trim() === '') {
+                return; // User cancelled
+            }
+
+            const confirmed = confirm(`Are you sure you want to reassign ${selectedVideos.size} video(s) to @${newHandle}?`);
+            if (!confirmed) return;
+
+            try {
+                // Show loading state
+                const toolbar = document.getElementById('bulk-actions-toolbar');
+                if (toolbar) {
+                    toolbar.style.opacity = '0.5';
+                    toolbar.style.pointerEvents = 'none';
+                }
+
+                // Send request to server (FIXED: Removed /iblog/ prefix)
+                const response = await fetch('/api/bulk-reassign-creator.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        video_ids: Array.from(selectedVideos),
+                        new_handle: newHandle.trim()
+                    })
+                });
+
+                // Get raw response text first for debugging
+                const responseText = await response.text();
+                console.log('📡 Raw API response:', responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error('❌ JSON Parse Error:', parseError);
+                    console.error('📄 Response was:', responseText.substring(0, 500)); // First 500 chars
+                    throw new Error('Server returned invalid JSON. Check browser console for details.');
+                }
+
+                if (result.success) {
+                    alert(`✅ Successfully reassigned ${result.updated_count} video(s) to @${newHandle}`);
+                    
+                    // Reload page to show updated data
+                    window.location.reload();
+                } else {
+                    alert(`❌ Error: ${result.error || 'Failed to reassign videos'}`);
+                }
+
+            } catch (error) {
+                console.error('Error reassigning videos:', error);
+                alert('❌ Network error: ' + error.message);
+            } finally {
+                // Restore toolbar state
+                const toolbar = document.getElementById('bulk-actions-toolbar');
+                if (toolbar) {
+                    toolbar.style.opacity = '';
+                    toolbar.style.pointerEvents = '';
+                }
+            }
+        }
+
+        // Ctrl+Click on video cards to enter multi-select mode and select videos
+        document.addEventListener('click', function(e) {
+            // Check if Ctrl key is pressed (Cmd on Mac)
+            if (!e.ctrlKey && !e.metaKey) return;
+            
+            // Find the video card (both card view and list view)
+            const videoCard = e.target.closest('.carousel-item') || e.target.closest('tr[data-video-id]');
+            if (!videoCard) return;
+            
+            // Prevent default behavior (like opening links)
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Get video ID
+            const videoId = videoCard.dataset.videoId || 
+                           videoCard.querySelector('[data-video-id]')?.dataset.videoId ||
+                           videoCard.querySelector('.delete-icon')?.dataset.videoId;
+            if (!videoId) return;
+            
+            console.log('🎯 Ctrl+Click detected on video card:', videoId);
+            
+            // If not in multi-select mode, activate it
+            if (!multiSelectMode) {
+                console.log('📦 Entering multi-select mode via Ctrl+Click');
+                multiSelectMode = true;
+                enableMultiSelectMode();
+            }
+            
+            // Toggle selection for this video
+            const checkbox = videoCard.querySelector('.video-select-checkbox');
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event('change'));
+            }
+        }, true); // Use capture phase to intercept before other handlers
+
+        // Show helper tooltip and change cursor when Ctrl is pressed
+        let ctrlTooltip = null;
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && !ctrlTooltip) {
+                // Add tooltip
+                ctrlTooltip = document.createElement('div');
+                ctrlTooltip.id = 'ctrl-tooltip';
+                ctrlTooltip.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: linear-gradient(135deg, #3b82f6, #2563eb);
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 14px;
+                    z-index: 10000;
+                    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4);
+                    animation: fadeInDown 0.3s ease;
+                    pointer-events: none;
+                `;
+                ctrlTooltip.innerHTML = '🎯 Click on video cards to select them';
+                document.body.appendChild(ctrlTooltip);
+                
+                // Change cursor on video cards (both card view and list view)
+                document.querySelectorAll('.carousel-item').forEach(card => {
+                    card.style.cursor = 'pointer';
+                    card.style.outline = '2px dashed rgba(59, 130, 246, 0.3)';
+                    card.style.outlineOffset = '2px';
+                });
+                
+                // Also add outline to list view rows
+                document.querySelectorAll('.videos-table tbody tr').forEach(row => {
+                    row.style.cursor = 'pointer';
+                    row.style.outline = '2px dashed rgba(59, 130, 246, 0.3)';
+                });
+            }
+        });
+
+        document.addEventListener('keyup', function(e) {
+            if ((!e.ctrlKey && !e.metaKey) && ctrlTooltip) {
+                // Remove tooltip
+                ctrlTooltip.remove();
+                ctrlTooltip = null;
+                
+                // Restore cursor on video cards (unless in multi-select mode)
+                if (!multiSelectMode) {
+                    document.querySelectorAll('.carousel-item').forEach(card => {
+                        card.style.cursor = '';
+                        card.style.outline = '';
+                        card.style.outlineOffset = '';
+                    });
+                    
+                    // Restore list view rows
+                    document.querySelectorAll('.videos-table tbody tr').forEach(row => {
+                        row.style.cursor = '';
+                        row.style.outline = '';
+                    });
+                }
+            }
+        });
+
+        // Add fadeInDown animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeInDown {
+                from {
+                    opacity: 0;
+                    transform: translateX(-50%) translateY(-20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(-50%) translateY(0);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Make functions globally available
+        window.toggleMultiSelectMode = toggleMultiSelectMode;
+        window.selectAllVideos = selectAllVideos;
+        window.deselectAllVideos = deselectAllVideos;
+        window.bulkReassignCreator = bulkReassignCreator;
+
+        console.log('📦 Multi-select functionality initialized');
+        // ==================== END MULTI-SELECT FUNCTIONALITY ====================
     </script>
 
 <style>

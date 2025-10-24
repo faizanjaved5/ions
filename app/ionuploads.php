@@ -742,7 +742,16 @@ if ($isEditMode) {
     <script>
         function initGapi() {
             gapi.load('client:picker', () => {
-                console.log('GAPI loaded');
+                console.log('✅ GAPI client:picker loaded');
+                // Initialize client with API key and Drive API
+                gapi.client.init({
+                    apiKey: '<?= $config['google_drive_api_key'] ?? '' ?>',
+                    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
+                }).then(() => {
+                    console.log('✅ GAPI client initialized with Drive API v3');
+                }).catch((error) => {
+                    console.error('❌ GAPI client init failed:', error);
+                });
             });
         }
     </script>
@@ -838,7 +847,7 @@ if ($isEditMode) {
                                         Google Drive
                                         <span class="dropdown-arrow" id="googleDriveArrow" style="display: none;">▼</span>
                                     </div>
-                                    <div class="google-drive-dropdown" id="googleDriveDropdown" style="display: none;">
+                                    <div class="google-drive-dropdown" id="googleDriveDropdown">
                                         <div class="dropdown-header">Connected Drives</div>
                                         <div class="connected-drives" id="connectedDrives">
                                             <div class="no-drives">No drives connected</div>
@@ -1135,6 +1144,85 @@ if ($isEditMode) {
                     <!-- Video Cards Container -->
                     <div class="bulk-file-list-improved" id="bulkFileList">
                         <!-- Video cards will be dynamically inserted here -->
+                    </div>
+                </div>
+                
+                <!-- Step 2C: CSV Bulk Import Interface -->
+                <div id="csvStep2" class="bulk-step2-content" style="display: none;">
+                    <!-- CSV Import Header -->
+                    <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="12" y1="18" x2="12" y2="12"></line>
+                                <line x1="9" y1="15" x2="15" y2="15"></line>
+                            </svg>
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600; color: #e2e8f0;">CSV Bulk Import</h3>
+                                <p style="margin: 4px 0 0 0; font-size: 0.875rem; color: #94a3b8;" id="csvFileNameDisplay">--</p>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 16px; font-size: 0.875rem; color: #cbd5e1;">
+                            <span><strong id="csvTotalCount">0</strong> videos to import</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Global Settings -->
+                    <div class="bulk-common-properties">
+                        <div style="margin-bottom: 12px;">
+                            <h4 style="margin: 0 0 8px 0; font-size: 0.9375rem; font-weight: 600; color: #e2e8f0;">Global Settings</h4>
+                            <p style="margin: 0; font-size: 0.8125rem; color: #94a3b8;">These settings apply to videos that don't have specific values in the CSV file</p>
+                        </div>
+                        <div class="bulk-common-grid">
+                            <div class="bulk-common-field">
+                                <label class="bulk-common-label">ION Networks Category</label>
+                                <select class="bulk-common-select" id="csvGlobalCategory">
+                                    <option value="">None (use CSV data)</option>
+                                    <?php echo generate_ion_category_options('', false); ?>
+                                </select>
+                            </div>
+                            
+                            <div class="bulk-common-field">
+                                <label class="bulk-common-label">ION Channels</label>
+                                <input type="text" 
+                                       class="bulk-common-input" 
+                                       id="csvGlobalChannels" 
+                                       placeholder="e.g. ion-orlando, ion-miami"
+                                       style="background: #1e293b; border: 1px solid #334155; color: white; padding: 10px 14px; border-radius: 6px; width: 100%;">
+                                <small style="color: #64748b; font-size: 0.75rem; margin-top: 4px; display: block;">Comma-separated channel slugs</small>
+                            </div>
+                            
+                            <div class="bulk-common-field">
+                                <label class="bulk-common-label">Visibility</label>
+                                <select class="bulk-common-select" id="csvGlobalVisibility">
+                                    <option value="">None (use CSV data or default to Public)</option>
+                                    <option value="Public">Public</option>
+                                    <option value="Private">Private</option>
+                                    <option value="Unlisted">Unlisted</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- CSV Import List Header -->
+                    <div class="bulk-videos-header" style="margin-top: 24px;">
+                        <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">
+                            Import List (<span id="csvImportCount">0</span>)
+                        </h3>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button type="button" 
+                                    class="btn-toggle-view" 
+                                    id="csvToggleValidation"
+                                    style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); padding: 6px 12px; cursor: pointer; font-weight: 500; font-size: 0.8125rem; border-radius: 6px;">
+                                ⚠️ Show Validation
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- CSV Import Cards Container -->
+                    <div class="bulk-file-list-improved" id="csvImportList">
+                        <!-- CSV import cards will be dynamically inserted here -->
                     </div>
                 </div>
             </div>

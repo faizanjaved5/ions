@@ -2287,6 +2287,8 @@ function openAddUserDialog() {
             height: auto;
             max-height: 90vh;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
             box-shadow: 
                 0 8px 32px rgba(0, 0, 0, 0.4),
                 0 0 0 1px hsl(var(--gold)/0.22),
@@ -2354,6 +2356,36 @@ function openAddUserDialog() {
         
         .add-user-modal-body {
             padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+            max-height: calc(90vh - 200px);
+        }
+        
+        .add-user-modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .add-user-modal-body::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+        
+        .add-user-modal-body::-webkit-scrollbar-thumb {
+            background: rgba(138, 105, 72, 0.5);
+            border-radius: 4px;
+        }
+        
+        .add-user-modal-body::-webkit-scrollbar-thumb:hover {
+            background: rgba(138, 105, 72, 0.7);
+        }
+        
+        .add-user-modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #282c34;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            flex-shrink: 0;
         }
         
         .add-user-modal .form-row {
@@ -2701,14 +2733,6 @@ function openAddUserDialog() {
             transform: rotate(180deg);
         }
         
-        .add-user-modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 1rem;
-            padding: 1.5rem;
-            border-top: 1px solid #282c34;
-        }
-        
         .add-user-modal .btn-primary,
         .add-user-modal .btn-secondary {
             padding: 0.75rem 1.5rem;
@@ -2822,19 +2846,67 @@ function openAddUserDialog() {
     // Setup bio editor functionality
     setupBioEditor();
     
-    // Close modal when clicking outside
+    // Prompt before closing modal when clicking outside
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
-            closeAddUserDialog();
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const form = modal.querySelector('#add-user-form');
+            const bioEditor = modal.querySelector('.bio-editor');
+            
+            // Check if any input has content
+            const hasContent = Array.from(form.elements).some(el => {
+                if (el.type === 'hidden') return false;
+                if (el.value && el.value.trim() !== '') {
+                    // Exclude placeholder-like values
+                    if (el.value === 'https://example.com' || el.value === '@_username') return false;
+                    return true;
+                }
+                return false;
+            }) || (bioEditor && bioEditor.textContent.trim() !== '');
+            
+            if (hasContent) {
+                if (confirm('You have unsaved changes. Are you sure you want to close this dialog?')) {
+                    closeAddUserDialog();
+                }
+            } else {
+                closeAddUserDialog();
+            }
         }
     });
     
-    // Close modal with Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeAddUserDialog();
+    // Prompt before closing modal with Escape key
+    const escapeHandler = function(e) {
+        if (e.key === 'Escape' && document.querySelector('.add-user-modal-overlay')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const modal = document.querySelector('.add-user-modal-overlay');
+            const form = modal.querySelector('#add-user-form');
+            const bioEditor = modal.querySelector('.bio-editor');
+            
+            // Check if any input has content
+            const hasContent = Array.from(form.elements).some(el => {
+                if (el.type === 'hidden') return false;
+                if (el.value && el.value.trim() !== '') {
+                    // Exclude placeholder-like values
+                    if (el.value === 'https://example.com' || el.value === '@_username') return false;
+                    return true;
+                }
+                return false;
+            }) || (bioEditor && bioEditor.textContent.trim() !== '');
+            
+            if (hasContent) {
+                if (confirm('You have unsaved changes. Are you sure you want to close this dialog?')) {
+                    closeAddUserDialog();
+                }
+            } else {
+                closeAddUserDialog();
+            }
         }
-    });
+    };
+    document.addEventListener('keydown', escapeHandler);
     
     // Setup photo upload functionality
     setupPhotoUpload();
@@ -3670,19 +3742,67 @@ function openEditUserDialog(userId, fullname, email, profileName, handle, phone,
     
     document.body.appendChild(modal);
     
-    // Close modal when clicking outside
+    // Prompt before closing modal when clicking outside
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
-            closeAddUserDialog();
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const form = modal.querySelector('#add-user-form');
+            const bioEditor = modal.querySelector('.bio-editor');
+            
+            // Check if any input has content
+            const hasContent = Array.from(form.elements).some(el => {
+                if (el.type === 'hidden') return false;
+                if (el.value && el.value.trim() !== '') {
+                    // Exclude placeholder-like values
+                    if (el.value === 'https://example.com' || el.value === '@_username') return false;
+                    return true;
+                }
+                return false;
+            }) || (bioEditor && bioEditor.textContent.trim() !== '');
+            
+            if (hasContent) {
+                if (confirm('You have unsaved changes. Are you sure you want to close this dialog?')) {
+                    closeAddUserDialog();
+                }
+            } else {
+                closeAddUserDialog();
+            }
         }
     });
     
-    // Close modal with Escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeAddUserDialog();
+    // Prompt before closing modal with Escape key
+    const escapeHandlerEdit = function(e) {
+        if (e.key === 'Escape' && document.querySelector('.add-user-modal-overlay')) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const modal = document.querySelector('.add-user-modal-overlay');
+            const form = modal.querySelector('#add-user-form');
+            const bioEditor = modal.querySelector('.bio-editor');
+            
+            // Check if any input has content
+            const hasContent = Array.from(form.elements).some(el => {
+                if (el.type === 'hidden') return false;
+                if (el.value && el.value.trim() !== '') {
+                    // Exclude placeholder-like values
+                    if (el.value === 'https://example.com' || el.value === '@_username') return false;
+                    return true;
+                }
+                return false;
+            }) || (bioEditor && bioEditor.textContent.trim() !== '');
+            
+            if (hasContent) {
+                if (confirm('You have unsaved changes. Are you sure you want to close this dialog?')) {
+                    closeAddUserDialog();
+                }
+            } else {
+                closeAddUserDialog();
+            }
         }
-    });
+    };
+    document.addEventListener('keydown', escapeHandlerEdit);
     
     // Setup photo upload functionality
     setupPhotoUpload();

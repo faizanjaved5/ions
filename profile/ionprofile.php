@@ -262,10 +262,21 @@ $version = '1.0.' . filemtime(__FILE__);
         padding:0;
         font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
         background:var(--bg);
-        color:var(--text)
+        color:var(--text);
+        border-top:none !important;
     }
     
-    .wrap{max-width:1200px;margin:0 auto;padding:32px 20px}
+    .wrap{max-width:1200px;margin:0 auto;padding:32px 20px;border-top:none !important;}
+    
+    /* Remove any white line under navbar */
+    #ion-navbar-root,
+    #ion-navbar-root *,
+    #ion-navbar-root::after,
+    #ion-navbar-root + * {
+        border-top: none !important;
+        border-bottom: none !important;
+    }
+    
     /* Default Layout (Stacked): Avatar + About in left column */
     .header{display:grid;grid-template-columns:300px 1fr;gap:40px;align-items:start;margin-top:10px}
     
@@ -770,6 +781,25 @@ $version = '1.0.' . filemtime(__FILE__);
         setTimeout(() => {
             const navbar = document.getElementById('ion-navbar-root');
             if (navbar) {
+                // Remove white border line from navbar (check both shadow DOM and regular DOM)
+                try {
+                    // Try to access shadow root
+                    if (navbar.shadowRoot) {
+                        const style = document.createElement('style');
+                        style.textContent = `
+                            * { border-top: none !important; border-bottom: none !important; }
+                            nav { border-top: none !important; border-bottom: none !important; }
+                            header { border-top: none !important; border-bottom: none !important; }
+                        `;
+                        navbar.shadowRoot.appendChild(style);
+                    }
+                    // Also remove from regular elements
+                    navbar.style.borderTop = 'none';
+                    navbar.style.borderBottom = 'none';
+                } catch (e) {
+                    console.log('Could not remove navbar border:', e);
+                }
+                
                 // Check if navbar already has theme toggle
                 const existingToggle = navbar.querySelector('[aria-label*="theme" i], [onclick*="theme" i]');
                 if (!existingToggle) {
@@ -859,7 +889,7 @@ $version = '1.0.' . filemtime(__FILE__);
 
     <?php
     // Include and render ION Featured Videos carousel for this profile
-    $carousel_path = $root . '/components/featured-videos-carousel.php';
+    $carousel_path = $root . '/includes/featured-videos.php';
     if (file_exists($carousel_path)) {
         require_once $carousel_path;
         renderFeaturedVideosCarousel($pdo, 'profile', $user['user_id']);

@@ -78,11 +78,6 @@ function handleSearchRequest($pdo, $city) {
             'timeout' => 10,
             'ignore_errors' => true,
             'user_agent' => 'ION-Search/1.0'
-        ],
-        'ssl' => [
-            'verify_peer' => false,
-            'verify_peer_name' => false,
-            'allow_self_signed' => true
         ]
     ]);
     
@@ -1129,395 +1124,41 @@ function get_video_info($video) {
 
 function get_stored_videos($slug, $category, $maxResults) {
     global $pdo;
-    
-    // First, try the new multi-channel approach
-    $stmt = $pdo->prepare("
-        SELECT 
-            v.video_id AS videoId, 
-            v.title, 
-            v.thumbnail, 
-            v.video_link,
-            v.published_at,
-            v.channel_title,
-            v.description,
-            v.tags,
-            v.view_count,
-            vc.published_at as channel_published_at,
-            vc.expires_at as channel_expires_at,
-            vc.status as channel_status,
-            vc.priority
-        FROM IONLocalVideos v
-        INNER JOIN IONLocalBlast vc ON v.video_id = vc.video_id
-        WHERE vc.channel_slug = :slug 
-        AND vc.category = :category
-        AND vc.status = 'active'
-        AND (vc.published_at IS NULL OR vc.published_at <= NOW())
-        AND (vc.expires_at IS NULL OR vc.expires_at > NOW())
-        AND v.status = 'Approved'
-        AND v.visibility = 'Public'
-        ORDER BY vc.priority DESC, vc.published_at DESC, v.published_at DESC
-        LIMIT :maxResults
-    ");
-    
+    $stmt = $pdo->prepare("SELECT video_id AS videoId, title, thumbnail, video_link FROM IONLocalVideos WHERE slug = :slug AND category = :category ORDER BY published_at DESC LIMIT :maxResults");
     $stmt->bindParam(':slug', $slug, PDO::PARAM_STR);
     $stmt->bindParam(':category', $category, PDO::PARAM_STR);
     $stmt->bindParam(':maxResults', $maxResults, PDO::PARAM_INT);
     $stmt->execute();
-    $results = $stmt->fetchAll(PDO::FETCH_OBJ);
-    
-    // If no results from multi-channel, fall back to original method for backward compatibility
-    if (empty($results)) {
-        $stmt = $pdo->prepare("
-            SELECT 
-                video_id AS videoId, 
-                title, 
-                thumbnail, 
-                video_link,
-                published_at,
-                channel_title,
-                description,
-                tags,
-                view_count
-            FROM IONLocalVideos 
-            WHERE slug = :slug 
-            AND category = :category
-            AND status = 'Approved'
-            AND visibility = 'Public'
-            ORDER BY published_at DESC 
-            LIMIT :maxResults
-        ");
-        
-        $stmt->bindParam(':slug', $slug, PDO::PARAM_STR);
-        $stmt->bindParam(':category', $category, PDO::PARAM_STR);
-        $stmt->bindParam(':maxResults', $maxResults, PDO::PARAM_INT);
-        $stmt->execute();
-        $results = $stmt->fetchAll(PDO::FETCH_OBJ);
-    }
-    
-    return $results ?: [];
+    return $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
 }
 
 function store_video($slug, $category, $video) {
     global $pdo;
-    
-    try {
-        $pdo->beginTransaction();
-        
-        $published_at = date('Y-m-d H:i:s', strtotime($video['publishedAt']));
-        
-        // First, insert/update the video in IONLocalVideos
-        $stmt = $pdo->prepare("
-            INSERT INTO IONLocalVideos (
-                video_id, title, thumbnail, video_link, published_at, 
-                channel_id, channel_title, description, tags, category_id, 
-                category_title, view_count, transcript, status, visibility, 
-                source, videotype, format, age, geo, upload_status
-            ) VALUES (
-                :video_id, :title, :thumbnail, :video_link, :published_at,
-                :channel_id, :channel_title, :description, :tags, :category_id,
-                :category_title, :view_count, :transcript, 'Approved', 'Public',
-                'Youtube', 'Youtube', 'Video', 'Everyone', 'None', 'Completed'
-            ) ON DUPLICATE KEY UPDATE
-                title = VALUES(title),
-                thumbnail = VALUES(thumbnail),
-                video_link = VALUES(video_link),
-                published_at = VALUES(published_at),
-                channel_id = VALUES(channel_id),
-                channel_title = VALUES(channel_title),
-                description = VALUES(description),
-                tags = VALUES(tags),
-                category_id = VALUES(category_id),
-                category_title = VALUES(category_title),
-                view_count = VALUES(view_count),
-                transcript = VALUES(transcript)
-        ");
-        
-        $stmt->execute([
-            ':video_id' => $video['videoId'],
-            ':title' => $video['title'],
-            ':thumbnail' => $video['thumbnail'],
-            ':video_link' => $video['video_link'] ?? 'https://www.youtube.com/watch?v=' . $video['videoId'],
-            ':published_at' => $published_at,
-            ':channel_id' => $video['channelId'] ?? '',
-            ':channel_title' => $video['channelTitle'] ?? '',
-            ':description' => $video['description'] ?? '',
-            ':tags' => $video['tags'] ?? '',
-            ':category_id' => $video['categoryId'] ?? '',
-            ':category_title' => $video['categoryTitle'] ?? '',
-            ':view_count' => $video['viewCount'] ?? 0,
-            ':transcript' => $video['transcript'] ?? '',
-        ]);
-        
-        // Then, insert/update the channel assignment in IONLocalBlast
-        $stmt = $pdo->prepare("
-            INSERT INTO IONLocalBlast (
-                video_id, channel_slug, category, published_at, 
-                status, priority, added_at
-            ) VALUES (
-                :video_id, :channel_slug, :category, :published_at,
-                'active', 0, NOW()
-            ) ON DUPLICATE KEY UPDATE
-                published_at = VALUES(published_at),
-                status = 'active',
-                priority = GREATEST(priority, VALUES(priority))
-        ");
-        
-        $stmt->execute([
-            ':video_id' => $video['videoId'],
-            ':channel_slug' => $slug,
-            ':category' => $category,
-            ':published_at' => $published_at,
-        ]);
-        
-        $pdo->commit();
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        error_log("Error storing video {$video['videoId']} for channel {$slug}: " . $e->getMessage());
-        throw $e;
-    }
-}
-
-// Multi-channel video management functions
-
-/**
- * Add a video to multiple channels
- */
-function add_video_to_channels($video_id, $channels, $category = 'General', $published_at = null, $expires_at = null, $priority = 0) {
-    global $pdo;
-    
-    try {
-        $pdo->beginTransaction();
-        
-        $published_at = $published_at ?: date('Y-m-d H:i:s');
-        
-        foreach ($channels as $channel_slug) {
-            $stmt = $pdo->prepare("
-                INSERT INTO IONLocalBlast (
-                    video_id, channel_slug, category, published_at, expires_at,
-                    status, priority, added_at
-                ) VALUES (
-                    :video_id, :channel_slug, :category, :published_at, :expires_at,
-                    'active', :priority, NOW()
-                ) ON DUPLICATE KEY UPDATE
-                    published_at = VALUES(published_at),
-                    expires_at = VALUES(expires_at),
-                    status = 'active',
-                    priority = GREATEST(priority, VALUES(priority))
-            ");
-            
-            $stmt->execute([
-                ':video_id' => $video_id,
-                ':channel_slug' => $channel_slug,
-                ':category' => $category,
-                ':published_at' => $published_at,
-                ':expires_at' => $expires_at,
-                ':priority' => $priority,
-            ]);
-        }
-        
-        $pdo->commit();
-        return true;
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        error_log("Error adding video {$video_id} to channels: " . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Remove a video from a specific channel
- */
-function remove_video_from_channel($video_id, $channel_slug, $category = null) {
-    global $pdo;
-    
-    $sql = "DELETE FROM IONLocalBlast WHERE video_id = :video_id AND channel_slug = :channel_slug";
-    $params = [':video_id' => $video_id, ':channel_slug' => $channel_slug];
-    
-    if ($category) {
-        $sql .= " AND category = :category";
-        $params[':category'] = $category;
-    }
-    
-    $stmt = $pdo->prepare($sql);
-    return $stmt->execute($params);
-}
-
-/**
- * Get all channels where a video is published
- */
-function get_video_channels($video_id) {
-    global $pdo;
-    
-    $stmt = $pdo->prepare("
-        SELECT 
-            vc.channel_slug,
-            vc.category,
-            vc.published_at,
-            vc.expires_at,
-            vc.status,
-            vc.priority,
-            n.city_name,
-            n.channel_name
-        FROM IONLocalBlast vc
-        LEFT JOIN IONLocalNetwork n ON vc.channel_slug = n.slug
-        WHERE vc.video_id = :video_id
-        ORDER BY vc.priority DESC, vc.published_at DESC
-    ");
-    
-    $stmt->execute([':video_id' => $video_id]);
-    return $stmt->fetchAll(PDO::FETCH_OBJ);
-}
-
-/**
- * Update video channel schedule
- */
-function update_video_channel_schedule($video_id, $channel_slug, $category, $published_at = null, $expires_at = null, $priority = null) {
-    global $pdo;
-    
-    $updates = [];
-    $params = [':video_id' => $video_id, ':channel_slug' => $channel_slug, ':category' => $category];
-    
-    if ($published_at !== null) {
-        $updates[] = "published_at = :published_at";
-        $params[':published_at'] = $published_at;
-    }
-    
-    if ($expires_at !== null) {
-        $updates[] = "expires_at = :expires_at";
-        $params[':expires_at'] = $expires_at;
-    }
-    
-    if ($priority !== null) {
-        $updates[] = "priority = :priority";
-        $params[':priority'] = $priority;
-    }
-    
-    if (empty($updates)) {
-        return false;
-    }
-    
-    $sql = "UPDATE IONLocalBlast SET " . implode(', ', $updates) . 
-           " WHERE video_id = :video_id AND channel_slug = :channel_slug AND category = :category";
-    
-    $stmt = $pdo->prepare($sql);
-    return $stmt->execute($params);
-}
-
-/**
- * Get videos scheduled for a specific time range
- */
-function get_scheduled_videos($start_date = null, $end_date = null) {
-    global $pdo;
-    
-    $start_date = $start_date ?: date('Y-m-d H:i:s');
-    $end_date = $end_date ?: date('Y-m-d H:i:s', strtotime('+1 day'));
-    
-    $stmt = $pdo->prepare("
-        SELECT 
-            v.video_id,
-            v.title,
-            v.thumbnail,
-            v.video_link,
-            vc.channel_slug,
-            vc.category,
-            vc.published_at,
-            vc.expires_at,
-            vc.status,
-            n.city_name,
-            n.channel_name
-        FROM IONLocalVideos v
-        INNER JOIN IONLocalBlast vc ON v.video_id = vc.video_id
-        LEFT JOIN IONLocalNetwork n ON vc.channel_slug = n.slug
-        WHERE vc.published_at BETWEEN :start_date AND :end_date
-        AND vc.status = 'scheduled'
-        ORDER BY vc.published_at ASC
-    ");
-    
-    $stmt->execute([':start_date' => $start_date, ':end_date' => $end_date]);
-    return $stmt->fetchAll(PDO::FETCH_OBJ);
-}
-
-/**
- * Activate scheduled videos (run this as a cron job)
- */
-function activate_scheduled_videos() {
-    global $pdo;
-    
-    $stmt = $pdo->prepare("
-        UPDATE IONLocalBlast 
-        SET status = 'active' 
-        WHERE status = 'scheduled' 
-        AND published_at <= NOW()
-    ");
-    
-    return $stmt->execute();
-}
-
-/**
- * Deactivate expired videos (run this as a cron job)
- */
-function deactivate_expired_videos() {
-    global $pdo;
-    
-    $stmt = $pdo->prepare("
-        UPDATE IONLocalBlast 
-        SET status = 'expired' 
-        WHERE status = 'active' 
-        AND expires_at IS NOT NULL 
-        AND expires_at <= NOW()
-    ");
-    
-    return $stmt->execute();
-}
-
-/**
- * Fallback function to fetch content using cURL
- */
-function fetch_with_curl($url) {
-    if (!function_exists('curl_init')) {
-        return false;
-    }
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
-    $result = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    return ($httpCode === 200) ? $result : false;
+    $published_at = date('Y-m-d H:i:s', strtotime($video['publishedAt']));
+    $stmt = $pdo->prepare("INSERT IGNORE INTO IONLocalVideos (slug, category, video_id, title, thumbnail, video_link, published_at, channel_id, channel_title, description, tags, category_id, category_title, view_count, transcript) VALUES (:slug, :category, :video_id, :title, :thumbnail, :video_link, :published_at, :channel_id, :channel_title, :description, :tags, :category_id, :category_title, :view_count, :transcript)");
+    $stmt->execute([
+        ':slug' => $slug,
+        ':category' => $category,
+        ':video_id' => $video['videoId'],
+        ':title' => $video['title'],
+        ':thumbnail' => $video['thumbnail'],
+        ':video_link' => $video['video_link'] ?? 'https://www.youtube.com/watch?v=' . $video['videoId'],
+        ':published_at' => $published_at,
+        ':channel_id' => $video['channelId'] ?? '',
+        ':channel_title' => $video['channelTitle'] ?? '',
+        ':description' => $video['description'] ?? '',
+        ':tags' => $video['tags'] ?? '',
+        ':category_id' => $video['categoryId'] ?? '',
+        ':category_title' => $video['categoryTitle'] ?? '',
+        ':view_count' => $video['viewCount'] ?? 0,
+        ':transcript' => $video['transcript'] ?? '',
+    ]);
 }
 
 function fetch_google_news_rss($query, $category, $max_items = 5) {
     $url = "https://news.google.com/rss/search?q=" . urlencode($query) . "&hl=en-US&gl=US&ceid=US:en";
-    
-    // Create SSL context to handle SSL issues
-    $context = stream_context_create([
-        'http' => [
-            'timeout' => 10,
-            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        ],
-        'ssl' => [
-            'verify_peer' => false,
-            'verify_peer_name' => false,
-            'allow_self_signed' => true
-        ]
-    ]);
-    
-    $rss = @file_get_contents($url, false, $context);
-    if (!$rss) {
-        // Fallback: try with cURL if file_get_contents fails
-        $rss = fetch_with_curl($url);
-        if (!$rss) return [];
-    }
+    $rss = file_get_contents($url);
+    if (!$rss) return [];
     $xml = simplexml_load_string($rss);
     if (!$xml) return [];
     $items = [];
@@ -1906,13 +1547,6 @@ document.addEventListener("DOMContentLoaded", function () {
             item.addEventListener('mouseenter', () => {
                 if (previewContainer) {
                     player.play();
-                    
-                    // Hide play button overlay when video is playing
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '0';
-                        playIcon.style.pointerEvents = 'none';
-                    }
                 }
             });
             
@@ -1920,13 +1554,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (previewContainer) {
                     player.pause();
                     player.currentTime(0);
-                    
-                    // Show play button overlay again when video stops
-                    const playIcon = item.querySelector('.play-icon-overlay');
-                    if (playIcon) {
-                        playIcon.style.opacity = '1';
-                        playIcon.style.pointerEvents = 'auto';
-                    }
                 }
             });
         }

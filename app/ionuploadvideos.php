@@ -986,6 +986,44 @@ function handlePlatformImport() {
     error_log('🎬 Platform import - Session data: ' . json_encode($_SESSION));
     
     $url = $_POST['url'] ?? '';
+    
+    // Determine which user should own this video
+    $targetUserEmail = $_SESSION['user_email'] ?? 'test@example.com';
+    
+    // Check if IONEER is specified (for CSV bulk imports)
+    if (!empty($_POST['ioneer'])) {
+        // SECURITY: Only Admins and Owners can assign videos to other users
+        // Get current logged-in user's role
+        $currentUser = $db->get_row("SELECT user_role FROM IONEERS WHERE email = ?", $targetUserEmail);
+        $currentUserRole = $currentUser->user_role ?? 'user';
+        $isAdminOrOwner = in_array(strtolower($currentUserRole), ['owner', 'admin', 'administrator', 'super_admin']);
+        
+        if ($isAdminOrOwner) {
+            // Admin/Owner: Can assign to any IONEER
+            $ioneerHandle = trim($_POST['ioneer']);
+            // Strip @ if present
+            if (strpos($ioneerHandle, '@') === 0) {
+                $ioneerHandle = substr($ioneerHandle, 1);
+            }
+            
+            error_log('🎬 Platform import - IONEER specified by Admin/Owner: @' . $ioneerHandle);
+            
+            // Look up user by handle
+            $ioneerUser = $db->get_row("SELECT email FROM IONEERS WHERE handle = ?", $ioneerHandle);
+            
+            if ($ioneerUser && !empty($ioneerUser->email)) {
+                $targetUserEmail = $ioneerUser->email;
+                error_log('✅ Platform import - Found IONEER user: ' . $targetUserEmail);
+            } else {
+                error_log('⚠️ Platform import - IONEER not found: @' . $ioneerHandle . ', using logged-in user');
+            }
+        } else {
+            // Regular user: Can only import to their own profile
+            error_log('🔒 Platform import - IONEER column ignored (user role: ' . $currentUserRole . '). Regular users can only import to their own profile.');
+            error_log('ℹ️ Platform import - Video will be assigned to logged-in user: ' . $targetUserEmail);
+        }
+    }
+    
     $metadata = [
         'title' => $_POST['title'] ?? 'Imported Video',
         'description' => $_POST['description'] ?? '',
@@ -993,7 +1031,7 @@ function handlePlatformImport() {
         'tags' => $_POST['tags'] ?? '',
         'visibility' => $_POST['visibility'] ?? 'public',
         'badges' => $_POST['badges'] ?? '',
-        'user_email' => $_SESSION['user_email'] ?? 'test@example.com'
+        'user_email' => $targetUserEmail
     ];
     
     error_log('🎬 Platform import - Processed metadata: ' . json_encode($metadata));
@@ -2080,8 +2118,10 @@ function uploadFileToR2($filePath, $objectKey, $contentType, $r2Config) {
  */
 function generateShareTemplate($videoId, $shortLink, $title, $db) {
     try {
-        // Generate video URL
-        $videoUrl = "https://iblog.bz/v/" . $shortLink;
+        // Generate video URL dynamically based on current domain
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'iblog.bz';
+        $videoUrl = $protocol . "://" . $host . "/v/" . $shortLink;
         
         // Simple template HTML (same structure as Enhanced Share Manager)
         $template = '<script type="text/template" id="enhanced-share-template-' . $videoId . '">

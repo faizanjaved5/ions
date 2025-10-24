@@ -102,6 +102,16 @@ if ($existing_user) {
     exit();
 }
 
+// Check if handle already exists (if provided)
+if (!empty($input['handle'])) {
+    $existing_handle = $db->get_var($db->prepare("SELECT user_id FROM IONEERS WHERE handle = %s", trim($input['handle'])));
+    if ($existing_handle) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Handle is already taken by another user']);
+        exit();
+    }
+}
+
 // Validate role
 $valid_roles = ['Owner', 'Admin', 'Creator', 'Member', 'Viewer', 'Guest'];
 if (!in_array($input['user_role'], $valid_roles)) {
@@ -201,7 +211,7 @@ $user_data = [
 
 // Add optional fields if provided
 if (!empty($input['phone'])) {
-    $user_data['phone'] = trim($input['phone']);
+    $user_data['phone_number'] = trim($input['phone']); // Form uses 'phone' but DB column is 'phone_number'
 }
 
 // Handle photo URL - either from upload or URL input
@@ -220,8 +230,20 @@ if (!empty($input['profile_name'])) {
     $user_data['profile_name'] = trim($input['profile_name']);
 }
 
+if (!empty($input['handle'])) {
+    $user_data['handle'] = trim($input['handle']);
+}
+
 if (!empty($input['user_url'])) {
     $user_data['user_url'] = trim($input['user_url']);
+}
+
+if (!empty($input['location'])) {
+    $user_data['location'] = trim($input['location']);
+}
+
+if (!empty($input['about'])) {
+    $user_data['about'] = trim($input['about']);
 }
 
 // Set default preferences

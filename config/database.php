@@ -29,6 +29,9 @@ class IONDatabase {
 
     /** @var int|string */
     public $insert_id = 0;
+    
+    /** @var int */
+    public $num_rows = 0;
 
     public function __construct(?array $configOverride = null) {
         $this->connect($configOverride);
@@ -290,12 +293,41 @@ class IONDatabase {
     }
 
     /**
-     * Direct query (for e.g., FULLTEXT or administrative ops).
+     * Direct query with optional parameter binding support.
+     * If parameters are provided, uses prepared statements.
+     * Otherwise, executes raw SQL (for e.g., FULLTEXT or administrative ops).
      */
-    public function query(string $sql) {
+    public function query(string $sql, ...$args) {
         $this->ensurePDO();
+        
+        // If parameters provided, use prepared statement
+        if (!empty($args)) {
+            try {
+                $stmt = $this->execute($sql, ...$args);
+                if ($stmt === false) {
+                    return false;
+                }
+                
+                // Set insert_id for INSERT queries
+                $this->insert_id = $this->pdo->lastInsertId();
+                $this->num_rows = $stmt->rowCount();
+                
+                return $stmt;
+            } catch (Throwable $e) {
+                $this->last_error = $e->getMessage();
+                error_log('[IONDatabase] Query Error (prepared): ' . $e->getMessage());
+                return false;
+            }
+        }
+        
+        // Raw query (no parameters)
         try {
-            return $this->pdo->query($sql);
+            $result = $this->pdo->query($sql);
+            if ($result !== false) {
+                $this->insert_id = $this->pdo->lastInsertId();
+                $this->num_rows = $result->rowCount();
+            }
+            return $result;
         } catch (Throwable $e) {
             $this->last_error = $e->getMessage();
             error_log('[IONDatabase] Query Error: ' . $e->getMessage());

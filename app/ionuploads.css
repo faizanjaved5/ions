@@ -2077,17 +2077,25 @@ body {
     z-index: 1000;
     max-height: 300px;
     overflow-y: auto;
-    margin-top: 4px;
+    margin-top: -2px; /* Overlap slightly to prevent gap mouseleave issues */
+    padding-top: 6px; /* Add padding inside to maintain visual spacing */
     pointer-events: auto;
+    display: none; /* Hidden by default */
 }
 
-/* Keep dropdown open when hovering the wrapper (button + dropdown) */
-.gd-wrapper:hover .google-drive-dropdown {
+/* Show dropdown when marked as visible */
+.google-drive-dropdown.visible {
     display: block !important;
 }
 
-/* Also allow click-to-toggle via .open class */
+/* Keep dropdown open when hovering the wrapper (button + dropdown) */
+.gd-wrapper:hover .google-drive-dropdown,
 .gd-wrapper.open .google-drive-dropdown {
+    display: block !important;
+}
+
+/* Prevent dropdown from closing when hovering over it */
+.google-drive-dropdown:hover {
     display: block !important;
 }
 

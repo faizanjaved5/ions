@@ -5,9 +5,9 @@
  * By Omar Sayed
  * Notes:
  * - All original logic (debug logging, required-file checks, IONDatabase usage,
- *   transients, canonicalization, Unsplash fallback, 404 template, globals for template) is preserved.
+ * transients, canonicalization, Unsplash fallback, 404 template, globals for template) is preserved.
  * - Added a lightweight @username profile route that exits early if matched.
- * 
+ *
  * The iondynamic.php is a central dynamic routing handler that serves both city pages and @username profile pages with caching, logging, and image handling.
  * It does the following:
  * - Enables or disables dynamic routing globally via a toggle.
@@ -22,32 +22,26 @@
  * - Sets global template variables for city name, image, alt text, and credits.
  * - Loads the ioncity.php template to render the city page.
  */
-
 // Enable error reporting for debugging (original)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-
 // Log function for debugging (original)
 function debug_log($message) {
     $timestamp = date('Y-m-d H:i:s');
     file_put_contents(__DIR__ . '/debug.log', "[$timestamp] $message\n", FILE_APPEND);
 }
-
 debug_log("=== Starting iondynamic.php ===");
-
-$dynamic_enabled = true;  // (original)
+$dynamic_enabled = true; // (original)
 if (!$dynamic_enabled) {
     debug_log("Dynamic rendering disabled");
     return;
 }
-
 // Check if required files exist (original)
 $required_files = [
     __DIR__ . '/config/database.php',
-    __DIR__ . '/city/helper-functions.php',
-    __DIR__ . '/city/ioncity.php'
+    __DIR__ . '/channel/helper-functions.php',
+    __DIR__ . '/channel/ioncity.php'
 ];
-
 foreach ($required_files as $file) {
     if (!file_exists($file)) {
         debug_log("MISSING FILE: $file");
@@ -56,17 +50,14 @@ foreach ($required_files as $file) {
         debug_log("Found file: $file");
     }
 }
-
 // Include required files with error handling (original)
 try {
     debug_log("Including database.php");
     require_once(__DIR__ . '/config/database.php');
     debug_log("Database.php included successfully");
-
     debug_log("Including helper-functions.php");
-    require_once(__DIR__ . '/city/helper-functions.php');
+    require_once(__DIR__ . '/channel/helper-functions.php');
     debug_log("Helper-functions.php included successfully");
-
     // Check if unsplash.php exists before including (original with fallback)
     if (file_exists(__DIR__ . '/unsplash.php')) {
         debug_log("Including unsplash.php");
@@ -89,10 +80,113 @@ try {
     debug_log("ERROR including files: " . $e->getMessage());
     die("Error including required files: " . $e->getMessage());
 }
-
+// =================== EARLY STATIC FILE SKIP ===================
+// Skip dynamic processing for common static assets (prevents redirects/processing)
+function ion_original_path(): string {
+    // Prefer envs set by .htaccess first
+    foreach (['ORIG_URI', 'UNENCODED_URL', 'REDIRECT_URL', 'REDIRECT_REQUEST_URI', 'REQUEST_URI'] as $k) {
+        if (!empty($_SERVER[$k])) {
+            $path = parse_url($_SERVER[$k], PHP_URL_PATH);
+            if (is_string($path) && $path !== '') return $path;
+        }
+    }
+    return '/';
+}
+$request_path = ion_original_path();
+debug_log("Request path: $request_path");
+$static_exts = ['ico', 'png', 'jpg', 'jpeg', 'gif', 'css', 'js', 'woff', 'ttf', 'svg', 'mp4', 'webm', 'ogg'];
+if (preg_match('/\.(' . implode('|', $static_exts) . ')$/i', $request_path)) {
+    debug_log("Static asset: $request_path - abort");
+    return;
+}
+// Add more patterns if needed, e.g.:
+// if (strpos($request_path, '/wp-admin/') === 0 || strpos($request_path, '/assets/') === 0) {
+//     debug_log("Non-dynamic path: $request_path - abort");
+//     return;
+// }
+// ==============================================================
+// =================== DOMAIN ➜ SLUG OVERRIDE (ALWAYS) ===================
+// If the request host is a mapped domain, ALWAYS override $_GET['slug']
+// and mark this request as a parked/mapped domain view.
+// Prefer explicit envs from .htaccess; fall back to Apache defaults
+$__ion_host = $_SERVER['VHOST'] ?? $_SERVER['HTTP_HOST'] ?? '';
+$__ion_orig_uri = $_SERVER['ORIG_URI'] ?? $_SERVER['REQUEST_URI'] ?? '/';
+debug_log("Env host={$__ion_host} | ORIG_URI={$__ion_orig_uri} | REQ_URI=" . ($_SERVER['REQUEST_URI'] ?? ''));
+// Normalize host for lookups (treat www. the same as apex)
+$__ion_host = preg_replace('/^www\./i', '', $__ion_host);
+$__PRIMARY_HOSTS = [
+    'ions.com',
+    'www.ions.com',
+    'iblog.bz',
+    'www.iblog.bz',
+    // add any other “primary” hosts that should NOT force override
+];
+$__IS_MAPPED_DOMAIN = false;
+try {
+    if (!empty($__ion_host) && !in_array(strtolower($__ion_host), array_map('strtolower', $__PRIMARY_HOSTS), true)) {
+        global $wpdb;
+        if (empty($wpdb) || !($wpdb instanceof IONDatabase)) {
+            $wpdb = new IONDatabase();
+        }
+        if (!method_exists($wpdb, 'isConnected') || $wpdb->isConnected()) {
+            $___row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT slug FROM IONLocalNetwork WHERE custom_domain = %s OR domain = %s LIMIT 1",
+                    $__ion_host, $__ion_host
+                )
+            );
+            if ($___row && !empty($___row->slug)) {
+                $_GET['slug'] = $___row->slug; // force override
+                $__IS_MAPPED_DOMAIN = true; // flag for later logic
+                if (function_exists('debug_log')) {
+                    debug_log("FORCE OVERRIDE by domain: {$__ion_host} -> slug={$___row->slug}");
+                }
+            } else {
+                if (function_exists('debug_log')) {
+                    debug_log("Domain not mapped: {$__ion_host} (no override)");
+                }
+            }
+        } else {
+            if (function_exists('debug_log')) {
+                debug_log("Domain override skipped: DB connection not available");
+            }
+        }
+    }
+} catch (Throwable $e) {
+    if (function_exists('debug_log')) {
+        debug_log("Domain override error: " . $e->getMessage());
+    }
+}
+// =================== HEURISTIC MAPPED DETECTION (FALLBACK) ===================
+// If DB didn't map, check if host follows "ion[-]slug.tld" pattern and treat as mapped
+if (!$__IS_MAPPED_DOMAIN && !empty($__ion_host)) {
+    // Only for non-primary hosts (consistent with DB logic)
+    if (!in_array(strtolower($__ion_host), array_map('strtolower', $__PRIMARY_HOSTS), true)) {
+        $hostForHeuristic = $__ion_host; // Already normalized
+        if (preg_match('/^ion-?([a-z0-9\-]+)\./', $hostForHeuristic, $m) && !empty($m[1])) {
+            $__IS_MAPPED_DOMAIN = true;
+            $heuristic_slug = 'ion-' . strtolower($m[1]);
+            if (empty($_GET['slug'])) {
+                $_GET['slug'] = $heuristic_slug;
+                debug_log("Early heuristic slug set: $heuristic_slug");
+            }
+            debug_log("Heuristic mapped detection: host=$hostForHeuristic -> mapped=true");
+        }
+    }
+}
+// Update global flag
+$GLOBALS['ION_IS_MAPPED_DOMAIN'] = $__IS_MAPPED_DOMAIN;
+// Cache-Control for mapped (already exists, but ensure it's after this)
+if (!headers_sent() && !empty($GLOBALS['ION_IS_MAPPED_DOMAIN'])) {
+    header('Cache-Control: private, no-store, no-cache, must-revalidate');
+    header('X-ION-Route: mapped');
+    debug_log('Mapped-domain request: ' . ($_SERVER['HTTP_HOST'] ?? ''));
+}
+// Expose the flag for later (canonicalization/template/etc.)
+// ======================================================================
 /* ============================= ION PROFILES: @username (ADDED) =============================
    Supports:
-     - Rewrite form:    ^@([A-Za-z0-9._-]+)/?$  iondynamic.php?route=profile&handle=$1 [QSA,L]
+     - Rewrite form: ^@([A-Za-z0-9._-]+)/?$ iondynamic.php?route=profile&handle=$1 [QSA,L]
      - Direct path hit: /@username
    This block is self-contained, uses native PHP only, logs via debug_log, and exits on match.
    It does not alter or rely on the city routing below.
@@ -101,7 +195,6 @@ try {
     // Determine if the request is a profile route
     $is_profile = false;
     $handle = '';
-
     // 1) Querystring-based route (via .htaccess rewrite)
     if (isset($_GET['route']) && $_GET['route'] === 'profile' && !empty($_GET['handle'])) {
         $handle = $_GET['handle'];
@@ -116,7 +209,6 @@ try {
             $is_profile = true;
         }
     }
-
     if ($is_profile) {
         // Validate handle
         if (!preg_match('/^[A-Za-z0-9._-]{1,64}$/', $handle)) {
@@ -125,17 +217,14 @@ try {
             echo '<h2>Profile not found.</h2>';
             exit;
         }
-
         $ip = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
         $ts = date('Y-m-d H:i:s');
         debug_log("Profile view: @$handle | $ip | $ts");
-
         $profile_file = __DIR__ . '/profile/ionprofile.php';
         if (file_exists($profile_file)) {
             require $profile_file;
             exit; // Important: stop here, do not fall through to city routing
         }
-
         debug_log("Profile file missing: $profile_file");
         http_response_code(404);
         echo '<h2>Profile not found.</h2>';
@@ -143,39 +232,73 @@ try {
     }
 })();
 /* =========================== END ION PROFILES: @username (ADDED) ========================== */
-
-// Get and validate slug (original)
-$slug_raw   = $_GET['slug'] ?? '';
-$subpath    = sanitize_text_field($_GET['subpath'] ?? '');
-$slug_raw   = str_replace('+', '-', $slug_raw);
-$slug       = strtolower(sanitize_title($slug_raw));
-$ip_address = $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
-$timestamp  = date('Y-m-d H:i:s');
-
+// ---------------- Get and validate slug (FINAL) ----------------
+// 1) If the domain->slug override didn't fire, try to derive from the original path
+if (empty($_GET['slug'])) {
+    $path = ion_original_path();
+    if (preg_match('#/(ion-[a-z0-9\-]+)(?:/|$)#i', $path, $m)) {
+        $_GET['slug'] = strtolower($m[1]);
+        debug_log("Fallback slug from path: {$_GET['slug']} (path={$path})");
+    } else {
+        debug_log("No slug in path (path={$path})");
+    }
+}
+// 2) Normalize slug (now that $_GET['slug'] may have been set)
+$subpath = sanitize_text_field($_GET['subpath'] ?? '');
+$slug_raw = $_GET['slug'] ?? '';
+$slug_raw = str_replace('+', '-', $slug_raw);
+$slug = strtolower(sanitize_title($slug_raw));
 debug_log("Processed slug: '$slug' from raw: '$slug_raw'");
-
-// Ignore favicon requests (original)
-$ignored_slugs = ['favicon', 'favicon.ico'];
-if (in_array($slug, $ignored_slugs)) {
+// 3) Ignore favicon
+if (in_array($slug, ['favicon', 'favicon.ico'], true)) {
     debug_log("Ignored slug: $slug");
     return;
 }
-
-if (empty($slug)) {
-    debug_log("Empty slug provided");
+// Last-chance: if mapped domain and slug still empty, try domain->slug again
+if ($slug === '' && !empty($GLOBALS['ION_IS_MAPPED_DOMAIN'])) {
+    try {
+        $hostForLookup = preg_replace('/^www\./i', '', ($_SERVER['HTTP_HOST'] ?? ''));
+        if (!empty($hostForLookup)) {
+            if (empty($wpdb) || !($wpdb instanceof IONDatabase)) {
+                $wpdb = new IONDatabase();
+            }
+            if (!method_exists($wpdb, 'isConnected') || $wpdb->isConnected()) {
+                $row2 = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT slug FROM IONLocalNetwork WHERE custom_domain = %s OR domain = %s LIMIT 1",
+                        $hostForLookup, $hostForLookup
+                    )
+                );
+                if ($row2 && !empty($row2->slug)) {
+                    $_GET['slug'] = $row2->slug;
+                    $slug_raw = $_GET['slug'];
+                    $slug = strtolower(sanitize_title(str_replace('+','-',$slug_raw)));
+                    debug_log("Last-chance domain lookup set slug={$slug} for host={$hostForLookup}");
+                } else {
+                    debug_log("Last-chance lookup found no row for host={$hostForLookup}");
+                }
+            } else {
+                debug_log("Last-chance lookup skipped: DB not connected");
+            }
+        }
+    } catch (Throwable $ee) {
+        debug_log("Last-chance lookup error: " . $ee->getMessage());
+    }
+}
+// 4) Bail if still empty
+if ($slug === '') {
+    debug_log("Empty slug provided (host=" . ($_SERVER['HTTP_HOST'] ?? '') . ", ORIG_URI=" . ($_SERVER['ORIG_URI'] ?? '') . ", REQ_URI=" . ($_SERVER['REQUEST_URI'] ?? '') . ")");
     http_response_code(400);
     echo '<h2>Invalid request: missing slug.</h2>';
     exit;
 }
-
 debug_log("Processing request for slug: $slug");
-
+if (!headers_sent()) header("X-ION-Debug-Slug: " . $slug);
 // Initialize database connection (original)
 try {
     debug_log("Initializing database connection");
     global $wpdb;
     $wpdb = new IONDatabase();
-
     if (!$wpdb->isConnected()) {
         debug_log("ERROR: Database connection failed");
         http_response_code(500);
@@ -189,13 +312,11 @@ try {
     echo '<h2>Database initialization error: ' . $e->getMessage() . '</h2>';
     exit;
 }
-
 // Look up city data (original with transients)
 try {
     debug_log("Looking up city data for slug: $slug");
     $cache_key = 'ion_city_' . $slug;
     $city = get_transient($cache_key);
-
     if ($city === false) {
         debug_log("No cache found, querying database");
         $city = $wpdb->get_row($wpdb->prepare("SELECT * FROM IONLocalNetwork WHERE LOWER(slug) = %s", $slug));
@@ -214,15 +335,13 @@ try {
     echo '<h2>Database query error: ' . $e->getMessage() . '</h2>';
     exit;
 }
-
 if (!$city || empty($city->slug)) {
     debug_log("City not found, showing 404");
     http_response_code(404);
     header('Cache-Control: no-cache, no-store, must-revalidate');
     header('Pragma: no-cache');
     header('Expires: 0');
-
-    $template_404 = __DIR__ . '/city/404.php';
+    $template_404 = __DIR__ . '/channel/404.php';
     if (file_exists($template_404)) {
         debug_log("Including 404 template");
         include $template_404;
@@ -233,47 +352,60 @@ if (!$city || empty($city->slug)) {
     }
     exit;
 }
-
 debug_log("City found: " . $city->city_name . " (Status: " . ($city->status ?? 'Unknown') . ")");
-
-// Handle URL canonicalization (original)
-$current_path = '';
+// =================== HEURISTIC CUSTOM DOMAIN SETTING & STATUS NORMALIZATION ===================
+// For heuristic mapped domains, set custom_domain on city object if missing (for template validation)
+// Also normalize status to lowercase for consistency
+if (!empty($GLOBALS['ION_IS_MAPPED_DOMAIN']) && empty($city->custom_domain)) {
+    $city->custom_domain = preg_replace('/^www\./i', '', $_SERVER['HTTP_HOST'] ?? '');
+    debug_log("Heuristic set custom_domain: " . $city->custom_domain . " for slug: " . $city->slug);
+}
+$city->status = strtolower($city->status ?? '');
+debug_log("Normalized status to: " . $city->status . " for slug: " . $city->slug);
+// =====================================================================
+// ---------------- Canonicalization (mapped-domain safe) ----------------
 try {
-    if (!empty($_SERVER['REQUEST_URI'])) {
-        $parsed_url = @parse_url($_SERVER['REQUEST_URI']);
-        if (!empty($parsed_url['path'])) {
-            $parsed_path = trim($parsed_url['path'], '/');
-            if (!empty($parsed_path)) {
-                $current_path = strtolower($parsed_path);
-                if (!empty($city->slug) && $current_path !== strtolower($city->slug)) {
-                    $redirect_url = (function () {
-                        // Prefer site URL if available in helpers; fallback to host header
-                        if (function_exists('get_site_url')) {
-                            return rtrim(get_site_url(), '/') . '/';
-                        }
-                        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-                        return $scheme . '://' . $host . '/';
-                    })() . $city->slug;
-
-                    debug_log("Redirecting to canonical URL: $redirect_url");
-                    header("Location: $redirect_url", true, 301);
-                    exit;
-                }
+    $req_uri = $_SERVER['REQUEST_URI'] ?? '/';
+    $parsed = @parse_url($req_uri);
+    $path_only = trim((string)($parsed['path'] ?? ''), '/'); // e.g. "", "ion-dallas"
+    $qs = isset($parsed['query']) && $parsed['query'] !== '' ? ('?' . $parsed['query']) : '';
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $is_mapped = !empty($GLOBALS['ION_IS_MAPPED_DOMAIN']);
+    $slug_lc = strtolower($city->slug ?? '');
+    if ($is_mapped) {
+        // ✅ For mapped/parked domains: canonical URL is the domain root (no slug in path)
+        if ($path_only !== '') {
+            $redirect_url = $scheme . '://' . $host . '/' . $qs; // collapse to "/"
+            debug_log("Mapped canonical: remove path '{$path_only}' -> {$redirect_url}");
+            if (!headers_sent()) {
+                header('X-ION-Canonical: root');
+                header("Location: {$redirect_url}", true, 301);
             }
+            exit;
+        }
+        // Already at root — serve content as-is (no redirect)
+    } else {
+        // 🌐 On primary hosts only, keep canonical path at "/{slug}"
+        if ($slug_lc !== '' && $path_only !== $slug_lc) {
+            $redirect_url = $scheme . '://' . $host . '/' . $slug_lc . $qs;
+            debug_log("Primary host canonical -> slug path: {$redirect_url}");
+            if (!headers_sent()) {
+                header('X-ION-Canonical: slug');
+                header("Location: {$redirect_url}", true, 301);
+            }
+            exit;
         }
     }
 } catch (Throwable $e) {
-    debug_log("Path processing error: " . $e->getMessage());
+    debug_log("Canonicalization error: " . $e->getMessage());
 }
-
 // Process images / Unsplash (original semantics preserved)
 debug_log("Processing images");
 $refresh = isset($_GET['refresh']) || isset($_GET['refresh_image']);
 $image_path = $city->image_path ?? '';
 $image_alt = '';
 $attribution = '';
-
 if (empty($image_path) || $refresh) {
     debug_log("Fetching background image");
     try {
@@ -282,23 +414,21 @@ if (empty($image_path) || $refresh) {
             $image_path = $data['image'];
             $image_alt = $data['alt'];
             $attribution = $data['credit'];
-
             if (empty($data['is_fallback'])) {
                 debug_log("Updating image in database");
                 $updated = $wpdb->update(
                     'IONLocalNetwork',
                     [
-                        'image_path'   => $image_path,
+                        'image_path' => $image_path,
                         'image_credit' => $attribution,
-                        'image_alt'    => $image_alt
+                        'image_alt' => $image_alt
                     ],
                     ['slug' => $city->slug]
                 );
-
                 if ($updated !== false) {
-                    $city->image_path   = $image_path;
+                    $city->image_path = $image_path;
                     $city->image_credit = $attribution;
-                    $city->image_alt    = $image_alt;
+                    $city->image_alt = $image_alt;
                     set_transient($cache_key, $city, HOUR_IN_SECONDS * 24);
                     debug_log("Image updated successfully");
                 } else {
@@ -312,25 +442,37 @@ if (empty($image_path) || $refresh) {
         debug_log("Error fetching background image: " . $e->getMessage());
     }
 }
-
 // Set template variables (original)
 debug_log("Setting template variables");
-$GLOBALS['ion_city_data']   = $city;
+$GLOBALS['ion_city_data'] = $city;
 $GLOBALS['ion_image_source'] = $image_path;
 $GLOBALS['ion_image_credit'] = $city->image_credit ?? $attribution;
-$GLOBALS['ion_image_alt']    = $city->image_alt ?? '';
-
+$GLOBALS['ion_image_alt'] = $city->image_alt ?? '';
 // Load template (original)
-$template_path = __DIR__ . '/city/ioncity.php';
+// ---------------- Template selection based on "type" ----------------
+$page_type = strtolower(trim($city->type ?? 'city'));
+$GLOBALS['ion_page_type'] = $page_type; // expose to templates if needed
+// Choose the template by type
+if ($page_type === 'country') {
+    $template_path = __DIR__ . '/channel/ioncountry.php';
+} elseif ($page_type === 'state' || $page_type === 'province') {
+    $template_path = __DIR__ . '/channel/ionstate.php';
+} else {
+    $template_path = __DIR__ . '/channel/ioncity.php';
+}
+// Safety fallback if the chosen file is missing
+if (!file_exists($template_path)) {
+    debug_log("Chosen template missing for type={$page_type}: $template_path — falling back to city template");
+    $template_path = __DIR__ . '/channel/ioncity.php';
+}
+// --------------------------------------------------------------------
 debug_log("Loading template: $template_path");
-
 if (file_exists($template_path)) {
     // Set up variables for template
-    $city         = $GLOBALS['ion_city_data'];
-    $image_path   = $GLOBALS['ion_image_source'];
+    $city = $GLOBALS['ion_city_data'];
+    $image_path = $GLOBALS['ion_image_source'];
     $image_credit = $GLOBALS['ion_image_credit'];
-    $image_alt    = $GLOBALS['ion_image_alt'];
-
+    $image_alt = $GLOBALS['ion_image_alt'];
     debug_log("Including template file");
     try {
         include $template_path;
@@ -343,9 +485,8 @@ if (file_exists($template_path)) {
 } else {
     debug_log("Template file not found: $template_path");
     http_response_code(500);
-    echo '<h2>Critical error: Missing ioncity.php template in /city/ directory.</h2>';
+    echo '<h2>Critical error: Missing ioncity.php template in /channel/ directory.</h2>';
     echo '<p>Expected path: ' . htmlspecialchars($template_path) . '</p>';
 }
-
 debug_log("=== End of iondynamic.php ===");
 ?>

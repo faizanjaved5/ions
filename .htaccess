@@ -1,4 +1,14 @@
 # ============================================
+# PHP RUNTIME LIMITS (requires mod_php or LiteSpeed allowing php_value)
+# If you get a 500 error, move these to a .user.ini file instead.
+php_value upload_max_filesize 100M
+php_value post_max_size 100M
+php_value max_execution_time 300
+php_value memory_limit 512M
+php_value max_input_time 300
+# ============================================
+
+# ============================================
 # FORCE REST API REQUESTS TO WORDPRESS
 # ============================================
 # This ensures /wp-json/ calls always hit WordPress index.php
@@ -7,100 +17,157 @@ RewriteEngine On
 RewriteCond %{REQUEST_URI} ^/wp-json/ [NC]
 RewriteRule ^ index.php [L]
 
+# ================= VIRTUAL HOST EMULATION (mapped domains only) =================
+# Let actual files/dirs through (but NOT the site root)
+RewriteCond %{REQUEST_URI} !^/?$                         # <- do not short-circuit on "/"
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Avoid looping on admin/cron/login/REST/router itself
+RewriteCond %{REQUEST_URI} ^/(iondynamic\.php|wp-admin/|wp-login\.php|wp-cron\.php|wp-json/) [NC]
+RewriteRule ^ - [L]
+
+# For NON-primary hosts only, internally route everything to iondynamic.php
+# (Primary hosts will simply continue to the normal WordPress rules below.)
+# 👉 Add any other primary hostnames to the group below.
+RewriteCond %{HTTP_HOST} !^(www\.)?(ions\.com|iblog\.bz)$ [NC]
+RewriteRule ^(.*)$ /iondynamic.php [L,QSA,E=VHOST:%{HTTP_HOST},E=ORIG_URI:%{REQUEST_URI}]
+# ================================================================================
 
 # ============================================
-# BEGIN NON_LSCACHE (LiteSpeed Browser Cache)
+# REDIRECT EXACT /upload and /upload-show-or-video TO /uploader
 # ============================================
+## RewriteCond %{REQUEST_URI} ^/upload-show-or-video/?$ [NC]
+## RewriteCond %{QUERY_STRING} ^$
+## RewriteRule ^ /uploader/ [R=302,L]
+
+## RewriteCond %{REQUEST_URI} ^/upload/?$ [NC]
+## RewriteCond %{QUERY_STRING} ^$
+## RewriteRule ^ /uploader/ [R=302,L]
+
+# Redirect /app/* to /ion-login/
+## RewriteRule ^app(/.*)?$ /ion-login/ [R=302,L,NC]
+
+# Redirect /login/* to /ion-login/
+## RewriteRule ^login(/.*)?$ /ion-login/ [R=302,L,NC]
+
+# Redirect /wp-login/* to /ion-login/
+# RewriteRule ^wp-login(/.*)?$ /ion-login/ [R=302,L,NC]
+
+# Redirect /wp-login.php* to /ion-login/
+# RewriteRule ^wp-login\.php(/.*)?$ /ion-login/ [R=302,L,NC]
+
+# Redirect /terms-of-service and /terms-of-service/ to /terms
+RewriteRule ^terms-of-service/?$ /terms [R=301,L]
+
+# ============================================
+# BEGIN NON_LSCACHE
 ## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
 ### marker BROWSER CACHE start ###
 <IfModule mod_expires.c>
-	ExpiresActive on
-	ExpiresByType application/pdf A31557600
-	ExpiresByType image/x-icon A31557600
-	ExpiresByType image/vnd.microsoft.icon A31557600
-	ExpiresByType image/svg+xml A31557600
-	
-	ExpiresByType image/jpg A31557600
-	ExpiresByType image/jpeg A31557600
-	ExpiresByType image/png A31557600
-	ExpiresByType image/gif A31557600
-	ExpiresByType image/webp A31557600
-	ExpiresByType image/avif A31557600
-	
-	ExpiresByType video/ogg A31557600
-	ExpiresByType audio/ogg A31557600
-	ExpiresByType video/mp4 A31557600
-	ExpiresByType video/webm A31557600
-	
-	ExpiresByType text/css A31557600
-	ExpiresByType text/javascript A31557600
-	ExpiresByType application/javascript A31557600
-	ExpiresByType application/x-javascript A31557600
-	
-	ExpiresByType application/x-font-ttf A31557600
-	ExpiresByType application/x-font-woff A31557600
-	ExpiresByType application/font-woff A31557600
-	ExpiresByType application/font-woff2 A31557600
-	ExpiresByType application/vnd.ms-fontobject A31557600
-	ExpiresByType font/ttf A31557600
-	ExpiresByType font/otf A31557600
-	ExpiresByType font/woff A31557600
-	ExpiresByType font/woff2 A31557600
+ExpiresActive on
+ExpiresByType application/pdf A31557600
+ExpiresByType image/x-icon A31557600
+ExpiresByType image/vnd.microsoft.icon A31557600
+ExpiresByType image/svg+xml A31557600
+
+ExpiresByType image/jpg A31557600
+ExpiresByType image/jpeg A31557600
+ExpiresByType image/png A31557600
+ExpiresByType image/gif A31557600
+ExpiresByType image/webp A31557600
+ExpiresByType image/avif A31557600
+
+ExpiresByType video/ogg A31557600
+ExpiresByType audio/ogg A31557600
+ExpiresByType video/mp4 A31557600
+ExpiresByType video/webm A31557600
+
+ExpiresByType text/css A31557600
+ExpiresByType text/javascript A31557600
+ExpiresByType application/javascript A31557600
+ExpiresByType application/x-javascript A31557600
+
+ExpiresByType application/x-font-ttf A31557600
+ExpiresByType application/x-font-woff A31557600
+ExpiresByType application/font-woff A31557600
+ExpiresByType application/font-woff2 A31557600
+ExpiresByType application/vnd.ms-fontobject A31557600
+ExpiresByType font/ttf A31557600
+ExpiresByType font/otf A31557600
+ExpiresByType font/woff A31557600
+ExpiresByType font/woff2 A31557600
 </IfModule>
 ### marker BROWSER CACHE end ###
 ## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
-# ============================================
 # END NON_LSCACHE
 # ============================================
 
-
 # ============================================
-# BEGIN LSCACHE (LiteSpeed Page Cache)
-# ============================================
+# BEGIN LSCACHE
 ## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
 <IfModule LiteSpeed>
-	RewriteEngine on
-	CacheLookup on
-	RewriteRule .* - [E=Cache-Control:no-autoflush]
-	RewriteRule litespeed/debug/.*\.log$ - [F,L]
-	RewriteRule \.litespeed_conf\.dat - [F,L]
-	
+RewriteEngine on
+CacheLookup on
+RewriteRule .* - [E=Cache-Control:no-autoflush]
+RewriteRule litespeed/debug/.*\.log$ - [F,L]
+RewriteRule \.litespeed_conf\.dat - [F,L]
+
 ### marker ASYNC start ###
-	RewriteCond %{REQUEST_URI} /wp-admin/admin-ajax\.php
-	RewriteCond %{QUERY_STRING} action=async_litespeed
-	RewriteRule .* - [E=noabort:1]
+RewriteCond %{REQUEST_URI} /wp-admin/admin-ajax\.php
+RewriteCond %{QUERY_STRING} action=async_litespeed
+RewriteRule .* - [E=noabort:1]
 ### marker ASYNC end ###
-	
+
 ### marker MOBILE start ###
-	RewriteCond %{HTTP_USER_AGENT} Mobile|Android|Silk/|Kindle|BlackBerry|Opera\ Mini|Opera\ Mobi [NC]
-	RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+ismobile]
+RewriteCond %{HTTP_USER_AGENT} Mobile|Android|Silk/|Kindle|BlackBerry|Opera\ Mini|Opera\ Mobi [NC]
+RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+ismobile]
 ### marker MOBILE end ###
-	
+
 ### marker WEBP start ###
-	RewriteCond %{HTTP_ACCEPT} image/webp [OR]
-	RewriteCond %{HTTP_USER_AGENT} iPhone.*Version/(1[4-9]|[2-9][0-9]|[1-9][0-9]{2,}).*Safari [OR]
-	RewriteCond %{HTTP_USER_AGENT} Firefox/([6-9][0-9]|[1-9][0-9]{2,})
-	RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+webp]
+RewriteCond %{HTTP_ACCEPT} image/webp [OR]
+RewriteCond %{HTTP_USER_AGENT} iPhone\ OS\ (1[4-9]|[2-9][0-9]) [OR]
+RewriteCond %{HTTP_USER_AGENT} Firefox/([6-9][0-9]|[1-9][0-9]{2,})
+RewriteRule .* - [E=Cache-Control:vary=%{ENV:LSCACHE_VARY_VALUE}+webp]
 ### marker WEBP end ###
-	
+
 ### marker DROPQS start ###
-	CacheKeyModify -qs:fbclid
-	CacheKeyModify -qs:gclid
-	CacheKeyModify -qs:utm*
-	CacheKeyModify -qs:_ga
+CacheKeyModify -qs:fbclid
+CacheKeyModify -qs:gclid
+CacheKeyModify -qs:utm*
+CacheKeyModify -qs:_ga
 ### marker DROPQS end ###
+
+# 🚫 Don’t cache the dynamic router to avoid cross-domain cache bleed
+RewriteCond %{REQUEST_URI} ^/iondynamic\.php [NC]
+RewriteRule .* - [E=Cache-Control:no-cache]
+
 </IfModule>
+## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
+# END LSCACHE
+# ============================================
 
 # ✅ Disable LiteSpeed cache for REST API calls
 <IfModule LiteSpeed>
     RewriteCond %{REQUEST_URI} ^/wp-json/ [NC]
     RewriteRule .* - [E=Cache-Control:no-cache]
 </IfModule>
-## LITESPEED WP CACHE PLUGIN - Do not edit the contents of this block! ##
-# ============================================
-# END LSCACHE
-# ============================================
 
+# ✅ Disable LiteSpeed cache for /app/ directory (ION Uploader)
+<IfModule LiteSpeed>
+    RewriteCond %{REQUEST_URI} ^/app/ [NC]
+    RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>
+
+# ✅ Disable browser caching for ION Uploader JavaScript files
+<IfModule mod_headers.c>
+    <FilesMatch "ionuploader.*\.js$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires 0
+    </FilesMatch>
+</IfModule>
 
 # ============================================
 # BEGIN IONLocalNetwork Channel Routing
@@ -124,15 +191,16 @@ RewriteRule ^([a-z0-9\-]+)/?(.*)?$ - [S=1]
 # Route ion-content pages directly to WordPress
 RewriteRule ^ion-content/.*$ index.php [L]
 
-# NEW RULE: Route exact /ion path to iondynamic.php
+# Route exact /ion to iondynamic.php
 RewriteRule ^ion/?$ /iondynamic.php?slug=ion [QSA,L,NC]
 
 # Route dynamic channel pages to handler (only if NOT ion-content)
-RewriteRule ^ion-([a-z0-9\-+]+)/?(.*)?$ /iondynamic.php?slug=ion-$1&subpath=$2 [QSA,L,NC]
+# Bypass dynamic routing when ?passthrough=1 is present and match ion-* in any path segment
+RewriteCond %{QUERY_STRING} !(^|&)passthrough=1(&|$)
+RewriteRule (^|.*/)ion-([a-z0-9\-\+]+)/?(.*)?$ /iondynamic.php?slug=ion-$2&subpath=$3 [QSA,L,NC]
 # ============================================
 # END IONLocalNetwork Channel Routing
 # ============================================
-
 
 # BEGIN ION Shortlink Routing
 # Handle /v/ shortlinks - route to shortlink resolver
@@ -145,7 +213,6 @@ RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 # END ION Shortlink Routing
 
-
 ### ION: @username profile routes  -------------------------------------------
 # Matches /@alex  -> routes through central router so we can log/track
 RewriteCond %{REQUEST_URI} ^/@[A-Za-z0-9._-]+/?$ [NC]
@@ -153,7 +220,6 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^@([A-Za-z0-9._-]+)/?$ iondynamic.php?route=profile&handle=$1 [QSA,L]
 ### --------------------------------------------------------------------------
-
 
 # ============================================
 # BEGIN WordPress Core
@@ -181,7 +247,6 @@ RewriteRule . index.php [L]
 # ============================================
 # END WordPress Core
 # ============================================
-
 
 # ============================================
 # BEGIN Cookie & CORS Fix for REST API Auth
