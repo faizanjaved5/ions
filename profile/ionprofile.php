@@ -171,11 +171,20 @@ function views_str($n): string {
 // Set default theme to dark
 $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
 
+// Cache busting version
+$version = '1.0.' . filemtime(__FILE__);
+
 ?><!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- Aggressive cache prevention for CSS/JS -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <title><?php echo '@' . h($user['handle']) . ' — ION'; ?></title>
 
 <!-- Enhanced Share System -->
@@ -219,33 +228,70 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
 </style>
 
 <style>
-    /* Theme-aware CSS Variables */
-    <?php if ($theme === 'light'): ?>
-    /* Light Mode Variables */
-    :root { 
-        --bg: #ffffff; 
-        --panel: #f8f9fa; 
-        --muted: #64748b; 
-        --text: #0f172a; /* Darker slate for better readability in light mode */
-        --chip: #e2e8f0; 
-        --ring: #cbd5e1; 
-    }
-    <?php else: ?>
-    /* Dark Mode Variables (default) */
-    :root { 
-        --bg: #0f1216; 
-        --panel: #151a21; 
-        --muted: #8a94a6; 
-        --text: #e9eef7; 
-        --chip: #202733; 
-        --ring: #2c3442; 
-    }
-    <?php endif; ?>
+    /* ION Profile Styles - Version: <?= $version ?> */
+    /* Theme: <?= $theme ?> (initial) */
     
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    /* Dark Mode Variables (default)) */
+    :root,
+    body[data-theme="dark"] { 
+        --bg: #0f1216;     /* Very dark background */
+        --panel: #151a21;  /* Dark panel - subtle contrast with bg */
+        --muted: #8a94a6;  /* Muted gray-blue text */
+        --text: #e9eef7;   /* Light text */
+        --chip: #202733;   /* Dark blue chips */
+        --ring: #2c3442;   /* Dark blue-gray borders */
+    }
+    
+    /* Light Mode Variables - Override when data-theme="light" */
+    body[data-theme="light"] { 
+        --bg: #ffffff;     /* White background */
+        --panel: #f8f9fa;  /* Very light gray panels */
+        --muted: #64748b;  /* Medium gray muted text */
+        --text: #0f172a;   /* Very dark text */
+        --chip: #e9ecef;   /* Light gray chips */
+        --ring: #dee2e6;   /* Light borders */
+    }
+    
+    /* IMPORTANT: Scope resets to wrap only - DO NOT affect navbar/menu */
+    .wrap, .wrap * {
+        box-sizing: border-box;
+    }
+    
+    body{
+        margin:0;
+        padding:0;
+        font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+        background:var(--bg);
+        color:var(--text)
+    }
+    
     .wrap{max-width:1200px;margin:0 auto;padding:32px 20px}
+    /* Default Layout (Stacked): Avatar + About in left column */
     .header{display:grid;grid-template-columns:300px 1fr;gap:40px;align-items:start;margin-top:10px}
+    
+    /* Three Column Layout: Avatar | Content | About */
+    body[data-layout="three-column"] .header {
+        grid-template-columns: 300px 1fr 280px;
+        gap: 32px;
+    }
+    
+    body[data-layout="three-column"] .left-column {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    body[data-layout="three-column"] .about {
+        display: block !important; /* Override responsive hiding */
+        position: static;
+        order: 3; /* Move to third column */
+    }
+    
+    body[data-layout="three-column"] .header > .about {
+        /* When about is moved out, it becomes direct child of .header */
+        grid-column: 3;
+        grid-row: 1;
+    }
     .avatar{width:300px;height:300px;border-radius:16px;object-fit:cover;border:1px solid var(--ring);background:var(--panel)}
     .name{font-size:28px;font-weight:700;color:var(--text)}
     .sub{font-size:13px;color:var(--muted);display:flex;gap:12px;align-items:center}
@@ -357,7 +403,7 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
     }
     
     .card{background:var(--panel);border:1px solid var(--ring);border-radius:16px;overflow:hidden;transition:transform 0.2s ease, box-shadow 0.2s ease}
-    .card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.3)}
+    .card:hover{transform:translateY(-2px)}
     .thumb{aspect-ratio:16/9;width:100%;object-fit:cover;background:var(--panel);display:block}
     .video-thumb-container{position:relative;overflow:hidden}
     .preview-iframe-container{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;pointer-events:none;transition:opacity 0.3s ease;z-index:2;background:var(--bg)}
@@ -373,20 +419,404 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
     .ion-mark:hover{opacity:0.8}
     .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
     
-       /* Responsive header adjustments */
-    @media (max-width:1024px){ .about{display:none;} }
+    /* Responsive header adjustments */
+    @media (max-width:1024px){ 
+        .about{display:none;}
+        /* Force stacked layout on smaller screens */
+        body[data-layout="three-column"] .header {
+            grid-template-columns: 300px 1fr !important;
+        }
+        body[data-layout="three-column"] .about {
+            display: none !important;
+        }
+    }
     @media (max-width:640px){ 
         .header{grid-template-columns:1fr;grid-auto-rows:auto} 
         .topbar{justify-content:flex-start} 
         .videos-section h2{margin:20px 0 8px 0;font-size:16px;}
     }
     a.card, a.title { text-decoration:none; }
+    
+    /* Light Mode Overrides for better shadows */
+    body[data-theme="light"] .card {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    body[data-theme="light"] .card:hover {
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    /* Dark Mode card hover - FROM ionprofile1.php (WORKING VERSION) */
+    body[data-theme="dark"] .card:hover {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Light Mode: Ensure proper text contrast and backgrounds */
+    body[data-theme="light"] {
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+    
+    body[data-theme="light"] .name,
+    body[data-theme="light"] h2,
+    body[data-theme="light"] h3,
+    body[data-theme="light"] .title {
+        color: #0f172a !important;
+    }
+    
+    body[data-theme="light"] .bio,
+    body[data-theme="light"] .bio strong,
+    body[data-theme="light"] p {
+        color: #1e293b !important;
+    }
+    
+    body[data-theme="light"] .sub,
+    body[data-theme="light"] .muted {
+        color: #64748b !important;
+    }
+    
+    body[data-theme="light"] .badge {
+        color: #475569 !important;
+        background: #e9ecef !important;
+        border-color: #dee2e6 !important;
+    }
+    
+    body[data-theme="light"] .about {
+        background: #f8f9fa !important;
+        border-color: #dee2e6 !important;
+        color: #0f172a !important;
+    }
+    
+    body[data-theme="light"] .card {
+        background: #ffffff !important;
+        border-color: #e2e8f6 !important;
+    }
+    
+    body[data-theme="light"] .meta,
+    body[data-theme="light"] .row {
+        color: #475569 !important;
+    }
+    
+    /* Dark Mode: Ensure proper contrast - FROM ionprofile1.php */
+    body[data-theme="dark"] {
+        background: #0f1216 !important;
+        color: #e9eef7 !important;
+    }
+    
+    body[data-theme="dark"] .name,
+    body[data-theme="dark"] h2,
+    body[data-theme="dark"] h3,
+    body[data-theme="dark"] .title {
+        color: #e9eef7 !important;
+    }
+    
+    body[data-theme="dark"] .bio,
+    body[data-theme="dark"] .bio strong,
+    body[data-theme="dark"] p {
+        color: #e9eef7 !important;
+    }
+    
+    body[data-theme="dark"] .sub,
+    body[data-theme="dark"] .muted {
+        color: #8a94a6 !important;
+    }
+    
+    body[data-theme="dark"] .badge {
+        color: #8a94a6 !important;
+        background: #202733 !important;
+        border-color: #2c3442 !important;
+    }
+    
+    body[data-theme="dark"] .about {
+        background: #151a21 !important;
+        border-color: #2c3442 !important;
+        color: #e9eef7 !important;
+    }
+    
+    body[data-theme="dark"] .card {
+        background: #151a21 !important;
+        border-color: #2c3442 !important;
+    }
+    
+    body[data-theme="dark"] .meta,
+    body[data-theme="dark"] .row {
+        color: #8a94a6 !important;
+    }
+    
+    /* Hide layout toggle on screens where three-column doesn't work */
+    @media (max-width: 1024px) {
+        button[aria-label="Toggle layout"] {
+            display: none !important;
+        }
+    }
 </style>
-</head>
-<body>
 
-<?php $ION_NAVBAR_BASE_URL = '/menu/'; ?>
-<?php require_once $root . '/menu/ion-navbar-embed.php'; ?>
+<!-- Theme Switcher & Layout Toggle JavaScript -->
+<script>
+    // VERSION: <?= $version ?>
+    console.log('🔄 ION Profile - Version: <?= $version ?>');
+    console.log('🎨 Initial theme from PHP: <?= $theme ?>');
+    
+    // Initialize theme from session/cookie/query
+    let currentTheme = '<?= $theme ?>';
+    
+    // Initialize layout from localStorage (default: stacked)
+    let currentLayout = localStorage.getItem('profile-layout') || 'stacked';
+    console.log('📐 Initial layout:', currentLayout);
+    
+    // Apply initial layout
+    document.body.setAttribute('data-layout', currentLayout === 'three-column' ? 'three-column' : 'stacked');
+    console.log('✅ Body data-theme attribute set to:', document.body.getAttribute('data-theme'));
+    console.log('✅ Body data-layout attribute set to:', document.body.getAttribute('data-layout'));
+    
+    // Toggle theme function
+    function toggleTheme() {
+        console.log('🎨 toggleTheme() called');
+        console.log('   Current theme BEFORE toggle:', currentTheme);
+        
+        // Toggle between light and dark
+        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        console.log('   New theme AFTER toggle:', currentTheme);
+        
+        // Update body data-theme attribute
+        document.body.setAttribute('data-theme', currentTheme);
+        console.log('   Body data-theme attribute updated to:', document.body.getAttribute('data-theme'));
+        
+        // Debug: Check CSS variable values
+        const bodyStyles = window.getComputedStyle(document.body);
+        const bgColor = bodyStyles.getPropertyValue('--bg');
+        const textColor = bodyStyles.getPropertyValue('--text');
+        console.log('   CSS Variables after toggle:');
+        console.log('     --bg:', bgColor);
+        console.log('     --text:', textColor);
+        console.log('     background-color:', bodyStyles.backgroundColor);
+        
+        // Update theme icon in navbar
+        if (typeof window.updateThemeIcon === 'function') {
+            window.updateThemeIcon();
+        }
+        
+        // Save preference to cookie
+        document.cookie = `theme=${currentTheme}; path=/; max-age=31536000`; // 1 year
+        console.log('   Theme saved to cookie');
+        
+        // Optional: Save to session via AJAX
+        fetch('/api/set-theme.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: currentTheme })
+        }).then(() => console.log('   Theme saved to server'))
+        .catch(err => console.warn('   Theme save to server failed:', err));
+    }
+    
+    // Toggle layout function
+    function toggleLayout() {
+        // Toggle between stacked and three-column
+        currentLayout = currentLayout === 'stacked' ? 'three-column' : 'stacked';
+        
+        // Update body data-layout attribute
+        document.body.setAttribute('data-layout', currentLayout);
+        
+        // Move about card to appropriate position
+        const aboutCard = document.querySelector('.about');
+        const header = document.querySelector('.header');
+        const leftColumn = document.querySelector('.left-column');
+        
+        if (currentLayout === 'three-column') {
+            // Move about card to be direct child of header (third column)
+            if (aboutCard && header && aboutCard.parentElement !== header) {
+                header.appendChild(aboutCard);
+            }
+        } else {
+            // Move about card back to left column
+            if (aboutCard && leftColumn && aboutCard.parentElement !== leftColumn) {
+                leftColumn.appendChild(aboutCard);
+            }
+        }
+        
+        // Save preference to localStorage
+        localStorage.setItem('profile-layout', currentLayout);
+        
+        console.log('Layout switched to:', currentLayout);
+    }
+    
+    // Expose globally for navbar/other components
+    window.toggleTheme = toggleTheme;
+    window.IONToggleTheme = toggleTheme; // Alternative name
+    window.switchTheme = toggleTheme; // Another alternative
+    window.toggleLayout = toggleLayout;
+    window.IONToggleLayout = toggleLayout;
+    
+    // Also expose on document for easy access
+    document.toggleTheme = toggleTheme;
+    document.toggleLayout = toggleLayout;
+    
+    // Debug helper function
+    window.debugTheme = function() {
+        console.log('=== THEME DEBUG INFO ===');
+        console.log('Version: <?= $version ?>');
+        console.log('Current theme:', currentTheme);
+        console.log('Body data-theme:', document.body.getAttribute('data-theme'));
+        console.log('Body data-layout:', document.body.getAttribute('data-layout'));
+        
+        const bodyStyles = window.getComputedStyle(document.body);
+        console.log('CSS Variables:');
+        console.log('  --bg:', bodyStyles.getPropertyValue('--bg'));
+        console.log('  --panel:', bodyStyles.getPropertyValue('--panel'));
+        console.log('  --text:', bodyStyles.getPropertyValue('--text'));
+        console.log('  --muted:', bodyStyles.getPropertyValue('--muted'));
+        console.log('Computed styles:');
+        console.log('  background-color:', bodyStyles.backgroundColor);
+        console.log('  color:', bodyStyles.color);
+        
+        // Check if CSS rules exist
+        const styleSheets = Array.from(document.styleSheets);
+        const hasLightMode = styleSheets.some(sheet => {
+            try {
+                const rules = Array.from(sheet.cssRules || []);
+                return rules.some(rule => 
+                    rule.selectorText && rule.selectorText.includes('data-theme="light"')
+                );
+            } catch(e) {
+                return false;
+            }
+        });
+        console.log('Light mode CSS rules found:', hasLightMode);
+        console.log('======================');
+    };
+    
+    // Initialize layout on page load (move about card if needed)
+    document.addEventListener('DOMContentLoaded', function() {
+        const aboutCard = document.querySelector('.about');
+        const header = document.querySelector('.header');
+        const leftColumn = document.querySelector('.left-column');
+        
+        if (currentLayout === 'three-column') {
+            // Move about card to header (third column)
+            if (aboutCard && header && aboutCard.parentElement !== header) {
+                header.appendChild(aboutCard);
+            }
+        }
+    });
+    
+    // Watch for theme changes made by other systems (like navbar)
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
+                const newTheme = document.body.getAttribute('data-theme');
+                if (newTheme && newTheme !== currentTheme) {
+                    currentTheme = newTheme;
+                }
+            }
+            
+            // Auto-correct if background doesn't match theme
+            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                const bgColor = window.getComputedStyle(document.body).backgroundColor;
+                const rgb = bgColor.match(/\d+/g);
+                if (rgb) {
+                    const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
+                    
+                    if (brightness > 128 && currentTheme === 'dark') {
+                        currentTheme = 'light';
+                        document.body.setAttribute('data-theme', 'light');
+                    } else if (brightness <= 128 && currentTheme === 'light') {
+                        currentTheme = 'dark';
+                        document.body.setAttribute('data-theme', 'dark');
+                    }
+                }
+            }
+        });
+    });
+    
+    // Start observing
+    observer.observe(document.body, { 
+        attributes: true, 
+        attributeFilter: ['data-theme', 'style', 'class'] 
+    });
+</script>
+</head>
+<body data-theme="<?= $theme ?>">
+
+<!-- ION Navbar Embed: fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="/menu/ion-navbar.css">
+
+<!-- ION Navbar (React component loaded via JavaScript) -->
+<div id="ion-navbar-root"></div>
+
+<!-- ION Navbar Embed: script setup -->
+<script>
+    // Minimal globals expected by some libraries
+    window.process = window.process || {
+        env: {
+            NODE_ENV: 'production'
+        }
+    };
+    window.global = window.global || window;
+</script>
+<script src="/menu/ion-navbar.iife.js"></script>
+<script>
+    (function() {
+        if (window.IONNavbar && typeof window.IONNavbar.mount === 'function') {
+            window.IONNavbar.mount('#ion-navbar-root', {
+                useShadowDom: true,
+                cssHref: '/menu/ion-navbar.css'
+            });
+        }
+        
+        // WORKAROUND: Add theme & layout toggle buttons to navbar after it loads
+        setTimeout(() => {
+            const navbar = document.getElementById('ion-navbar-root');
+            if (navbar) {
+                // Check if navbar already has theme toggle
+                const existingToggle = navbar.querySelector('[aria-label*="theme" i], [onclick*="theme" i]');
+                if (!existingToggle) {
+                    // Create a theme toggle button
+                    const themeBtn = document.createElement('button');
+                    themeBtn.setAttribute('aria-label', 'Toggle theme');
+                    themeBtn.innerHTML = `
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                    `;
+                    themeBtn.onclick = window.toggleTheme;
+                    themeBtn.style.cssText = 'position: fixed; top: 15px; right: 5px; z-index: 10001; background: transparent; border: none; color: #f59e0b; cursor: pointer; padding: 8px; display: flex; align-items: center; transition: transform 0.2s;';
+                    themeBtn.onmouseover = () => themeBtn.style.transform = 'scale(1.1)';
+                    themeBtn.onmouseout = () => themeBtn.style.transform = 'scale(1)';
+                    themeBtn.title = 'Toggle light/dark theme';
+                    document.body.appendChild(themeBtn);
+                    
+                    // Create layout toggle button
+                    const layoutBtn = document.createElement('button');
+                    layoutBtn.setAttribute('aria-label', 'Toggle layout');
+                    layoutBtn.innerHTML = `
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                            <line x1="15" y1="3" x2="15" y2="21"></line>
+                        </svg>
+                    `;
+                    layoutBtn.onclick = window.toggleLayout;
+                    layoutBtn.style.cssText = 'position: fixed; top: 15px; right: 45px; z-index: 10001; background: transparent; border: none; color: #3b82f6; cursor: pointer; padding: 8px; display: flex; align-items: center; transition: transform 0.2s;';
+                    layoutBtn.onmouseover = () => layoutBtn.style.transform = 'scale(1.1)';
+                    layoutBtn.onmouseout = () => layoutBtn.style.transform = 'scale(1)';
+                    layoutBtn.title = 'Toggle profile layout (2 or 3 columns)';
+                    document.body.appendChild(layoutBtn);
+                }
+            }
+        }, 1000); // Wait for navbar to fully load
+    })();
+</script>
 
 <div class="wrap">
 
@@ -427,6 +857,17 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
         </div>
     </section>
 
+    <?php
+    // Include and render ION Featured Videos carousel for this profile
+    $carousel_path = $root . '/components/featured-videos-carousel.php';
+    if (file_exists($carousel_path)) {
+        require_once $carousel_path;
+        renderFeaturedVideosCarousel($pdo, 'profile', $user['user_id']);
+    } else {
+        error_log('ION Featured Videos: Component file not found at ' . $carousel_path);
+    }
+    ?>
+
     <div class="videos-section">
         <h2 style="margin:26px 0 8px 0;font-size:16px;">
             Videos
@@ -438,7 +879,7 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
         <section class="grid">
         <?php if (!$videos): ?>
             <div class="card" style="padding:20px">
-                <div style="color:#b6c0cf;font-size:14px;">No public videos yet.</div>
+                <div style="color:var(--muted);font-size:14px;">No public videos yet.</div>
             </div>
         <?php else: foreach ($videos as $v):
             $thumb = $v['thumbnail'] ?: '/assets/placeholders/video-16x9.png';
@@ -720,6 +1161,13 @@ function initializeVideoHoverPreviews() {
                 if (previewContainer) {
                     previewContainer.style.opacity = '1';
                 }
+                
+                // Hide play button overlay when video is playing
+                const playIcon = thumb.querySelector('.play-icon-overlay');
+                if (playIcon) {
+                    playIcon.style.opacity = '0';
+                    playIcon.style.pointerEvents = 'none';
+                }
             }, 300); // 300ms delay
         });
         
@@ -729,6 +1177,14 @@ function initializeVideoHoverPreviews() {
                 clearTimeout(hoverTimeout);
                 hoverTimeout = null;
             }
+            
+            // Show play button overlay again when video stops
+            const playIcon = thumb.querySelector('.play-icon-overlay');
+            if (playIcon) {
+                playIcon.style.opacity = '1';
+                playIcon.style.pointerEvents = 'auto';
+            }
+            
             if (previewContainer) {
                 previewContainer.style.opacity = '0';
                 
