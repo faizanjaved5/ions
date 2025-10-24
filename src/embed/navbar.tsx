@@ -1,5 +1,4 @@
 import { createRoot, Root } from "react-dom/client";
-import { ThemeProvider } from "next-themes";
 import Header from "@/components/Header";
 import "@/index.css";
 import { PortalProvider } from "@/components/ui/portal-provider";
@@ -45,16 +44,9 @@ export function mount(
       const root = createRoot(shadowContainer);
       root.render(
         <AuthProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem={false}
-            storageKey="ion-theme"
-          >
-            <PortalProvider container={shadow}>
-              <Header />
-            </PortalProvider>
-          </ThemeProvider>
+          <PortalProvider container={shadow}>
+            <Header />
+          </PortalProvider>
         </AuthProvider>
       );
       mounted.set(host, root);
@@ -83,14 +75,7 @@ export function mount(
   const root = createRoot(el);
   root.render(
     <AuthProvider>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="dark"
-        enableSystem={false}
-        storageKey="ion-theme"
-      >
-        <Header />
-      </ThemeProvider>
+      <Header />
     </AuthProvider>
   );
   mounted.set(el, root);

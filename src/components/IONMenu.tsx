@@ -1,6 +1,15 @@
 import { useState, useMemo } from "react";
-import { Search, MapPin, ChevronRight, ExternalLink, Sun, Moon, ChevronLeft, Menu } from "lucide-react";
-import { useTheme } from "next-themes";
+import {
+  Search,
+  MapPin,
+  ChevronRight,
+  ExternalLink,
+  Sun,
+  Moon,
+  ChevronLeft,
+  Menu,
+} from "lucide-react";
+import { useTheme } from "@/hooks/use-theme";
 import menuData from "../data/menuData.json";
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
@@ -17,177 +26,252 @@ interface MenuItem {
 
 // Helper function to generate URL from name
 const generateUrl = (name: string): string => {
-  return `https://ions.com/ion-${name.toLowerCase().replace(/\s+/g, '-')}`;
+  return `https://ions.com/ion-${name.toLowerCase().replace(/\s+/g, "-")}`;
 };
 
 // State/Province code mapping for North America
 const stateCodeMap: Record<string, string> = {
   // US States
-  "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
-  "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
-  "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
-  "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
-  "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
-  "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS",
-  "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV",
-  "new hampshire": "NH", "new jersey": "NJ", "new york": "NY", "north carolina": "NC",
-  "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR",
-  "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD",
-  "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT",
-  "virginia": "VA", "washington": "WA", "washington dc": "DC", "west virginia": "WV",
-  "wisconsin": "WI", "wyoming": "WY",
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "washington dc": "DC",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
   // Canadian Provinces
-  "alberta": "AB", "british columbia": "BC", "manitoba": "MB", "new brunswick": "NB",
-  "newfoundland and labrador": "NL", "northwest territories": "NT", "nova scotia": "NS",
-  "nunavut": "NU", "ontario": "ON", "prince edward island": "PE", "quebec": "QC",
-  "saskatchewan": "SK", "yukon": "YT",
+  alberta: "AB",
+  "british columbia": "BC",
+  manitoba: "MB",
+  "new brunswick": "NB",
+  "newfoundland and labrador": "NL",
+  "northwest territories": "NT",
+  "nova scotia": "NS",
+  nunavut: "NU",
+  ontario: "ON",
+  "prince edward island": "PE",
+  quebec: "QC",
+  saskatchewan: "SK",
+  yukon: "YT",
   // Mexican States
-  "aguascalientes": "AGS", "baja california": "BC", "baja california sur": "BCS",
-  "campeche": "CAMP", "chiapas": "CHIS", "chihuahua": "CHIH", "coahuila": "COAH",
-  "colima": "COL", "durango": "DGO", "guanajuato": "GTO", "guerrero": "GRO",
-  "hidalgo": "HGO", "jalisco": "JAL", "mexico city": "CDMX", "michoacán": "MICH",
-  "morelos": "MOR", "nayarit": "NAY", "nuevo león": "NL", "oaxaca": "OAX",
-  "puebla": "PUE", "querétaro": "QRO", "quintana roo": "QROO", "san luis potosí": "SLP",
-  "sinaloa": "SIN", "sonora": "SON", "tabasco": "TAB", "tamaulipas": "TAMPS",
-  "tlaxcala": "TLAX", "veracruz": "VER", "yucatán": "YUC", "zacatecas": "ZAC"
+  aguascalientes: "AGS",
+  "baja california": "BC",
+  "baja california sur": "BCS",
+  campeche: "CAMP",
+  chiapas: "CHIS",
+  chihuahua: "CHIH",
+  coahuila: "COAH",
+  colima: "COL",
+  durango: "DGO",
+  guanajuato: "GTO",
+  guerrero: "GRO",
+  hidalgo: "HGO",
+  jalisco: "JAL",
+  "mexico city": "CDMX",
+  michoacán: "MICH",
+  morelos: "MOR",
+  nayarit: "NAY",
+  "nuevo león": "NL",
+  oaxaca: "OAX",
+  puebla: "PUE",
+  querétaro: "QRO",
+  "quintana roo": "QROO",
+  "san luis potosí": "SLP",
+  sinaloa: "SIN",
+  sonora: "SON",
+  tabasco: "TAB",
+  tamaulipas: "TAMPS",
+  tlaxcala: "TLAX",
+  veracruz: "VER",
+  yucatán: "YUC",
+  zacatecas: "ZAC",
 };
 
 // Country ID to flag code mapping
 const countryCodeMap: Record<string, string> = {
-  "usa": "us",
-  "canada": "ca",
-  "mexico": "mx",
-  "belize": "bz",
+  usa: "us",
+  canada: "ca",
+  mexico: "mx",
+  belize: "bz",
   "costa-rica": "cr",
   "el-salvador": "sv",
-  "guatemala": "gt",
-  "honduras": "hn",
-  "nicaragua": "ni",
-  "panama": "pa",
-  "argentina": "ar",
-  "bolivia": "bo",
-  "brazil": "br",
-  "chile": "cl",
-  "colombia": "co",
-  "ecuador": "ec",
-  "guyana": "gy",
-  "paraguay": "py",
-  "peru": "pe",
-  "suriname": "sr",
-  "uruguay": "uy",
-  "venezuela": "ve",
-  "albania": "al",
-  "andorra": "ad",
-  "austria": "at",
-  "belgium": "be",
-  "bosnia": "ba",
-  "bulgaria": "bg",
-  "croatia": "hr",
+  guatemala: "gt",
+  honduras: "hn",
+  nicaragua: "ni",
+  panama: "pa",
+  argentina: "ar",
+  bolivia: "bo",
+  brazil: "br",
+  chile: "cl",
+  colombia: "co",
+  ecuador: "ec",
+  guyana: "gy",
+  paraguay: "py",
+  peru: "pe",
+  suriname: "sr",
+  uruguay: "uy",
+  venezuela: "ve",
+  albania: "al",
+  andorra: "ad",
+  austria: "at",
+  belgium: "be",
+  bosnia: "ba",
+  bulgaria: "bg",
+  croatia: "hr",
   "czech-republic": "cz",
-  "denmark": "dk",
-  "england": "gb",
-  "estonia": "ee",
-  "finland": "fi",
-  "france": "fr",
-  "germany": "de",
-  "greece": "gr",
-  "hungary": "hu",
-  "iceland": "is",
-  "ireland": "ie",
-  "italy": "it",
-  "latvia": "lv",
-  "lithuania": "lt",
-  "luxembourg": "lu",
-  "malta": "mt",
-  "montenegro": "me",
-  "netherlands": "nl",
-  "norway": "no",
-  "poland": "pl",
-  "portugal": "pt",
-  "romania": "ro",
-  "scotland": "gb-sct",
-  "serbia": "rs",
-  "slovakia": "sk",
-  "slovenia": "si",
-  "spain": "es",
-  "sweden": "se",
-  "switzerland": "ch",
-  "wales": "gb-wls",
-  "antigua": "ag",
-  "bahamas": "bs",
-  "barbados": "bb",
-  "cuba": "cu",
-  "dominica": "dm",
+  denmark: "dk",
+  england: "gb",
+  estonia: "ee",
+  finland: "fi",
+  france: "fr",
+  germany: "de",
+  greece: "gr",
+  hungary: "hu",
+  iceland: "is",
+  ireland: "ie",
+  italy: "it",
+  latvia: "lv",
+  lithuania: "lt",
+  luxembourg: "lu",
+  malta: "mt",
+  montenegro: "me",
+  netherlands: "nl",
+  norway: "no",
+  poland: "pl",
+  portugal: "pt",
+  romania: "ro",
+  scotland: "gb-sct",
+  serbia: "rs",
+  slovakia: "sk",
+  slovenia: "si",
+  spain: "es",
+  sweden: "se",
+  switzerland: "ch",
+  wales: "gb-wls",
+  antigua: "ag",
+  bahamas: "bs",
+  barbados: "bb",
+  cuba: "cu",
+  dominica: "dm",
   "dominican-republic": "do",
-  "grenada": "gd",
-  "haiti": "ht",
-  "jamaica": "jm",
+  grenada: "gd",
+  haiti: "ht",
+  jamaica: "jm",
   "saint-kitts": "kn",
   "saint-lucia": "lc",
   "saint-vincent": "vc",
-  "trinidad": "tt",
-  "fiji": "fj",
-  "kiribati": "ki",
+  trinidad: "tt",
+  fiji: "fj",
+  kiribati: "ki",
   "marshall-islands": "mh",
   "micronesia-country": "fm",
-  "nauru": "nr",
-  "palau": "pw",
-  "papua": "pg",
-  "samoa": "ws",
-  "solomon": "sb",
-  "tonga": "to",
-  "tuvalu": "tv",
-  "vanuatu": "vu",
-  "australia": "au",
+  nauru: "nr",
+  palau: "pw",
+  papua: "pg",
+  samoa: "ws",
+  solomon: "sb",
+  tonga: "to",
+  tuvalu: "tv",
+  vanuatu: "vu",
+  australia: "au",
   "new-zealand": "nz",
-  "china": "cn",
-  "india": "in",
-  "japan": "jp",
+  china: "cn",
+  india: "in",
+  japan: "jp",
   "south-korea": "kr",
-  "russia": "ru",
-  "ukraine": "ua",
-  "turkey": "tr",
-  "uae": "ae",
+  russia: "ru",
+  ukraine: "ua",
+  turkey: "tr",
+  uae: "ae",
   "saudi-arabia": "sa",
-  "israel": "il",
-  "egypt": "eg",
+  israel: "il",
+  egypt: "eg",
   "south-africa": "za",
-  "nigeria": "ng",
-  "kenya": "ke",
-  "morocco": "ma",
-  "thailand": "th",
-  "vietnam": "vn",
-  "indonesia": "id",
-  "malaysia": "my",
-  "singapore": "sg",
-  "philippines": "ph",
-  "pakistan": "pk",
-  "bangladesh": "bd",
-  "iran": "ir",
-  "iraq": "iq",
-  "qatar": "qa",
-  "kuwait": "kw",
-  "lebanon": "lb"
+  nigeria: "ng",
+  kenya: "ke",
+  morocco: "ma",
+  thailand: "th",
+  vietnam: "vn",
+  indonesia: "id",
+  malaysia: "my",
+  singapore: "sg",
+  philippines: "ph",
+  pakistan: "pk",
+  bangladesh: "bd",
+  iran: "ir",
+  iraq: "iq",
+  qatar: "qa",
+  kuwait: "kw",
+  lebanon: "lb",
 };
 
 export const IONMenu = () => {
   const { theme, setTheme } = useTheme();
-  const [selectedRegion, setSelectedRegion] = useState<string | null>("featured");
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(
+    "featured"
+  );
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [useBebasFont, setUseBebasFont] = useState(false);
-  const [mobileView, setMobileView] = useState<"regions" | "countries" | "states">("regions");
+  const [mobileView, setMobileView] = useState<
+    "regions" | "countries" | "states"
+  >("regions");
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
   const isDarkMode = theme === "dark";
 
   const currentRegion = useMemo(() => {
-    return menuData.regions.find(r => r.id === selectedRegion);
+    return menuData.regions.find((r) => r.id === selectedRegion);
   }, [selectedRegion]);
 
   const currentCountry = useMemo(() => {
     if (!currentRegion || !selectedCountry) return null;
-    return currentRegion.countries?.find((c: MenuItem) => c.id === selectedCountry);
+    return currentRegion.countries?.find(
+      (c: MenuItem) => c.id === selectedCountry
+    );
   }, [currentRegion, selectedCountry]);
 
   const filteredItems = useMemo(() => {
@@ -197,7 +281,7 @@ export const IONMenu = () => {
     const results: any[] = [];
 
     // Search through all regions, countries, and states/cities
-    menuData.regions.forEach(region => {
+    menuData.regions.forEach((region) => {
       if (region.name.toLowerCase().includes(query)) {
         results.push({ type: "region", ...region });
       }
@@ -205,29 +289,39 @@ export const IONMenu = () => {
         const countryCode = countryCodeMap[country.id] || country.id;
         const matchesName = country.name.toLowerCase().includes(query);
         const matchesCode = countryCode.toLowerCase().includes(query);
-        
+
         if (matchesName || matchesCode) {
           results.push({ type: "country", ...country, regionId: region.id });
         }
-        country.states?.forEach(state => {
+        country.states?.forEach((state) => {
           const stateCode = stateCodeMap[state.name.toLowerCase()] || "";
           const matchesName = state.name.toLowerCase().includes(query);
           const matchesCode = stateCode.toLowerCase().includes(query);
-          
+
           if (matchesName || matchesCode) {
-            results.push({ type: "state", ...state, countryId: country.id, regionId: region.id });
+            results.push({
+              type: "state",
+              ...state,
+              countryId: country.id,
+              regionId: region.id,
+            });
           }
         });
-        country.cities?.forEach(city => {
+        country.cities?.forEach((city) => {
           if (city.name.toLowerCase().includes(query)) {
-            results.push({ type: "city", ...city, countryId: country.id, regionId: region.id });
+            results.push({
+              type: "city",
+              ...city,
+              countryId: country.id,
+              regionId: region.id,
+            });
           }
         });
       });
     });
 
     // Search featured channels
-    menuData.featuredChannels.forEach(channel => {
+    menuData.featuredChannels.forEach((channel) => {
       if (channel.name.toLowerCase().includes(query)) {
         results.push({ type: "featured", ...channel });
       }
@@ -273,7 +367,7 @@ export const IONMenu = () => {
               key={state.name}
               href={stateUrl}
               className={`group flex items-center gap-2 px-3 py-2.5 text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 relative hover:shadow-sm hover:scale-[1.01] ${
-                useBebasFont ? bebasStyles : 'text-xs uppercase tracking-wide'
+                useBebasFont ? bebasStyles : "text-xs uppercase tracking-wide"
               }`}
             >
               <MapPin className="w-3.5 h-3.5 flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity" />
@@ -286,11 +380,11 @@ export const IONMenu = () => {
                   ({stateCode})
                 </span>
               )}
-              <ExternalLink 
-                className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" 
+              <ExternalLink
+                className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={(e) => {
                   e.preventDefault();
-                  window.open(stateUrl, '_blank');
+                  window.open(stateUrl, "_blank");
                 }}
               />
             </a>
@@ -300,13 +394,15 @@ export const IONMenu = () => {
     );
   };
 
-  const bebasStyles = useBebasFont ? 'font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider' : '';
-  const menuItemPadding = useBebasFont ? 'py-2' : 'py-3';
+  const bebasStyles = useBebasFont
+    ? "font-bebas text-lg font-normal whitespace-nowrap uppercase tracking-wider"
+    : "";
+  const menuItemPadding = useBebasFont ? "py-2" : "py-3";
 
   const MenuContent = () => (
-    <div 
+    <div
       className={`w-full border border-menu-border rounded-sm overflow-hidden bg-menu-bg ${
-        isMobile ? 'h-full border-0 rounded-none' : 'max-w-[960px]'
+        isMobile ? "h-full border-0 rounded-none" : "max-w-[960px]"
       }`}
     >
       {/* Header */}
@@ -328,7 +424,11 @@ export const IONMenu = () => {
               <span className="text-foreground">LOCAL NETWORK</span>
             </h2>
           </div>
-          <div className={`${isMobile ? 'hidden' : 'flex-1 max-w-md relative mx-4 md:mx-[30px]'}`}>
+          <div
+            className={`${
+              isMobile ? "hidden" : "flex-1 max-w-md relative mx-4 md:mx-[30px]"
+            }`}
+          >
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
@@ -346,7 +446,7 @@ export const IONMenu = () => {
               onClick={() => setUseBebasFont(!useBebasFont)}
               className="h-8 px-2 text-xs"
             >
-              <span className={useBebasFont ? 'font-bebas' : ''}>Aa</span>
+              <span className={useBebasFont ? "font-bebas" : ""}>Aa</span>
             </Button>
             <Button
               variant="ghost"
@@ -354,7 +454,11 @@ export const IONMenu = () => {
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="h-8 w-8 p-0"
             >
-              {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {isDarkMode ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
@@ -374,13 +478,15 @@ export const IONMenu = () => {
       </div>
 
       {/* Main Content */}
-      <div className={`flex ${isMobile ? 'h-[calc(100vh-80px)]' : 'h-[420px]'}`}>
+      <div
+        className={`flex ${isMobile ? "h-[calc(100vh-80px)]" : "h-[420px]"}`}
+      >
         {/* Left Sidebar - Main Categories (Desktop) or Full View (Mobile) */}
-        <div className={`flex flex-col border-menu-border overflow-y-auto overflow-x-hidden ${
-          isMobile 
-            ? 'w-full' 
-            : 'w-48 md:w-60 border-r'
-        } ${isMobile && mobileView !== "regions" ? 'hidden' : ''}`}>
+        <div
+          className={`flex flex-col border-menu-border overflow-y-auto overflow-x-hidden ${
+            isMobile ? "w-full" : "w-48 md:w-60 border-r"
+          } ${isMobile && mobileView !== "regions" ? "hidden" : ""}`}
+        >
           <button
             onClick={() => {
               setSelectedRegion("featured");
@@ -388,11 +494,11 @@ export const IONMenu = () => {
               setSearchQuery("");
             }}
             className={`flex items-center justify-between px-4 ${menuItemPadding} text-left transition-all duration-200 border-b border-menu-border ${
-              useBebasFont ? bebasStyles : 'text-sm uppercase tracking-wide'
+              useBebasFont ? bebasStyles : "text-sm uppercase tracking-wide"
             } ${
               !searchQuery && selectedRegion === "featured"
-                ? 'border-l-2 border-l-primary bg-menu-item-active shadow-sm'
-                : 'hover:bg-menu-item-hover hover:shadow-sm hover:translate-x-[2px]'
+                ? "border-l-2 border-l-primary bg-menu-item-active shadow-sm"
+                : "hover:bg-menu-item-hover hover:shadow-sm hover:translate-x-[2px]"
             }`}
           >
             <span>
@@ -406,11 +512,11 @@ export const IONMenu = () => {
               key={region.id}
               onClick={() => handleRegionClick(region.id)}
               className={`flex items-center justify-between px-4 ${menuItemPadding} text-left border-b border-menu-border transition-all duration-200 ${
-                useBebasFont ? bebasStyles : 'text-sm uppercase tracking-wide'
+                useBebasFont ? bebasStyles : "text-sm uppercase tracking-wide"
               } ${
                 !searchQuery && selectedRegion === region.id
-                  ? 'border-l-2 border-l-primary bg-menu-item-active shadow-sm'
-                  : 'hover:bg-menu-item-hover hover:shadow-sm hover:translate-x-[2px]'
+                  ? "border-l-2 border-l-primary bg-menu-item-active shadow-sm"
+                  : "hover:bg-menu-item-hover hover:shadow-sm hover:translate-x-[2px]"
               }`}
             >
               <span>
@@ -423,9 +529,11 @@ export const IONMenu = () => {
         </div>
 
         {/* Content Area */}
-        <div className={`flex-1 p-[0.5rem] overflow-y-auto ${
-          isMobile && mobileView === "regions" ? 'hidden' : ''
-        }`}>
+        <div
+          className={`flex-1 p-[0.5rem] overflow-y-auto ${
+            isMobile && mobileView === "regions" ? "hidden" : ""
+          }`}
+        >
           {/* Search Results */}
           {filteredItems && filteredItems.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[0.3rem]">
@@ -441,12 +549,16 @@ export const IONMenu = () => {
                         setSearchQuery("");
                       }}
                       className={`group flex items-center gap-2 px-3 py-2.5 text-left text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 relative hover:shadow-sm hover:scale-[1.01] w-full ${
-                        useBebasFont ? bebasStyles : 'text-xs uppercase tracking-wide'
+                        useBebasFont
+                          ? bebasStyles
+                          : "text-xs uppercase tracking-wide"
                       }`}
                     >
                       {item.id && (
-                        <img 
-                          src={`https://iblog.bz/assets/flags/${countryCodeMap[item.id] || item.id}.svg`}
+                        <img
+                          src={`https://iblog.bz/assets/flags/${
+                            countryCodeMap[item.id] || item.id
+                          }.svg`}
                           alt={item.name}
                           className="w-5 h-4 object-cover flex-shrink-0"
                         />
@@ -464,14 +576,16 @@ export const IONMenu = () => {
                     </button>
                   );
                 }
-                
+
                 // For other types (states, cities, featured), keep them as links
                 return (
                   <a
                     key={`${item.type}-${item.id || item.name}-${index}`}
                     href={item.url || "#"}
                     className={`group flex items-center gap-2 px-3 py-2.5 text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 relative hover:shadow-sm hover:scale-[1.01] ${
-                      useBebasFont ? bebasStyles : 'text-xs uppercase tracking-wide'
+                      useBebasFont
+                        ? bebasStyles
+                        : "text-xs uppercase tracking-wide"
                     }`}
                   >
                     <MapPin className="w-3.5 h-3.5 flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity" />
@@ -480,11 +594,11 @@ export const IONMenu = () => {
                       {item.name}
                     </span>
                     {item.url && item.url !== "#" && (
-                      <ExternalLink 
-                        className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" 
+                      <ExternalLink
+                        className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => {
                           e.preventDefault();
-                          window.open(item.url, '_blank');
+                          window.open(item.url, "_blank");
                         }}
                       />
                     )}
@@ -498,23 +612,25 @@ export const IONMenu = () => {
           {!searchQuery && selectedRegion === "featured" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[0.3rem]">
               {menuData.featuredChannels.map((channel) => (
-                  <a
-                    key={channel.name}
-                    href={channel.url}
-                    className={`group flex items-center gap-2 px-3 py-2.5 text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 relative hover:shadow-sm hover:scale-[1.01] ${
-                      useBebasFont ? bebasStyles : 'text-xs uppercase tracking-wide'
-                    }`}
-                  >
+                <a
+                  key={channel.name}
+                  href={channel.url}
+                  className={`group flex items-center gap-2 px-3 py-2.5 text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 relative hover:shadow-sm hover:scale-[1.01] ${
+                    useBebasFont
+                      ? bebasStyles
+                      : "text-xs uppercase tracking-wide"
+                  }`}
+                >
                   <MapPin className="w-3.5 h-3.5 flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity" />
                   <span className="truncate flex-1">
                     <span className="text-primary font-medium">ION</span>{" "}
                     {channel.name}
                   </span>
                   <ExternalLink
-                    className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" 
+                    className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => {
                       e.preventDefault();
-                      window.open(channel.url, '_blank');
+                      window.open(channel.url, "_blank");
                     }}
                   />
                 </a>
@@ -523,114 +639,147 @@ export const IONMenu = () => {
           )}
 
           {/* Region View - Show Countries/States */}
-          {!searchQuery && selectedRegion && selectedRegion !== "featured" && !selectedCountry && (
-            <div className="flex gap-4">
-              {currentRegion?.countries && currentRegion.countries.length > 0 && (
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[0.3rem]">
-                  {currentRegion.countries.map((country: MenuItem) => {
-                    const hasSubItems = country.states?.length > 0 || country.cities?.length > 0;
-                    const countryUrl = generateUrl(country.name);
-                    
-                    if (hasSubItems) {
-                      return (
-                        <button
-                          key={country.id}
-                          onClick={() => handleCountryClick(country.id)}
-                          className={`flex items-center gap-2 px-3 py-2.5 text-left text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 justify-between group hover:shadow-sm hover:scale-[1.01] ${
-                            useBebasFont ? bebasStyles : 'text-xs uppercase tracking-wide'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <img 
-                              src={`https://iblog.bz/assets/flags/${countryCodeMap[country.id] || country.id}.svg`}
-                              alt={country.name}
-                              className="w-5 h-4 object-cover flex-shrink-0"
-                            />
-                            <span className="truncate flex-1">
-                              <span className="text-primary font-medium">ION</span>{" "}
-                              {country.name}
-                            </span>
-                            <span className="text-muted-foreground/60 text-xs ml-auto flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                              ({(countryCodeMap[country.id] || country.id).toUpperCase()})
-                            </span>
-                          </div>
-                          <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 flex-shrink-0" />
-                        </button>
-                      );
-                    } else {
-                      return (
-                        <a
-                          key={country.id}
-                          href={countryUrl}
-                          className={`group flex items-center gap-2 px-3 py-2.5 text-left text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 justify-between hover:shadow-sm hover:scale-[1.01] ${
-                            useBebasFont ? bebasStyles : 'text-xs uppercase tracking-wide'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <img 
-                              src={`https://iblog.bz/assets/flags/${countryCodeMap[country.id] || country.id}.svg`}
-                              alt={country.name}
-                              className="w-5 h-4 object-cover flex-shrink-0"
-                            />
-                            <span className="truncate flex-1">
-                              <span className="text-primary font-medium">ION</span>{" "}
-                              {country.name}
-                            </span>
-                            <span className="text-muted-foreground/60 text-xs ml-auto flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                              ({(countryCodeMap[country.id] || country.id).toUpperCase()})
-                            </span>
-                          </div>
-                          <ExternalLink 
-                            className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              window.open(countryUrl, '_blank');
-                            }}
-                          />
-                        </a>
-                      );
-                    }
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          {!searchQuery &&
+            selectedRegion &&
+            selectedRegion !== "featured" &&
+            !selectedCountry && (
+              <div className="flex gap-4">
+                {currentRegion?.countries &&
+                  currentRegion.countries.length > 0 && (
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[0.3rem]">
+                      {currentRegion.countries.map((country: MenuItem) => {
+                        const hasSubItems =
+                          country.states?.length > 0 ||
+                          country.cities?.length > 0;
+                        const countryUrl = generateUrl(country.name);
+
+                        if (hasSubItems) {
+                          return (
+                            <button
+                              key={country.id}
+                              onClick={() => handleCountryClick(country.id)}
+                              className={`flex items-center gap-2 px-3 py-2.5 text-left text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 justify-between group hover:shadow-sm hover:scale-[1.01] ${
+                                useBebasFont
+                                  ? bebasStyles
+                                  : "text-xs uppercase tracking-wide"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <img
+                                  src={`https://iblog.bz/assets/flags/${
+                                    countryCodeMap[country.id] || country.id
+                                  }.svg`}
+                                  alt={country.name}
+                                  className="w-5 h-4 object-cover flex-shrink-0"
+                                />
+                                <span className="truncate flex-1">
+                                  <span className="text-primary font-medium">
+                                    ION
+                                  </span>{" "}
+                                  {country.name}
+                                </span>
+                                <span className="text-muted-foreground/60 text-xs ml-auto flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  (
+                                  {(
+                                    countryCodeMap[country.id] || country.id
+                                  ).toUpperCase()}
+                                  )
+                                </span>
+                              </div>
+                              <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 flex-shrink-0" />
+                            </button>
+                          );
+                        } else {
+                          return (
+                            <a
+                              key={country.id}
+                              href={countryUrl}
+                              className={`group flex items-center gap-2 px-3 py-2.5 text-left text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 justify-between hover:shadow-sm hover:scale-[1.01] ${
+                                useBebasFont
+                                  ? bebasStyles
+                                  : "text-xs uppercase tracking-wide"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <img
+                                  src={`https://iblog.bz/assets/flags/${
+                                    countryCodeMap[country.id] || country.id
+                                  }.svg`}
+                                  alt={country.name}
+                                  className="w-5 h-4 object-cover flex-shrink-0"
+                                />
+                                <span className="truncate flex-1">
+                                  <span className="text-primary font-medium">
+                                    ION
+                                  </span>{" "}
+                                  {country.name}
+                                </span>
+                                <span className="text-muted-foreground/60 text-xs ml-auto flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  (
+                                  {(
+                                    countryCodeMap[country.id] || country.id
+                                  ).toUpperCase()}
+                                  )
+                                </span>
+                              </div>
+                              <ExternalLink
+                                className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  window.open(countryUrl, "_blank");
+                                }}
+                              />
+                            </a>
+                          );
+                        }
+                      })}
+                    </div>
+                  )}
+              </div>
+            )}
 
           {/* Country View - Show States/Cities */}
           {!searchQuery && currentCountry && (
             <>
-              {'states' in currentCountry && currentCountry.states && currentCountry.states.length > 0 && (
-                renderStatesGrid(currentCountry.states)
-              )}
-              {'cities' in currentCountry && currentCountry.cities && currentCountry.cities.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[0.3rem]">
-                  {currentCountry.cities.map((city: any) => {
-                    const cityUrl = city.url || generateUrl(city.name);
-                    return (
-                      <a
-                        key={city.name}
-                        href={cityUrl}
-                        className={`group flex items-center gap-2 px-3 py-2.5 text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 relative hover:shadow-sm hover:scale-[1.01] ${
-                          useBebasFont ? bebasStyles : 'text-xs uppercase tracking-wide'
-                        }`}
-                      >
-                        <MapPin className="w-3.5 h-3.5 flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity" />
-                        <span className="truncate flex-1">
-                          <span className="text-primary font-medium">ION</span>{" "}
-                          {city.name}
-                        </span>
-                        <ExternalLink
-                          className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            window.open(cityUrl, '_blank');
-                          }}
-                        />
-                      </a>
-                    );
-                  })}
-                </div>
-              )}
+              {"states" in currentCountry &&
+                currentCountry.states &&
+                currentCountry.states.length > 0 &&
+                renderStatesGrid(currentCountry.states)}
+              {"cities" in currentCountry &&
+                currentCountry.cities &&
+                currentCountry.cities.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[0.3rem]">
+                    {currentCountry.cities.map((city: any) => {
+                      const cityUrl = city.url || generateUrl(city.name);
+                      return (
+                        <a
+                          key={city.name}
+                          href={cityUrl}
+                          className={`group flex items-center gap-2 px-3 py-2.5 text-muted-foreground hover:bg-menu-item-hover hover:text-primary rounded transition-all duration-200 relative hover:shadow-sm hover:scale-[1.01] ${
+                            useBebasFont
+                              ? bebasStyles
+                              : "text-xs uppercase tracking-wide"
+                          }`}
+                        >
+                          <MapPin className="w-3.5 h-3.5 flex-shrink-0 opacity-30 group-hover:opacity-100 transition-opacity" />
+                          <span className="truncate flex-1">
+                            <span className="text-primary font-medium">
+                              ION
+                            </span>{" "}
+                            {city.name}
+                          </span>
+                          <ExternalLink
+                            className="w-3.5 h-3.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              window.open(cityUrl, "_blank");
+                            }}
+                          />
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
             </>
           )}
         </div>

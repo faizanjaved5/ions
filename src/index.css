@@ -7,47 +7,9 @@ All colors MUST be HSL.
 */
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 10%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-
-    --primary: 29 36% 46%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 10%;
-
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 40%;
-
-    --accent: 29 36% 46%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 90%;
-    --input: 0 0% 96%;
-    --ring: 29 36% 46%;
-
-    --radius: 0.25rem;
-
-    --menu-bg: 0 0% 98%;
-    --menu-item-hover: 29 36% 95%;
-    --menu-item-active: 29 40% 92%;
-    --menu-border: 0 0% 90%;
-    
-    --scrollbar-track: 0 0% 98%;
-    --scrollbar-thumb: 29 36% 46%;
-  }
-
-  .dark {
+  /* Dark mode variables (default) */
+  :root,
+  body[data-theme="dark"] {
     --background: 216 20% 15%;
     --foreground: 210 20% 85%;
 
@@ -76,6 +38,8 @@ All colors MUST be HSL.
     --input: 220 18% 22%;
     --ring: 29 36% 46%;
 
+    --radius: 0.25rem;
+
     --menu-bg: 218 22% 16%;
     --menu-item-hover: 29 25% 22%;
     --menu-item-active: 29 30% 26%;
@@ -84,6 +48,46 @@ All colors MUST be HSL.
     --scrollbar-track: 218 22% 16%;
     --scrollbar-thumb: 29 36% 46%;
   }
+
+  /* Light mode variables - explicit override */
+  body[data-theme="light"] {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 29 36% 46%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 29 36% 46%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 96%;
+    --ring: 29 36% 46%;
+
+    --menu-bg: 0 0% 98%;
+    --menu-item-hover: 29 36% 95%;
+    --menu-item-active: 29 40% 92%;
+    --menu-border: 0 0% 90%;
+    
+    --scrollbar-track: 0 0% 98%;
+    --scrollbar-thumb: 29 36% 46%;
+  }
+
 }
 
 @layer base {

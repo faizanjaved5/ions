@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, Upload, Moon, Sun, Menu, Bell, Loader2 } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/hooks/use-theme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -608,11 +608,13 @@ const Header = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className="group gap-0 font-bebas text-lg uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white rounded-md"
+                className="group gap-0 font-bebas text-lg uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white rounded-md [&]:border-[#a0744b] [&]:text-[#a0744b] [&]:bg-[#1f252e] [&]:hover:bg-[#a0744b] [&]:hover:text-white"
                 onClick={handleSignIn}
               >
                 Sign
-                <span className="text-primary group-hover:text-white">ION</span>
+                <span className="text-primary group-hover:text-white [&]:text-[#a0744b] [&]:group-hover:text-white">
+                  ION
+                </span>
               </Button>
             )}
 
@@ -690,14 +692,14 @@ const Header = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 group gap-0 justify-center font-bebas uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white rounded-md"
+                        className="flex-1 group gap-0 justify-center font-bebas uppercase tracking-wider border-primary text-primary hover:bg-primary hover:text-white rounded-md [&]:border-[#a0744b] [&]:text-[#a0744b] [&]:bg-[#1f252e] [&]:hover:bg-[#a0744b] [&]:hover:text-white"
                         onClick={() => {
                           handleSignIn();
                           setMobileMenuOpen(false);
                         }}
                       >
                         Sign
-                        <span className="text-primary group-hover:text-white">
+                        <span className="text-primary group-hover:text-white [&]:text-[#a0744b] [&]:group-hover:text-white">
                           ION
                         </span>
                       </Button>
