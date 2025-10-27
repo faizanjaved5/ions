@@ -31,6 +31,14 @@ function debug_log($message) {
     file_put_contents(__DIR__ . '/debug.log', "[$timestamp] $message\n", FILE_APPEND);
 }
 debug_log("=== Starting iondynamic.php ===");
+
+// CRITICAL: If pass=1 is set, we should not be here (htaccess should skip)
+// This prevents redirect loops - exit immediately and let WordPress handle it
+if (isset($_GET['pass']) && $_GET['pass'] == '1') {
+    debug_log("pass=1 detected - this should have been handled by WordPress. Exiting to prevent loop.");
+    return;
+}
+
 $dynamic_enabled = true; // (original)
 if (!$dynamic_enabled) {
     debug_log("Dynamic rendering disabled");
@@ -104,6 +112,18 @@ if (preg_match('/\.(' . implode('|', $static_exts) . ')$/i', $request_path)) {
 //     debug_log("Non-dynamic path: $request_path - abort");
 //     return;
 // }
+
+// Skip video shortlink directory - should be handled by v/index.php
+if (preg_match('#^/v(/|$)#', $request_path)) {
+    debug_log("Video shortlink path: $request_path - skipping iondynamic");
+    // If this is /v/ without a slug, redirect to home
+    if ($request_path === '/v' || $request_path === '/v/') {
+        header('Location: /');
+        exit();
+    }
+    // Otherwise, let v/index.php handle it
+    return;
+}
 // ==============================================================
 // =================== DOMAIN ➜ SLUG OVERRIDE (ALWAYS) ===================
 // If the request host is a mapped domain, ALWAYS override $_GET['slug']
@@ -236,9 +256,16 @@ if (!headers_sent() && !empty($GLOBALS['ION_IS_MAPPED_DOMAIN'])) {
 // 1) If the domain->slug override didn't fire, try to derive from the original path
 if (empty($_GET['slug'])) {
     $path = ion_original_path();
+    // Match any slug pattern (ion-something OR other-slug-format)
+    // First try ion- prefix (most common for channels)
     if (preg_match('#/(ion-[a-z0-9\-]+)(?:/|$)#i', $path, $m)) {
         $_GET['slug'] = strtolower($m[1]);
-        debug_log("Fallback slug from path: {$_GET['slug']} (path={$path})");
+        debug_log("Fallback slug from path (ion- prefix): {$_GET['slug']} (path={$path})");
+    } 
+    // Then try any slug-like pattern (for academy, studio, etc.)
+    elseif (preg_match('#/([a-z0-9]+(?:-[a-z0-9]+)+)(?:/|$)#i', $path, $m)) {
+        $_GET['slug'] = strtolower($m[1]);
+        debug_log("Fallback slug from path (generic): {$_GET['slug']} (path={$path})");
     } else {
         debug_log("No slug in path (path={$path})");
     }
@@ -294,6 +321,167 @@ if ($slug === '') {
 }
 debug_log("Processing request for slug: $slug");
 if (!headers_sent()) header("X-ION-Debug-Slug: " . $slug);
+
+// =================== GEOGRAPHIC HIERARCHY ROUTING (ADDED) ===================
+// Check if this slug is a country or state before trying to load as a city
+// This allows /ion-united-states, /ion-canada, /ion-arizona etc. to work
+$countryMap = [
+    'ion-united-states' => 'US', 'ion-usa' => 'US', 'ion-canada' => 'CA',
+    'ion-mexico' => 'MX', 'ion-united-kingdom' => 'GB', 'ion-uk' => 'GB',
+    'ion-australia' => 'AU', 'ion-new-zealand' => 'NZ', 'ion-germany' => 'DE',
+    'ion-france' => 'FR', 'ion-spain' => 'ES', 'ion-italy' => 'IT',
+    'ion-japan' => 'JP', 'ion-china' => 'CN', 'ion-india' => 'IN',
+    'ion-brazil' => 'BR', 'ion-argentina' => 'AR', 'ion-south-africa' => 'ZA',
+    'ion-uae' => 'AE', 'ion-bulgaria' => 'BG', 'ion-iceland' => 'IS',
+    'ion-philippines' => 'PH', 'ion-saudi-arabia' => 'SA',
+];
+
+$countriesWithStates = ['US', 'CA', 'MX'];
+
+if (isset($countryMap[$slug])) {
+    debug_log("Geographic routing: Country detected - $slug");
+    // Set up for ioncountry.php or direct cities
+    $countryCode = $countryMap[$slug];
+    $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? 'dark';
+    
+    // Initialize PDO for geographic pages
+    $config = require __DIR__ . '/config/config.php';
+    try {
+        $pdo = new PDO(
+            "mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4",
+            $config['username'],
+            $config['password'],
+            [ PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ]
+        );
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo "Database connection error.";
+        exit;
+    }
+    
+    if (in_array($countryCode, $countriesWithStates)) {
+        // Show states/provinces
+        require __DIR__ . '/channel/ioncountry.php';
+    } else {
+        // Show cities directly
+        $hierarchyLevel = 'cities';
+        require __DIR__ . '/channel/ionstate.php';
+    }
+    exit; // Stop further processing
+}
+
+// Check if this is a state slug
+try {
+    global $wpdb;
+    if (empty($wpdb)) {
+        $wpdb = new IONDatabase();
+    }
+    
+    // Extract state name from slug (remove 'ion-' prefix if present)
+    $stateSlugSearch = preg_replace('/^ion-/', '', $slug);
+    $stateSlugSearch = str_replace('-', ' ', $stateSlugSearch);
+    
+    $stateCheck = $wpdb->get_row($wpdb->prepare(
+        "SELECT DISTINCT state_name, state_code, country_code FROM IONLocalNetwork 
+         WHERE LOWER(REPLACE(state_name, ' ', '-')) = %s 
+         OR LOWER(state_name) = %s 
+         LIMIT 1",
+        strtolower($stateSlugSearch),
+        strtolower($stateSlugSearch)
+    ));
+    
+    if ($stateCheck && !empty($stateCheck->state_name)) {
+        debug_log("Geographic routing: State detected - " . $stateCheck->state_name);
+        $stateName = $stateCheck->state_name;
+        $countryCode = $stateCheck->country_code;
+        $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? 'dark';
+        
+        // Initialize PDO for geographic pages
+        $config = require __DIR__ . '/config/config.php';
+        try {
+            $pdo = new PDO(
+                "mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4",
+                $config['username'],
+                $config['password'],
+                [ PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ]
+            );
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo "Database connection error.";
+            exit;
+        }
+        
+        require __DIR__ . '/channel/ionstate.php';
+        exit; // Stop further processing
+    }
+} catch (Exception $e) {
+    debug_log("Geographic routing check error: " . $e->getMessage());
+    // Continue to city lookup on error
+}
+// =================== END GEOGRAPHIC HIERARCHY ROUTING ===================
+
+// =================== TOPIC/NETWORK ROUTING ===================
+// Check if this slug is a topic/network before trying city lookup
+// This allows /ion-sports-network, /ion-comedy-network etc. to work
+try {
+    global $wpdb;
+    if (empty($wpdb)) {
+        $wpdb = new IONDatabase();
+    }
+    
+    debug_log("Checking if slug '$slug' is a topic/network...");
+    
+    // First, check if there are duplicate slugs for debugging
+    $check_duplicates = $wpdb->get_results($wpdb->prepare(
+        "SELECT id, network_name, slug FROM IONNetworks WHERE LOWER(slug) = LOWER(%s) ORDER BY id ASC",
+        $slug
+    ));
+    
+    if (count($check_duplicates) > 1) {
+        $dup_info = array_map(function($r) { return "ID:{$r->id}={$r->network_name}"; }, $check_duplicates);
+        debug_log("WARNING: Found " . count($check_duplicates) . " duplicate slugs for '$slug': " . implode(", ", $dup_info));
+    }
+    
+    // Try exact slug match (case-insensitive)
+    // Added ORDER BY id ASC to ensure consistent results when there are duplicate slugs
+    $topic = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM IONNetworks WHERE LOWER(slug) = LOWER(%s) ORDER BY id ASC LIMIT 1",
+        $slug
+    ));
+    
+    if ($topic && !empty($topic->slug)) {
+        debug_log("Topic/Network detected: ID=" . $topic->id . ", Name=" . $topic->network_name . " (slug: " . $topic->slug . ")");
+        
+        // Set up for iontopic.php
+        $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? 'dark';
+        
+        // Initialize PDO for topic pages
+        $config = require __DIR__ . '/config/config.php';
+        try {
+            $pdo = new PDO(
+                "mysql:host={$config['host']};dbname={$config['dbname']};charset=utf8mb4",
+                $config['username'],
+                $config['password'],
+                [ PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ]
+            );
+        } catch (PDOException $e) {
+            http_response_code(500);
+            echo "Database connection error.";
+            exit;
+        }
+        
+        // Load the topic page
+        require __DIR__ . '/channel/iontopic.php';
+        exit; // Stop further processing
+    } else {
+        debug_log("Slug '$slug' is not a topic/network, continuing to city lookup...");
+    }
+} catch (Exception $e) {
+    debug_log("Topic routing check error: " . $e->getMessage());
+    // Continue to city lookup on error
+}
+// =================== END TOPIC/NETWORK ROUTING ===================
+
 // Initialize database connection (original)
 try {
     debug_log("Initializing database connection");
@@ -336,20 +524,29 @@ try {
     exit;
 }
 if (!$city || empty($city->slug)) {
-    debug_log("City not found, showing 404");
-    http_response_code(404);
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    header('Pragma: no-cache');
-    header('Expires: 0');
-    $template_404 = __DIR__ . '/channel/404.php';
-    if (file_exists($template_404)) {
-        debug_log("Including 404 template");
-        include $template_404;
-    } else {
-        debug_log("404 template not found");
-        echo '<h2>404 Not Found</h2>';
-        echo '<p>The requested city page could not be found.</p>';
+    debug_log("City not found in database for slug: $slug");
+    // Fallback: if no city found, redirect to clean URL with only ?pass=1
+    // Remove slug and subpath parameters added by .htaccess rewrite
+    $qs = $_SERVER['QUERY_STRING'] ?? '';
+    parse_str($qs, $qarr);
+    
+    // Remove internal rewrite parameters
+    unset($qarr['slug']);
+    unset($qarr['subpath']);
+    
+    // Add pass=1 to skip .htaccess rewrite
+    $qarr['pass'] = '1';
+    
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $redirect_url = $scheme . '://' . $host . '/' . $slug;
+    
+    if (!empty($qarr)) {
+        $redirect_url .= '?' . http_build_query($qarr);
     }
+    
+    debug_log("No city found. Passthrough to WordPress: $redirect_url");
+    header("Location: $redirect_url", true, 307);
     exit;
 }
 debug_log("City found: " . $city->city_name . " (Status: " . ($city->status ?? 'Unknown') . ")");

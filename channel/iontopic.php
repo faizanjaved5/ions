@@ -146,24 +146,101 @@ function handleSearchRequest($pdo, $city) {
     ];
 }
 
-// Fetch $city from DB (using table 'IONLocalNetwork')
-$slug = trim( parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
-echo '<!-- Debug: Slug used for query: ' . htmlspecialchars($slug) . ' -->';
-try {
-    $stmt = $pdo->prepare("SELECT * FROM IONLocalNetwork WHERE slug = :slug LIMIT 1");
-    $stmt->execute([':slug' => $slug]);
-    $city = $stmt->fetch(PDO::FETCH_OBJ);
-    if (!$city) {
-        echo '<!-- Debug: No city found for slug in DB. Check if row exists with slug "' . htmlspecialchars($slug) . '". -->';
-        echo "<p>This ION Channel is not online yet.</p>";
+// Fetch topic/network from IONNetworks (instead of IONLocalNetwork)
+// Extract slug properly from URL if not passed from iondynamic.php
+if (!isset($topic) || empty($topic)) {
+    $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    // Extract the slug from the path (e.g., /ion-business-network -> ion-business-network)
+    if (preg_match('#/(ion-[a-z0-9\-]+)(?:/|$)#i', $path, $matches)) {
+        $slug = strtolower($matches[1]);
+    } else {
+        $slug = trim($path, '/');
+    }
+    echo '<!-- Debug: Topic slug extracted from URL: ' . htmlspecialchars($slug) . ' -->';
+    
+    try {
+        // Added ORDER BY id ASC to ensure consistent results when there are duplicate slugs
+        $stmt = $pdo->prepare("SELECT * FROM IONNetworks WHERE LOWER(slug) = LOWER(:slug) ORDER BY id ASC LIMIT 1");
+        $stmt->execute([':slug' => $slug]);
+        $topic = $stmt->fetch(PDO::FETCH_OBJ);
+        
+        if (!$topic) {
+            echo '<!-- Debug: No topic found for slug in DB. Check if row exists with slug "' . htmlspecialchars($slug) . '". -->';
+            echo "<p>This ION Topic/Network is not available yet.</p>";
+            return;
+        }
+        echo '<!-- Debug: Topic fetched successfully: ID=' . htmlspecialchars($topic->id) . ', Name=' . htmlspecialchars($topic->network_name) . ' (slug: ' . htmlspecialchars($topic->slug) . ') -->';
+    } catch (PDOException $e) {
+        echo '<!-- Debug: Topic query failed: ' . htmlspecialchars($e->getMessage()) . ' -->';
+        echo "<p>Failed to fetch topic data. Check table 'IONNetworks' and columns (e.g., slug, network_name).</p>";
         return;
     }
-    echo '<!-- Debug: City fetched successfully: ' . htmlspecialchars($city->city_name) . ' -->';
-} catch (PDOException $e) {
-    echo '<!-- Debug: City query failed: ' . htmlspecialchars($e->getMessage()) . ' -->';
-    echo "<p>Failed to fetch city data. Check table 'IONLocalNetwork' and columns (e.g., slug, city_name).</p>";
-    return;
+} else {
+    // Topic was passed from iondynamic.php
+    $slug = $topic->slug;
+    echo '<!-- Debug: Topic passed from iondynamic.php: ' . htmlspecialchars($topic->network_name) . ' (slug: ' . htmlspecialchars($slug) . ') -->';
 }
+
+// Fetch Unsplash background image if image_path is empty
+$unsplash_image = null;
+if (empty($topic->image_path)) {
+    echo '<!-- Debug: Fetching Unsplash image for: ' . htmlspecialchars($topic->network_name) . ' -->';
+    
+    // Include Unsplash helper
+    require_once __DIR__ . '/../unsplash.php';
+    
+    // Fetch image for the network/topic name (strip ™ and other special chars for better search)
+    $searchQuery = str_replace(['™', '®', 'ION ', ' Network'], '', $topic->network_name);
+    echo '<!-- Debug: Unsplash search query: ' . htmlspecialchars($searchQuery) . ' -->';
+    
+    $unsplash_image = fetchUnsplashBackgroundImage($searchQuery, null, null, false);
+    
+    if ($unsplash_image) {
+        echo '<!-- Debug: Unsplash image fetched: ' . ($unsplash_image['is_fallback'] ? 'FALLBACK' : 'SUCCESS') . ' -->';
+        echo '<!-- Debug: Image URL: ' . htmlspecialchars($unsplash_image['image']) . ' -->';
+        
+        // Update the IONNetworks table with the fetched image (even if fallback)
+        try {
+            $stmt = $pdo->prepare("UPDATE IONNetworks SET image_path = :image_path WHERE id = :id");
+            $stmt->execute([
+                ':image_path' => $unsplash_image['image'],
+                ':id' => $topic->id
+            ]);
+            // Update the topic object
+            $topic->image_path = $unsplash_image['image'];
+            echo '<!-- Debug: Image saved to database for topic ID: ' . htmlspecialchars($topic->id) . ' -->';
+        } catch (PDOException $e) {
+            error_log("Failed to save Unsplash image for topic {$topic->id}: " . $e->getMessage());
+            echo '<!-- Debug ERROR: Failed to save image: ' . htmlspecialchars($e->getMessage()) . ' -->';
+        }
+    } else {
+        echo '<!-- Debug: Unsplash fetch returned NULL -->';
+    }
+} else {
+    echo '<!-- Debug: Using existing image_path from database: ' . htmlspecialchars($topic->image_path) . ' -->';
+}
+
+// Create a city-like object for backward compatibility with existing functions
+// Generate a better default description if none exists
+$defaultDescription = "Watch the latest " . str_replace(['™', '®'], '', $topic->network_name) . " videos and content on ION";
+
+$city = (object)[
+    'city_name' => $topic->network_name,
+    'channel_name' => $topic->network_name,
+    'title' => $topic->network_name,
+    'description' => !empty($topic->description) ? $topic->description : $defaultDescription,
+    'state_name' => '',
+    'country_name' => 'Network',
+    'slug' => $topic->slug,
+    'page_URL' => '',
+    'seo_title' => $topic->network_name . ' on ION',
+    'seo_description' => !empty($topic->description) ? $topic->description : $defaultDescription,
+    'seo_keywords' => $topic->network_name . ', ION',
+    'image_path' => $topic->image_path ?? '/assets/default-hero.jpg',
+    'parent_id' => $topic->parent_id ?? null,
+    'level' => $topic->level ?? 0,
+    'network_group' => $topic->group ?? null
+];
 
 // Add JavaScript context for search functionality integration
 echo '<script>';
@@ -736,7 +813,7 @@ echo '<!-- Debug: Has slider media: ' . ($has_slider_media ? 'Yes' : 'No') . ' -
                     <?php if ($index === 0): ?>
                         <div class="slide-text">
                             <h1>Welcome to <?= esc_html($city->channel_name ?: $city->title) ?></h1>
-                            <p>Your local ION channel for <?= esc_html($city->city_name) ?></p>
+                            <p><?= esc_html($city->description ?: 'Explore content from ' . $city->channel_name) ?></p>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -1217,67 +1294,110 @@ function get_video_info($video) {
 }
 
 function get_stored_videos($slug, $category, $maxResults) {
-    global $pdo;
+    global $pdo, $topic;
     
-    // FIXED: Use UNION to get videos from BOTH IONLocalBlast (distributed channels) 
-    // AND IONLocalVideos.slug (primary channel). This ensures all videos appear 
-    // in the carousel regardless of whether they're primary or distributed.
-    $stmt = $pdo->prepare("
-        SELECT 
-            v.video_id AS videoId, 
-            v.title, 
-            v.thumbnail, 
-            v.video_link,
-            v.published_at,
-            v.channel_title,
-            v.description,
-            v.tags,
-            v.view_count,
-            vc.published_at as channel_published_at,
-            vc.expires_at as channel_expires_at,
-            vc.status as channel_status,
-            vc.priority
-        FROM IONLocalVideos v
-        INNER JOIN IONLocalBlast vc ON v.id = vc.video_id
-        WHERE vc.channel_slug = :slug 
-        AND v.ion_category = :category
-        AND vc.status = 'active'
-        AND (vc.published_at IS NULL OR vc.published_at <= NOW())
-        AND (vc.expires_at IS NULL OR vc.expires_at > NOW())
-        AND v.status = 'Approved'
-        AND v.visibility = 'Public'
-        
-        UNION
-        
-        SELECT 
-            video_id AS videoId, 
-            title, 
-            thumbnail, 
-            video_link,
-            published_at,
-            channel_title,
-            description,
-            tags,
-            view_count,
-            NULL as channel_published_at,
-            NULL as channel_expires_at,
-            'active' as channel_status,
-            0 as priority
-        FROM IONLocalVideos 
-        WHERE slug = :slug2 
-        AND ion_category = :category2
-        AND status = 'Approved'
-        AND visibility = 'Public'
-        
-        ORDER BY priority DESC, channel_published_at DESC, published_at DESC
-        LIMIT :maxResults
-    ");
+    // Check if we're in topic mode (topic object exists)
+    $isTopicMode = isset($topic) && !empty($topic->slug);
     
-    $stmt->bindParam(':slug', $slug, PDO::PARAM_STR);
-    $stmt->bindParam(':category', $category, PDO::PARAM_STR);
-    $stmt->bindParam(':slug2', $slug, PDO::PARAM_STR);
-    $stmt->bindParam(':category2', $category, PDO::PARAM_STR);
-    $stmt->bindParam(':maxResults', $maxResults, PDO::PARAM_INT);
+    if ($isTopicMode) {
+        // TOPIC MODE: Filter by ion_network and ion_category fields
+        // Get the topic's network name and use it for filtering
+        $topicSlug = $topic->slug;
+        $topicSlugWithoutPrefix = preg_replace('/^ion-(.+)$/', '$1', $topicSlug);
+        
+        $stmt = $pdo->prepare("
+            SELECT 
+                video_id AS videoId, 
+                title, 
+                thumbnail, 
+                video_link,
+                published_at,
+                channel_title,
+                description,
+                tags,
+                view_count,
+                NULL as channel_published_at,
+                NULL as channel_expires_at,
+                'active' as channel_status,
+                0 as priority
+            FROM IONLocalVideos 
+            WHERE (
+                ion_network = :topicSlug 
+                OR ion_network = :topicSlugWithoutPrefix
+                OR ion_category = :category
+                OR ion_category = :topicSlugWithoutPrefix
+            )
+            AND status = 'Approved'
+            AND visibility = 'Public'
+            
+            ORDER BY published_at DESC
+            LIMIT :maxResults
+        ");
+        
+        $stmt->bindParam(':topicSlug', $topicSlug, PDO::PARAM_STR);
+        $stmt->bindParam(':topicSlugWithoutPrefix', $topicSlugWithoutPrefix, PDO::PARAM_STR);
+        $stmt->bindParam(':category', $category, PDO::PARAM_STR);
+        $stmt->bindParam(':maxResults', $maxResults, PDO::PARAM_INT);
+    } else {
+        // CITY MODE: Original location-based filtering
+        $stmt = $pdo->prepare("
+            SELECT 
+                v.video_id AS videoId, 
+                v.title, 
+                v.thumbnail, 
+                v.video_link,
+                v.published_at,
+                v.channel_title,
+                v.description,
+                v.tags,
+                v.view_count,
+                vc.published_at as channel_published_at,
+                vc.expires_at as channel_expires_at,
+                vc.status as channel_status,
+                vc.priority
+            FROM IONLocalVideos v
+            INNER JOIN IONLocalBlast vc ON v.id = vc.video_id
+            WHERE vc.channel_slug = :slug 
+            AND v.ion_category = :category
+            AND vc.status = 'active'
+            AND (vc.published_at IS NULL OR vc.published_at <= NOW())
+            AND (vc.expires_at IS NULL OR vc.expires_at > NOW())
+            AND v.status = 'Approved'
+            AND v.visibility = 'Public'
+            
+            UNION
+            
+            SELECT 
+                video_id AS videoId, 
+                title, 
+                thumbnail, 
+                video_link,
+                published_at,
+                channel_title,
+                description,
+                tags,
+                view_count,
+                NULL as channel_published_at,
+                NULL as channel_expires_at,
+                'active' as channel_status,
+                0 as priority
+            FROM IONLocalVideos 
+            WHERE slug = :slug2 
+            AND ion_category = :category2
+            AND status = 'Approved'
+            AND visibility = 'Public'
+            
+            ORDER BY priority DESC, channel_published_at DESC, published_at DESC
+            LIMIT :maxResults
+        ");
+        
+        $stmt->bindParam(':slug', $slug, PDO::PARAM_STR);
+        $stmt->bindParam(':category', $category, PDO::PARAM_STR);
+        $stmt->bindParam(':slug2', $slug, PDO::PARAM_STR);
+        $stmt->bindParam(':category2', $category, PDO::PARAM_STR);
+        $stmt->bindParam(':maxResults', $maxResults, PDO::PARAM_INT);
+    }
+    
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_OBJ);
     
@@ -1622,11 +1742,11 @@ foreach ($categories as $category):
     // Convert slug to display name (e.g., 'ion-sports-network' → 'ION Sports™ Network')
     require_once __DIR__ . '/../includes/ioncategories.php';
     $category_display_name = get_ion_category_name_from_slug($category) ?: ucwords(str_replace(['-', 'ion', 'network'], [' ', 'ION', 'Network'], $category));
-    // Remove "ION " and "™ Network" for heading since we add city name
+    // Remove "ION " and "™ Network" for heading since we already have network name
     $category_short = str_replace(['ION ', '™ Network'], ['', ''], $category_display_name);
     ?>
     <section class="video-carousel">
-        <h2>ION <?= esc_html($city->city_name) ?> <?= esc_html($category_short) ?></h2>
+        <h2><?= esc_html($city->city_name) ?> <?= esc_html($category_short) ?></h2>
         <div class="carousel-container">
             <?php foreach ($videos as $video): 
                 $video_info = get_video_info((array)$video);
@@ -1740,28 +1860,7 @@ if (!empty($all_news_items)): ?>
 // End regular content (only show when not displaying search results)
 endif; ?>
 
-<section class="ion-metrics">
-    <div class="metric-container">
-        <div class="metric-card">
-            <div class="metric-icon-wrapper city-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M4.25 20.5v-15A.75.75 0 0 1 5 4.75h14a.75.75 0 0 1 .75.75v15a.75.75 0 0 1-1.5 0v-3.5H5.75v3.5a.75.75 0 0 1-1.5 0zM11 15.5h2V13h-2v2.5zm-4.5 0h2.5V13H6.5v2.5zm9 0h2.5V13H15.5v2.5zm-4.5-4h2.5v-2.5H11v2.5zm-4.5 0h2.5v-2.5H6.5v2.5zm9 0h2.5v-2.5H15.5v2.5zM11 7h2.5V4.5H11V7z"/></svg>
-            </div>
-            <div><h4>City</h4><p><?= esc_html($city->city_name . ($city->state_name ? ', ' . $city->state_name : '')) ?></p></div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-icon-wrapper location-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8zm0 11.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
-            </div>
-            <div><h4>Location</h4><p><?= esc_html($city->country_name) ?></p></div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-icon-wrapper population-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0zm-6 5a6 6 0 0 0-5.45 3.14a.75.75 0 0 0 1.3.72A4.5 4.5 0 0 1 12 16.5a4.5 4.5 0 0 1 4.15 2.36a.75.75 0 1 0 1.3-.72A6 6 0 0 0 12 15h-2zm9.14-3.55a.75.75 0 0 0-1.06-1.06A6.5 6.5 0 0 0 12 8.5a6.5 6.5 0 0 0-4.08 1.39a.75.75 0 1 0 1.06 1.06A5 5 0 0 1 12 10a5 5 0 0 1 3.08 1.15a.75.75 0 0 0 1.06-1.06A6.5 6.5 0 0 0 20.5 8a.75.75 0 0 0 0-1.5 8 8 0 1 0-8.65 7.92.75.75 0 0 0 1.5-.34A6.5 6.5 0 0 1 12 2.5a6.5 6.5 0 0 1 6.5 6.5c0 1.25-.36 2.41-1 3.45z"/></svg>
-            </div>
-            <div><h4>Population</h4><p><?= esc_html($city->population) ?></p></div>
-        </div>
-    </div>
-</section>
+<!-- City/Location/Population section removed for topic pages -->
 
 <section class="info-blocks">
     <div class="info-block blue">

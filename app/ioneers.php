@@ -2174,7 +2174,7 @@ function openAddUserDialog() {
                             <label for="handle">Profile Handle</label>
                             <div class="handle-input-container">
                                 <span class="handle-prefix">@</span>
-                                <input type="text" id="handle" name="handle" placeholder="username" pattern="[a-zA-Z0-9._-]+" title="Only letters, numbers, dots, underscores, and hyphens allowed">
+                                <input type="text" id="handle" name="handle" placeholder="username" pattern="[a-zA-Z0-9._\-]+" title="Only letters, numbers, dots, underscores, and hyphens allowed">
                             </div>
                         </div>
                     </div>
@@ -3144,7 +3144,7 @@ function openEditUserDialog(userId, fullname, email, profileName, handle, phone,
                             <label for="handle">Profile Handle</label>
                             <div class="handle-input-container">
                                 <span class="handle-prefix">@</span>
-                                <input type="text" id="handle" name="handle" value="${handle}" placeholder="username" pattern="[a-zA-Z0-9._-]+" title="Only letters, numbers, dots, underscores, and hyphens allowed">
+                                <input type="text" id="handle" name="handle" value="${handle}" placeholder="username" pattern="[a-zA-Z0-9._\-]+" title="Only letters, numbers, dots, underscores, and hyphens allowed">
                             </div>
                         </div>
                     </div>

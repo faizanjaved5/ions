@@ -90,7 +90,11 @@ if (!isset($_GET['code'])) {
         'redirect_uri' => $redirectUri,
         'response_type' => 'code',
         'scope' => implode(' ', [
-            'https://www.googleapis.com/auth/drive.file',     // Non-sensitive: Only files created by app
+            'https://www.googleapis.com/auth/drive.file',      // Non-sensitive: Files selected by user via Picker
+                                                               // NOTE: With drive.file scope, files are downloaded in
+                                                               // frontend during active Picker session, then uploaded
+                                                               // as regular files. This works because drive.file grants
+                                                               // access during the session when user explicitly selects.
             'https://www.googleapis.com/auth/userinfo.email',  // Get user email
             'https://www.googleapis.com/auth/userinfo.profile' // Get user profile
         ]),
@@ -435,4 +439,3 @@ try {
     die();
 }
 ?>
-

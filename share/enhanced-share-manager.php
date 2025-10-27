@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Enhanced ION Video Share Manager with Embed Support
  * Reusable sharing module for all video sharing functionality including embed codes
@@ -7,57 +6,54 @@
 
 require_once __DIR__ . '/../app/shortlink-manager.php';
 
-class EnhancedIONShareManager
-{
+class EnhancedIONShareManager {
     private $db;
     private $shortlink_manager;
     private $base_url;
     private $embed_domain;
-
-    public function __construct($db, $base_url = null, $embed_domain = null)
-    {
+    
+    public function __construct($db, $base_url = null, $embed_domain = null) {
         $this->db = $db;
         $this->shortlink_manager = new VideoShortlinkManager($db);
-        $this->base_url = $base_url ?: 'https://ions.com';
-        $this->embed_domain = $embed_domain ?: 'https://ions.com';
+        $this->base_url = $base_url ?:         'https://iblog.bz';
+        $this->embed_domain = $embed_domain ?: 'https://iblog.bz';
     }
-
+    
     /**
      * Get or generate share data for a video including embed codes
      */
-    public function getShareData($video_id)
-    {
+    public function getShareData($video_id) {
         try {
             // Get video details
             $video = $this->db->get_row($this->db->prepare(
-                "SELECT * FROM IONLocalVideos WHERE id = %d",
+                "SELECT * FROM IONLocalVideos WHERE id = %d", 
                 $video_id
             ));
-
+            
             if (!$video) {
                 return false;
             }
-
+            
             // Get or generate shortlink
             $shortlink_data = $this->shortlink_manager->getVideoShortlink($video_id);
-
+            
             if (!$shortlink_data) {
                 // Generate shortlink if it doesn't exist
                 $shortlink_data = $this->shortlink_manager->generateShortlink($video_id, $video->title);
             }
-
+            
             if (!$shortlink_data) {
                 return false;
             }
-
+            
             // Prepare share data
             $share_url = $shortlink_data['url'];
             $title = $video->title ?: 'Watch this video';
-            $description = $video->description ?
-                substr(strip_tags($video->description), 0, 160) :
+            $description = $video->description ? 
+                substr(strip_tags($video->description), 0, 160) : 
                 "Watch {$title} on ION";
             $thumbnail = $video->thumbnail ?: $this->base_url . '/assets/default/ionthumbnail.png';
-
+            
             return [
                 'video_id' => $video_id,
                 'title' => $title,
@@ -69,21 +65,21 @@ class EnhancedIONShareManager
                 'platforms' => $this->generatePlatformUrls($share_url, $title, $description, $thumbnail),
                 'embed_codes' => $this->generateEmbedCodes($video, $share_url, $title, $thumbnail)
             ];
+            
         } catch (Exception $e) {
             error_log("Share data error: " . $e->getMessage());
             return false;
         }
     }
-
+    
     /**
      * Generate embed codes for different platforms and sizes
      */
-    private function generateEmbedCodes($video, $share_url, $title, $thumbnail)
-    {
+    private function generateEmbedCodes($video, $share_url, $title, $thumbnail) {
         $video_url = $video->video_link;
         $video_type = strtolower($video->source ?? 'local');
         $video_id = $video->video_id;
-
+        
         // Base embed configuration
         $embed_configs = [
             'small' => ['width' => 320, 'height' => 180],
@@ -91,16 +87,16 @@ class EnhancedIONShareManager
             'large' => ['width' => 853, 'height' => 480],
             'responsive' => ['width' => '100%', 'height' => 'auto']
         ];
-
+        
         $embed_codes = [];
-
+        
         foreach ($embed_configs as $size => $dimensions) {
             $width = $dimensions['width'];
             $height = $dimensions['height'];
-
+            
             // Generate the embed code based on the template from embed.php
             $embed_code = $this->generateVideoEmbedCode($video, $width, $height, $size === 'responsive');
-
+            
             $embed_codes[$size] = [
                 'name' => ucfirst($size) . ($size === 'responsive' ? ' (Responsive)' : " ({$width}x{$height})"),
                 'width' => $width,
@@ -108,22 +104,21 @@ class EnhancedIONShareManager
                 'code' => $embed_code
             ];
         }
-
+        
         return $embed_codes;
     }
-
+    
     /**
      * Generate the actual embed code HTML
      */
-    private function generateVideoEmbedCode($video, $width, $height, $responsive = false)
-    {
+    private function generateVideoEmbedCode($video, $width, $height, $responsive = false) {
         $video_url = htmlspecialchars($video->video_link, ENT_QUOTES);
         $video_type = strtolower($video->source ?? 'local');
         $video_id = htmlspecialchars($video->video_id, ENT_QUOTES);
         $title = htmlspecialchars($video->title, ENT_QUOTES);
         $thumbnail = htmlspecialchars($video->thumbnail ?: $this->base_url . '/assets/default/ionthumbnail.png', ENT_QUOTES);
         $date_added = htmlspecialchars($video->date_added, ENT_QUOTES);
-
+        
         // Determine video format for local videos
         $video_format = 'mp4';
         if ($video_type === 'local' || $video_type === 'upload') {
@@ -131,11 +126,11 @@ class EnhancedIONShareManager
             $video_format = $extension ?: 'mp4';
             $video_type = 'local';
         }
-
+        
         // Generate responsive wrapper if needed
         $wrapper_style = '';
         $container_style = '';
-
+        
         if ($responsive) {
             $wrapper_style = 'style="position: relative; width: 100%; height: 0; padding-bottom: 56.25%; /* 16:9 aspect ratio */"';
             $container_style = 'style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"';
@@ -144,7 +139,7 @@ class EnhancedIONShareManager
         } else {
             $container_style = "style=\"width: {$width}px; height: {$height}px;\"";
         }
-
+        
         $embed_code = <<<HTML
 <!-- ION Video Player Embed -->
 <div class="ion-video-embed" {$wrapper_style}>
@@ -204,17 +199,16 @@ HTML;
 
         return $embed_code;
     }
-
+    
     /**
      * Generate sharing URLs for all major platforms
      */
-    private function generatePlatformUrls($url, $title, $description, $thumbnail)
-    {
+    private function generatePlatformUrls($url, $title, $description, $thumbnail) {
         $encoded_url = urlencode($url);
         $encoded_title = urlencode($title);
         $encoded_description = urlencode($description);
         $encoded_thumbnail = urlencode($thumbnail);
-
+        
         return [
             'facebook' => "https://www.facebook.com/sharer/sharer.php?u={$encoded_url}",
             'twitter' => "https://twitter.com/intent/tweet?url={$encoded_url}&text={$encoded_title}",
@@ -228,12 +222,17 @@ HTML;
             'copy' => $url
         ];
     }
-
+    
     /**
      * Render enhanced share button with embed functionality
      */
-    public function renderShareButton($video_id, $options = [])
-    {
+    public function renderShareButton($video_id, $options = []) {
+        // Ensure $options is always an array (defensive programming)
+        if (!is_array($options)) {
+            error_log('⚠️ EnhancedIONShareManager::renderShareButton received non-array options: ' . gettype($options));
+            $options = [];
+        }
+        
         $default_options = [
             'size' => 'medium',
             'style' => 'both',
@@ -241,36 +240,36 @@ HTML;
             'show_embed' => true,
             'trigger' => 'click'
         ];
-
+        
         $options = array_merge($default_options, $options);
-
+        
         $share_data = $this->getShareData($video_id);
         if (!$share_data) {
             return '<span class="share-error" style="color: #ef4444; font-size: 12px;">Share unavailable</span>';
         }
-
+        
         $button_id = 'share-btn-' . $video_id;
         $modal_id = 'enhanced-share-modal-' . $video_id;
-
+        
         // Default prefilled share message
         $prefill_message = "Check out this video!\n\n\"" . ($share_data['title'] ?? 'Awesome video') . "\"\n" . ($share_data['url'] ?? '');
 
         ob_start();
-?>
-        <button class="ion-share-button enhanced-share-button"
-            id="<?= $button_id ?>"
-            data-video-id="<?= $video_id ?>"
-            title="Share & Embed this video"
-            onclick="window.EnhancedIONShare.openFromTemplate(<?= $video_id ?>)"
-            style="background: none; border: none; cursor: pointer; padding: 6px 8px; color: #3b82f6; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; gap: 4px; font-size: 12px;"
-            onmouseover="this.style.backgroundColor='rgba(59, 130, 246, 0.1)'"
-            onmouseout="this.style.backgroundColor='transparent'">
+        ?>
+        <button class="ion-share-button enhanced-share-button" 
+                id="<?= $button_id ?>" 
+                data-video-id="<?= $video_id ?>"
+                title="Share & Embed this video"
+                onclick="window.EnhancedIONShare.openFromTemplate(<?= $video_id ?>)"
+                style="background: none; border: none; cursor: pointer; padding: 6px 8px; color: #3b82f6; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; gap: 4px; font-size: 12px;"
+                onmouseover="this.style.backgroundColor='rgba(59, 130, 246, 0.1)'" 
+                onmouseout="this.style.backgroundColor='transparent'">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                <path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"/>
             </svg>
             <span>Share</span>
         </button>
-
+        
         <!-- Per-video modal content stored as a template to avoid rendering inside cards -->
         <script type="text/template" id="enhanced-share-template-<?= $video_id ?>">
             <div class="enhanced-share-header" style="padding: 20px 24px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
@@ -381,7 +380,7 @@ HTML;
                         <div style="margin-top: 12px;">
                             <label style="display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #ccc;">Preview</label>
                             <div style="background: #f5f5f5; border-radius: 6px; padding: 16px; <?= !$embed_data['width'] || $embed_data['width'] === '100%' ? '' : 'max-width: ' . $embed_data['width'] . 'px;' ?>">
-                                <div style="background: #ddd; border-radius: 4px; <?= $embed_data['width'] === '100%' ? 'aspect-ratio: 16/9;' : 'width: ' . ($embed_data['width'] / 2) . 'px; height: ' . ($embed_data['height'] / 2) . 'px;' ?> display: flex; align-items: center; justify-content: center; color: #666; font-size: 12px; position: relative;">
+                                <div style="background: #ddd; border-radius: 4px; <?= $embed_data['width'] === '100%' ? 'aspect-ratio: 16/9;' : 'width: ' . ($embed_data['width']/2) . 'px; height: ' . ($embed_data['height']/2) . 'px;' ?> display: flex; align-items: center; justify-content: center; color: #666; font-size: 12px; position: relative;">
                                     <img src="<?= htmlspecialchars($share_data['thumbnail']) ?>" alt="Preview" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px; opacity: 0.8;">
                                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"></path></svg>
@@ -393,17 +392,16 @@ HTML;
                 <?php endforeach; ?>
             </div>
         </script>
-
+        
         <!-- Click binding handled via inline onclick attribute above to avoid duplicates -->
-<?php
+        <?php
         return ob_get_clean();
     }
-
+    
     /**
      * Get platform icon SVG
      */
-    public function getPlatformIcon($platform)
-    {
+    private function getPlatformIcon($platform) {
         $icons = [
             'facebook' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="#1877f2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>',
             // X (formerly Twitter) logo
@@ -416,12 +414,11 @@ HTML;
             'email' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="#666"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>',
             'copy' => '<svg width="16" height="16" viewBox="0 0 24 24" fill="#666"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>'
         ];
-
+        
         return $icons[$platform] ?? '';
     }
 
-    public function getPlatformLabel($platform)
-    {
+    private function getPlatformLabel($platform) {
         if ($platform === 'twitter') {
             return 'X.com';
         }

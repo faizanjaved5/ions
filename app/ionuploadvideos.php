@@ -27,6 +27,12 @@ if (!file_exists($database_path)) {
 }
 require_once $database_path;
 
+// Load ION categories for slug lookup
+$categories_path = __DIR__ . '/../includes/ioncategories.php';
+if (file_exists($categories_path)) {
+    require_once $categories_path;
+}
+
 // Headers
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -177,31 +183,7 @@ function handleFileUpload() {
     // Debug: Log received badges
     error_log('🏷️ ION Badges received: ' . ($metadata['badges'] ?: 'none'));
     
-    // Handle thumbnail if provided
-    $thumbnailUrl = '';
-    error_log('🔍 DEBUG: Checking for thumbnail...');
-    error_log('🔍 DEBUG: $_FILES[thumbnail] exists: ' . (isset($_FILES['thumbnail']) ? 'YES' : 'NO'));
-    if (isset($_FILES['thumbnail'])) {
-        error_log('🔍 DEBUG: $_FILES[thumbnail][error]: ' . ($_FILES['thumbnail']['error'] ?? 'NOT SET'));
-        error_log('🔍 DEBUG: $_FILES[thumbnail][name]: ' . ($_FILES['thumbnail']['name'] ?? 'NOT SET'));
-        error_log('🔍 DEBUG: $_FILES[thumbnail][size]: ' . ($_FILES['thumbnail']['size'] ?? 'NOT SET'));
-    }
-    error_log('🔍 DEBUG: $_POST[thumbnail_data] exists: ' . (!empty($_POST['thumbnail_data']) ? 'YES (length: ' . strlen($_POST['thumbnail_data']) . ')' : 'NO'));
-    
-    if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
-        error_log('📸 Thumbnail file uploaded: ' . $_FILES['thumbnail']['name'] . ' (' . $_FILES['thumbnail']['size'] . ' bytes)');
-        $thumbnailUrl = handleThumbnailUpload($_FILES['thumbnail']);
-        error_log('📸 Thumbnail saved at: ' . ($thumbnailUrl ?: 'FAILED'));
-    } elseif (!empty($_POST['thumbnail_data'])) {
-        // Base64 encoded thumbnail from video frame capture
-        error_log('📸 Thumbnail data (base64) provided, length: ' . strlen($_POST['thumbnail_data']));
-        $thumbnailUrl = handleThumbnailFromData($_POST['thumbnail_data'], $file['name']);
-        error_log('📸 Thumbnail saved at: ' . ($thumbnailUrl ?: 'FAILED'));
-    } else {
-        error_log('⚠️ No thumbnail provided for this upload');
-    }
-    
-    // Get user info from session
+    // Get user info from session (needed before shortLink generation)
     $userEmail = $_SESSION['user_email'] ?? 'test@example.com';
     
     // Look up user ID from email - try multiple tables
@@ -224,9 +206,37 @@ function handleFileUpload() {
         error_log("⚠️ User lookup failed for email: $userEmail, using fallback user ID: $userId");
     }
     
-    // Generate short link
+    // Generate short link (needed for SEO thumbnail filename)
     $shortLink = generateShortLink();
     error_log('🔗 Generated short link: ' . $shortLink);
+    
+    // Extract title and description for SEO thumbnail (if not already set)
+    $videoTitle = $metadata['title'] ?? '';
+    $videoDescription = $metadata['description'] ?? '';
+    
+    // Handle thumbnail NOW - after shortLink is generated (for SEO filename)
+    $thumbnailUrl = '';
+    error_log('🔍 DEBUG: Checking for thumbnail...');
+    error_log('🔍 DEBUG: $_FILES[thumbnail] exists: ' . (isset($_FILES['thumbnail']) ? 'YES' : 'NO'));
+    if (isset($_FILES['thumbnail'])) {
+        error_log('🔍 DEBUG: $_FILES[thumbnail][error]: ' . ($_FILES['thumbnail']['error'] ?? 'NOT SET'));
+        error_log('🔍 DEBUG: $_FILES[thumbnail][name]: ' . ($_FILES['thumbnail']['name'] ?? 'NOT SET'));
+        error_log('🔍 DEBUG: $_FILES[thumbnail][size]: ' . ($_FILES['thumbnail']['size'] ?? 'NOT SET'));
+    }
+    error_log('🔍 DEBUG: $_POST[thumbnail_data] exists: ' . (!empty($_POST['thumbnail_data']) ? 'YES (length: ' . strlen($_POST['thumbnail_data']) . ')' : 'NO'));
+    
+    if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
+        error_log('📸 Thumbnail file uploaded: ' . $_FILES['thumbnail']['name'] . ' (' . $_FILES['thumbnail']['size'] . ' bytes)');
+        $thumbnailUrl = handleThumbnailUpload($_FILES['thumbnail'], $shortLink, $videoTitle, $videoDescription);
+        error_log('📸 Thumbnail saved at: ' . ($thumbnailUrl ?: 'FAILED'));
+    } elseif (!empty($_POST['thumbnail_data'])) {
+        // Base64 encoded thumbnail from video frame capture
+        error_log('📸 Thumbnail data (base64) provided, length: ' . strlen($_POST['thumbnail_data']));
+        $thumbnailUrl = handleThumbnailFromData($_POST['thumbnail_data'], $file['name'], $shortLink, $videoTitle, $videoDescription);
+        error_log('📸 Thumbnail saved at: ' . ($thumbnailUrl ?: 'FAILED'));
+    } else {
+        error_log('⚠️ No thumbnail provided for this upload');
+    }
     
     // CRITICAL: Determine channel slug - MUST be from IONLocalNetwork, NEVER from video title
     // Priority: 1) Selected channels from channel selector, 2) User's primary channel, 3) Default 'ions'
@@ -270,8 +280,28 @@ function handleFileUpload() {
     
     error_log('📺 FINAL Channel determined - Slug: ' . $channelSlug . ', ID: ' . ($channelId ?? 'null'));
     
+    // NEW: Look up descriptive channel name from IONLocalNetwork for ion_channel field
+    $ionChannelName = null;
+    if ($channelSlug) {
+        $channelData = $db->get_row(
+            "SELECT channel_name, city_name FROM IONLocalNetwork WHERE slug = %s LIMIT 1",
+            $channelSlug
+        );
+        if ($channelData) {
+            $ionChannelName = $channelData->channel_name ?: $channelData->city_name;
+            error_log('📺 Channel name resolved: ' . $ionChannelName . ' (from slug: ' . $channelSlug . ')');
+        } else {
+            error_log('⚠️ Channel not found in IONLocalNetwork for slug: ' . $channelSlug);
+            // Fallback: use the slug itself if no channel found
+            $ionChannelName = $channelSlug;
+        }
+    } else {
+        error_log('⚠️ No channelSlug available, ion_channel will be NULL');
+    }
+    
     // Get category ID from categories table
     $categoryId = null;
+    $ionCategorySlug = null;
     if (!empty($metadata['category'])) {
         $categoryData = $db->get_row(
             "SELECT id FROM categories WHERE title = %s OR slug = %s LIMIT 1",
@@ -279,6 +309,83 @@ function handleFileUpload() {
             strtolower(str_replace(' ', '-', $metadata['category']))
         );
         $categoryId = $categoryData->id ?? null;
+        
+        // NEW: Look up category slug - try fast array lookup first, then database
+        $ionCategorySlug = null;
+        
+        // Try fast array lookup from ioncategories.php
+        if (function_exists('get_ion_category_slug')) {
+            $ionCategorySlug = get_ion_category_slug($metadata['category']);
+            if ($ionCategorySlug) {
+                error_log('✅ Category slug resolved from array: ' . $ionCategorySlug);
+            }
+        }
+        
+        // If array lookup failed, try database
+        if (!$ionCategorySlug) {
+            $categoryVariations = [
+                $metadata['category'],                              // Exact match
+                $metadata['category'] . '™ Network',               // ION Local → ION Local™ Network
+                $metadata['category'] . ' Network',                 // ION Local → ION Local Network
+                $metadata['category'] . '™',                        // ION Local → ION Local™
+            ];
+            
+            foreach ($categoryVariations as $variation) {
+                $categoryNetworkData = $db->get_row(
+                    "SELECT slug FROM IONNetworks WHERE network_name = %s LIMIT 1",
+                    $variation
+                );
+                if ($categoryNetworkData && !empty($categoryNetworkData->slug)) {
+                    $ionCategorySlug = strtolower($categoryNetworkData->slug);
+                    error_log('✅ Category slug resolved from database: ' . $ionCategorySlug);
+                    break;
+                }
+            }
+        }
+        
+        // Final fallback: create slug from category name
+        if (!$ionCategorySlug) {
+            $ionCategorySlug = strtolower(str_replace([' ', '™', '®'], ['-', '', ''], $metadata['category']));
+            $ionCategorySlug = preg_replace('/[^a-z0-9-]/', '', $ionCategorySlug);
+            error_log('⚠️ Category slug created from name: ' . $ionCategorySlug);
+        }
+    }
+    
+    // NEW: Determine primary network from selected networks for ion_network field (store SLUG)
+    $ionNetworkSlug = null;
+    $primaryNetworkId = null;
+    
+    error_log('🔍 Checking for selected_networks in POST...');
+    error_log('🔍 isset($_POST[selected_networks]): ' . (isset($_POST['selected_networks']) ? 'YES' : 'NO'));
+    error_log('🔍 $_POST[selected_networks] value: ' . ($_POST['selected_networks'] ?? 'NOT SET'));
+    
+    if (isset($_POST['selected_networks']) && !empty($_POST['selected_networks'])) {
+        $selectedNetworks = json_decode($_POST['selected_networks'], true);
+        error_log('🔍 Decoded selected_networks: ' . print_r($selectedNetworks, true));
+        
+        if (!empty($selectedNetworks) && is_array($selectedNetworks)) {
+            // First network in array = primary network
+            $primaryNetworkKey = $selectedNetworks[0];
+            error_log('📡 Primary network key: ' . $primaryNetworkKey);
+            
+            // Look up network slug from IONNetworks table
+            $networkData = $db->get_row(
+                "SELECT id, slug FROM IONNetworks WHERE network_key = %s LIMIT 1",
+                $primaryNetworkKey
+            );
+            
+            if ($networkData) {
+                $ionNetworkSlug = strtolower($networkData->slug);
+                $primaryNetworkId = $networkData->id;
+                error_log('✅ Primary network resolved: ' . $ionNetworkSlug . ' (ID: ' . $primaryNetworkId . ')');
+            } else {
+                error_log('⚠️ Network not found in IONNetworks for key: ' . $primaryNetworkKey);
+            }
+        } else {
+            error_log('⚠️ selected_networks is empty or not an array after decode');
+        }
+    } else {
+        error_log('ℹ️ No networks selected - ion_network will be NULL');
     }
     
     // Generate unique video_id for uploaded files
@@ -294,7 +401,8 @@ function handleFileUpload() {
     // Prepare comprehensive video data with all fields properly populated
     $videoData = [
         // Core identification
-        'slug'              => $channelSlug,              // Channel slug (not random!)
+        'slug'              => $channelSlug,              // Channel slug identifier
+        'ion_channel'       => $ionChannelName,           // NEW: Descriptive channel name (e.g., "ION Chandler")
         'video_id'          => $videoIdField,             // Unique ID for uploaded file
         'title'             => $metadata['title'],
         'description'       => $metadata['description'] ?: '',
@@ -305,8 +413,9 @@ function handleFileUpload() {
         'channel_id'        => $channelId,
         'channel_title'     => $channelTitle,
         
-        // Category
-        'category'          => $metadata['category'] ?: 'General',
+        // Category & Network (NEW STRUCTURE - store slugs)
+        'ion_category'      => $ionCategorySlug ?? 'general',       // NEW: Store category SLUG from IONNetworks
+        'ion_network'       => $ionNetworkSlug,                     // NEW: Store primary network SLUG from IONNetworks
         'category_id'       => $categoryId,
         'tags'              => $metadata['tags'] ?: '',
         
@@ -432,6 +541,72 @@ function handleFileUpload() {
     } catch (Exception $e) {
         error_log('❌ Badge processing failed: ' . $e->getMessage());
         // Don't fail the whole upload if just badges fail
+    }
+    
+    // Handle ION Networks (using junction table with is_primary flag)
+    try {
+        // Check if IONNetworks table exists
+        $networksTableExists = $db->get_var("SHOW TABLES LIKE 'IONNetworks'");
+        if (!$networksTableExists) {
+            error_log('⚠️ IONNetworks table does not exist - skipping network associations');
+            error_log('💡 Run add_ion_networks_support.sql to create the table');
+        }
+        
+        $selectedNetworks = isset($_POST['selected_networks']) ? json_decode($_POST['selected_networks'], true) : [];
+        error_log('🔍 DEBUG: selected_networks POST value: ' . ($_POST['selected_networks'] ?? 'NOT SET'));
+        error_log('🔍 DEBUG: decoded selectedNetworks: ' . print_r($selectedNetworks, true));
+        error_log('🔍 DEBUG: is_array: ' . (is_array($selectedNetworks) ? 'YES' : 'NO'));
+        error_log('🔍 DEBUG: count: ' . (is_array($selectedNetworks) ? count($selectedNetworks) : '0'));
+        
+        if (!empty($selectedNetworks) && is_array($selectedNetworks) && $networksTableExists) {
+            error_log('📡 Processing network associations for video ID ' . $videoId . ' with ' . count($selectedNetworks) . ' networks');
+            error_log('📡 Network list: ' . implode(', ', $selectedNetworks));
+            
+            $priority = 1;
+            $networkIndex = 0; // Track actual network index (not loop iteration)
+            foreach ($selectedNetworks as $index => $networkKey) {
+                error_log('📡 Associating with network: ' . $networkKey . ' (index: ' . $networkIndex . ', priority: ' . $priority . ')');
+                
+                // Lookup network ID from IONNetworks table
+                $network = $db->get_row(
+                    "SELECT id FROM IONNetworks WHERE network_key = %s LIMIT 1",
+                    $networkKey
+                );
+                
+                if (!$network) {
+                    error_log('⚠️ Network not found: ' . $networkKey);
+                    $priority++;
+                    continue;
+                }
+                
+                $networkId = $network->id;
+                $isPrimary = ($networkIndex === 0) ? 1 : 0; // NEW: First network = primary
+                
+                // Insert into junction table with is_primary flag
+                $insertResult = $db->insert('IONVideoNetworks', [
+                    'video_id' => $videoId,
+                    'network_id' => $networkId,
+                    'is_primary' => $isPrimary,  // NEW: Mark first network as primary
+                    'priority' => $priority
+                ]);
+                
+                if ($insertResult) {
+                    $primaryLabel = $isPrimary ? ' (PRIMARY)' : '';
+                    error_log('✅ Network association created: Video ' . $videoId . ' -> Network ' . $networkKey . $primaryLabel . ' (priority: ' . $priority . ')');
+                    $networkIndex++; // Increment only on successful insert
+                } else {
+                    error_log('❌ Failed to create network association for: ' . $networkKey);
+                }
+                
+                $priority++;
+            }
+            error_log('✅ Network associations processed successfully');
+        } else {
+            error_log('ℹ️ No networks selected for this video');
+        }
+    } catch (Exception $e) {
+        error_log('❌ Network processing failed: ' . $e->getMessage());
+        // Don't fail the whole upload if just networks fail
     }
     
     // Handle multi-channel distribution
@@ -1043,7 +1218,10 @@ function handlePlatformImport() {
     // Extract platform and video ID
     $platformInfo = extractPlatformInfo($url);
     
-    // Handle custom thumbnail upload first (user-uploaded takes priority)
+    // Generate unique short link FIRST (needed for SEO thumbnail filename)
+    $shortLinkForThumbnail = generateShortLink();
+    
+    // Handle custom thumbnail upload (user-uploaded takes priority)
     $thumbnail = '';
     error_log('🔍 PLATFORM IMPORT - Checking for custom thumbnail...');
     error_log('🔍 PLATFORM IMPORT - $_FILES[thumbnail] exists: ' . (isset($_FILES['thumbnail']) ? 'YES' : 'NO'));
@@ -1052,11 +1230,11 @@ function handlePlatformImport() {
     
     if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
         error_log('📸 PLATFORM IMPORT - Custom thumbnail file uploaded: ' . $_FILES['thumbnail']['name'] . ' (' . $_FILES['thumbnail']['size'] . ' bytes)');
-        $thumbnail = handleThumbnailUpload($_FILES['thumbnail']);
+        $thumbnail = handleThumbnailUpload($_FILES['thumbnail'], $shortLinkForThumbnail, $metadata['title'], $metadata['description']);
         error_log('📸 PLATFORM IMPORT - Custom thumbnail saved at: ' . ($thumbnail ?: 'FAILED'));
     } elseif (!empty($_POST['thumbnail_data'])) {
         error_log('📸 PLATFORM IMPORT - Custom thumbnail data (base64) provided, length: ' . strlen($_POST['thumbnail_data']));
-        $thumbnail = handleThumbnailFromData($_POST['thumbnail_data'], $metadata['title']);
+        $thumbnail = handleThumbnailFromData($_POST['thumbnail_data'], $metadata['title'], $shortLinkForThumbnail, $metadata['title'], $metadata['description']);
         error_log('📸 PLATFORM IMPORT - Custom thumbnail saved at: ' . ($thumbnail ?: 'FAILED'));
     } elseif (!empty($_POST['thumbnail_url'])) {
         // CORS fallback: Fetch thumbnail from URL on server-side (no CORS restriction)
@@ -1088,8 +1266,8 @@ function handlePlatformImport() {
     
     error_log('✅ Platform import - User found: ' . $user->user_id . ' (' . $user->email . ')');
     
-    // Generate unique short link
-    $shortLink = generateShortLink();
+    // Use the shortLink we already generated for the thumbnail
+    $shortLink = $shortLinkForThumbnail;
     
     // CRITICAL: Determine channel slug - MUST be from IONLocalNetwork, NEVER from video title
     // Priority: 1) Selected channels from channel selector, 2) User's primary channel, 3) Default 'ions'
@@ -1255,6 +1433,66 @@ function handlePlatformImport() {
     // Handle badges if provided
     if (!empty($metadata['badges'])) {
         handleVideoBadges($videoId, $metadata['badges'], $user->user_id);
+    }
+    
+    // Handle ION Networks (using junction table)
+    try {
+        // Check if IONNetworks table exists
+        $networksTableExists = $db->get_var("SHOW TABLES LIKE 'IONNetworks'");
+        if (!$networksTableExists) {
+            error_log('⚠️ PLATFORM IMPORT - IONNetworks table does not exist - skipping network associations');
+        }
+        
+        $selectedNetworks = isset($_POST['selected_networks']) ? json_decode($_POST['selected_networks'], true) : [];
+        error_log('🔍 PLATFORM IMPORT - selected_networks POST value: ' . ($_POST['selected_networks'] ?? 'NOT SET'));
+        error_log('🔍 PLATFORM IMPORT - decoded selectedNetworks: ' . print_r($selectedNetworks, true));
+        error_log('🔍 PLATFORM IMPORT - is_array: ' . (is_array($selectedNetworks) ? 'YES' : 'NO'));
+        error_log('🔍 PLATFORM IMPORT - count: ' . (is_array($selectedNetworks) ? count($selectedNetworks) : '0'));
+        
+        if (!empty($selectedNetworks) && is_array($selectedNetworks) && $networksTableExists) {
+            error_log('📡 PLATFORM IMPORT - Processing network associations for video ID ' . $videoId . ' with ' . count($selectedNetworks) . ' networks');
+            error_log('📡 PLATFORM IMPORT - Network list: ' . implode(', ', $selectedNetworks));
+            
+            $priority = 1; // First network = highest priority (Featured Network)
+            foreach ($selectedNetworks as $networkKey) {
+                error_log('📡 PLATFORM IMPORT - Associating with network: ' . $networkKey . ' (priority: ' . $priority . ')');
+                
+                // Lookup network ID from IONNetworks table
+                $network = $db->get_row(
+                    "SELECT id FROM IONNetworks WHERE network_key = %s LIMIT 1",
+                    $networkKey
+                );
+                
+                if (!$network) {
+                    error_log('⚠️ PLATFORM IMPORT - Network not found: ' . $networkKey);
+                    $priority++;
+                    continue;
+                }
+                
+                $networkId = $network->id;
+                
+                // Insert into junction table
+                $insertResult = $db->insert('IONVideoNetworks', [
+                    'video_id' => $videoId,
+                    'network_id' => $networkId,
+                    'priority' => $priority
+                ]);
+                
+                if ($insertResult) {
+                    error_log('✅ PLATFORM IMPORT - Network association created: Video ' . $videoId . ' -> Network ' . $networkKey . ' (priority: ' . $priority . ')');
+                } else {
+                    error_log('❌ PLATFORM IMPORT - Failed to create network association for: ' . $networkKey);
+                }
+                
+                $priority++;
+            }
+            error_log('✅ PLATFORM IMPORT - Network associations processed successfully');
+        } else {
+            error_log('ℹ️ PLATFORM IMPORT - No networks selected for this video');
+        }
+    } catch (Exception $e) {
+        error_log('❌ PLATFORM IMPORT - Network processing failed: ' . $e->getMessage());
+        // Don't fail the whole upload if just networks fail
     }
     
     // Handle multi-channel distribution (CRITICAL FIX: was missing for platform imports!)
@@ -1499,16 +1737,210 @@ function generateShortLink() {
 }
 
 /**
- * Handle uploaded thumbnail file
+ * Generate SEO-optimized thumbnail filename
+ * Format: {seo-title}-{description}-{timestamp}-{shortcode}.{ext}
+ * Total length: 70-100 characters
  */
-function handleThumbnailUpload($thumbnailFile) {
-    try {
-        // Create thumbs directory if it doesn't exist
-        $uploadDir = __DIR__ . '/../uploads/thumbs/';
-        if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+function generateSeoThumbnailFilename($shortcode, $title, $description = '', $fileExtension = 'jpg') {
+    // Sanitize and prepare text for URL
+    function sanitizeForFilename($text) {
+        // Remove special characters, keep alphanumeric and spaces
+        $text = preg_replace('/[^a-zA-Z0-9\s-]/', '', $text);
+        // Replace multiple spaces/dashes with single dash
+        $text = preg_replace('/[\s-]+/', '-', $text);
+        // Convert to lowercase
+        $text = strtolower(trim($text, '-'));
+        return $text;
+    }
+    
+    // Start with empty filename - we'll build: title-description-timestamp-shortcode
+    $filename = '';
+    
+    // Target length: 70-100 chars (minus extension, shortcode, and dots)
+    // Reserve space for shortcode (8 chars) + dash + timestamp (8 chars) + dash = 18 chars
+    $reservedSpace = strlen($shortcode) + 18;
+    $maxLength = 95 - strlen($fileExtension) - 1 - $reservedSpace;
+    $minLength = 65 - strlen($fileExtension) - 1 - $reservedSpace;
+    
+    $currentLength = 0;
+    
+    // Add title content first
+    if (!empty($title)) {
+        $titleSlug = sanitizeForFilename($title);
+        
+        // Calculate available space for title
+        $availableSpace = $maxLength;
+        
+        if (strlen($titleSlug) > $availableSpace) {
+            // Truncate title at word boundary
+            $titleSlug = substr($titleSlug, 0, $availableSpace);
+            // Remove partial word at end
+            $lastDash = strrpos($titleSlug, '-');
+            if ($lastDash !== false && $lastDash > 20) {
+                $titleSlug = substr($titleSlug, 0, $lastDash);
+            }
         }
         
+        if (!empty($titleSlug)) {
+            $filename .= $titleSlug;
+            $currentLength = strlen($filename);
+        }
+    }
+    
+    // If we still have space and have a description, add keywords from it
+    if ($currentLength < $minLength && !empty($description)) {
+        $descSlug = sanitizeForFilename($description);
+        $availableSpace = $minLength - $currentLength;
+        
+        if (!empty($descSlug) && $availableSpace > 10) {
+            $descPart = substr($descSlug, 0, $availableSpace);
+            $lastDash = strrpos($descPart, '-');
+            if ($lastDash !== false && $lastDash > 5) {
+                $descPart = substr($descPart, 0, $lastDash);
+            }
+            
+            if (!empty($descPart)) {
+                $filename .= '-' . $descPart;
+                $currentLength = strlen($filename);
+            }
+        }
+    }
+    
+    // Add timestamp for uniqueness (8 chars)
+    $timestamp = substr(time(), -8);
+    if (!empty($filename)) {
+        $filename .= '-' . $timestamp;
+    } else {
+        $filename = $timestamp;
+    }
+    
+    // Add shortcode at the END (e.g., "g7vrRaHa")
+    $filename .= '-' . $shortcode;
+    
+    // Final filename with extension
+    $finalFilename = $filename . '.' . $fileExtension;
+    
+    error_log("🎯 SEO Thumbnail: Generated '{$finalFilename}' (length: " . strlen($finalFilename) . ")");
+    
+    return $finalFilename;
+}
+
+/**
+ * Upload file to Cloudflare R2 storage
+ */
+function uploadToCloudflareR2($file_path, $filename, $content_type, $visibility = 'public') {
+    global $config;
+    $r2_config = $config['cloudflare_r2_api'] ?? null;
+
+    // Validate configuration
+    if (!$r2_config || empty($r2_config['access_key_id']) || empty($r2_config['secret_access_key']) || empty($r2_config['bucket_name'])) {
+        return ['success' => false, 'error' => 'Cloudflare R2 credentials not configured'];
+    }
+
+    try {
+        // Check file exists
+        if (!file_exists($file_path)) {
+            return ['success' => false, 'error' => 'File not found'];
+        }
+
+        // Prepare R2 details
+        $bucket = $r2_config['bucket_name'];
+        $key = $filename; // Use filename as-is (caller should include path like 'thumbnails/...')
+        $endpoint = rtrim($r2_config['endpoint'], '/');
+        $publicBase = rtrim($r2_config['public_url_base'], '/');
+        
+        // Prepare S3 PUT URL
+        $keyParts = explode('/', $key);
+        $encodedKey = implode('/', array_map('rawurlencode', $keyParts));
+        $url = "{$endpoint}/{$bucket}/{$encodedKey}";
+        
+        // Create date headers for signature
+        $date = gmdate('Ymd\THis\Z');
+        $shortDate = gmdate('Ymd');
+        $region = $r2_config['region'];
+        $service = 's3';
+        
+        // Create Canonical Request
+        $payloadHash = hash_file('sha256', $file_path);
+        
+        // Determine ACL setting based on visibility
+        $acl = ($visibility === 'public') ? 'public-read' : 'private';
+        
+        $host = parse_url($r2_config['endpoint'], PHP_URL_HOST);
+        $canonicalHeaders = "host:{$host}\nx-amz-acl:{$acl}\nx-amz-content-sha256:{$payloadHash}\nx-amz-date:{$date}\n";
+        $signedHeaders = "host;x-amz-acl;x-amz-content-sha256;x-amz-date";
+        $canonicalRequest = "PUT\n/{$bucket}/{$key}\n\n{$canonicalHeaders}\n{$signedHeaders}\n{$payloadHash}";
+
+        // Create String to Sign
+        $algorithm = 'AWS4-HMAC-SHA256';
+        $credentialScope = "{$shortDate}/{$region}/{$service}/aws4_request";
+        $stringToSign = "{$algorithm}\n{$date}\n{$credentialScope}\n" . hash('sha256', $canonicalRequest);
+
+        // Calculate Signature
+        $kDate = hash_hmac('sha256', $shortDate, "AWS4" . $r2_config['secret_access_key'], true);
+        $kRegion = hash_hmac('sha256', $region, $kDate, true);
+        $kService = hash_hmac('sha256', $service, $kRegion, true);
+        $kSigning = hash_hmac('sha256', "aws4_request", $kService, true);
+        $signature = hash_hmac('sha256', $stringToSign, $kSigning);
+
+        // Authorization header
+        $authorization = "{$algorithm} Credential={$r2_config['access_key_id']}/{$credentialScope}, SignedHeaders={$signedHeaders}, Signature={$signature}";
+
+        // Upload via cURL
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_PUT => true,
+            CURLOPT_INFILE => fopen($file_path, 'rb'),
+            CURLOPT_INFILESIZE => filesize($file_path),
+            CURLOPT_HTTPHEADER => [
+                "Authorization: {$authorization}",
+                "x-amz-acl: {$acl}",
+                "x-amz-content-sha256: {$payloadHash}",
+                "x-amz-date: {$date}",
+                "Content-Type: " . $content_type,
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_SSL_VERIFYPEER => true
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // Handle response
+        if ($httpCode >= 200 && $httpCode < 300) {
+            // Build public URL
+            $publicUrl = "{$publicBase}/{$key}";
+            error_log("✅ R2 SUCCESS: HTTP $httpCode - Thumbnail uploaded to $publicUrl");
+
+            return [
+                'success' => true,
+                'url' => $publicUrl,
+                'file_name' => $key,
+                'size_bytes' => filesize($file_path)
+            ];
+        } else {
+            error_log("❌ R2 FAILURE: HTTP $httpCode - Response: " . substr($response, 0, 500));
+            return [
+                'success' => false,
+                'error' => "Upload failed (HTTP $httpCode)",
+                'response' => $response
+            ];
+        }
+    } catch (Exception $e) {
+        return ['success' => false, 'error' => 'Upload failed: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Handle uploaded thumbnail file - Upload to R2 instead of local storage
+ * @param array $thumbnailFile - The uploaded file from $_FILES
+ * @param string $shortcode - Video shortcode for SEO filename
+ * @param string $title - Video title for SEO filename
+ * @param string $description - Video description for SEO filename
+ */
+function handleThumbnailUpload($thumbnailFile, $shortcode = '', $title = '', $description = '') {
+    try {
         // Validate file type
         $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
         $fileType = mime_content_type($thumbnailFile['tmp_name']);
@@ -1518,18 +1950,29 @@ function handleThumbnailUpload($thumbnailFile) {
             return '';
         }
         
-        // Generate unique filename
+        // Generate SEO-optimized filename
         $fileExt = pathinfo($thumbnailFile['name'], PATHINFO_EXTENSION);
-        $fileName = 'thumb_' . uniqid() . '.' . $fileExt;
-        $filePath = $uploadDir . $fileName;
         
-        // Move uploaded file
-        if (move_uploaded_file($thumbnailFile['tmp_name'], $filePath)) {
-            $publicUrl = '/uploads/thumbs/' . $fileName;
-            error_log("✅ Thumbnail saved: {$publicUrl}");
+        if (!empty($shortcode)) {
+            $fileName = generateSeoThumbnailFilename($shortcode, $title, $description, $fileExt);
+        } else {
+            // Fallback to old format if no shortcode provided
+            $fileName = 'thumb_' . time() . '_' . uniqid() . '.' . $fileExt;
+        }
+        
+        $r2Key = 'thumbnails/' . $fileName; // Store in thumbnails folder on R2
+        
+        error_log("📤 Uploading thumbnail to R2: {$r2Key}");
+        
+        // Upload to R2
+        $uploadResult = uploadToCloudflareR2($thumbnailFile['tmp_name'], $r2Key, $fileType, 'public');
+        
+        if ($uploadResult['success']) {
+            $publicUrl = $uploadResult['url'];
+            error_log("✅ Thumbnail uploaded to R2: {$publicUrl}");
             return $publicUrl;
         } else {
-            error_log("❌ Failed to save thumbnail");
+            error_log("❌ Failed to upload thumbnail to R2: " . ($uploadResult['error'] ?? 'Unknown error'));
             return '';
         }
     } catch (Exception $e) {
@@ -1539,42 +1982,68 @@ function handleThumbnailUpload($thumbnailFile) {
 }
 
 /**
- * Handle thumbnail from base64 data (video frame capture)
+ * Handle thumbnail from base64 data (video frame capture) - Upload to R2 instead of local storage
+ * @param string $base64Data - Base64 encoded image data
+ * @param string $videoName - Video filename (legacy parameter, kept for compatibility)
+ * @param string $shortcode - Video shortcode for SEO filename
+ * @param string $title - Video title for SEO filename
+ * @param string $description - Video description for SEO filename
  */
-function handleThumbnailFromData($base64Data, $videoName) {
+function handleThumbnailFromData($base64Data, $videoName = '', $shortcode = '', $title = '', $description = '') {
     try {
         // Remove data URI prefix if present
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
             $imageType = $matches[1];
             $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
         } else {
-            $imageType = 'png'; // Default
+            // Default to jpg if format not specified
+            $imageType = 'jpeg';
         }
         
-        // Decode base64
+        // Decode base64 data
         $imageData = base64_decode($base64Data);
         if ($imageData === false) {
-            error_log('❌ Failed to decode thumbnail data');
+            error_log("❌ Failed to decode base64 thumbnail data");
             return '';
         }
         
-        // Create thumbs directory if it doesn't exist
-        $uploadDir = __DIR__ . '/../uploads/thumbs/';
-        if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+        // Save to temporary file for R2 upload
+        $tempFile = sys_get_temp_dir() . '/thumb_' . time() . '_' . uniqid() . '.' . $imageType;
+        if (!file_put_contents($tempFile, $imageData)) {
+            error_log("❌ Failed to save thumbnail to temp file");
+            return '';
         }
         
-        // Generate unique filename
-        $fileName = 'thumb_' . uniqid() . '.' . $imageType;
-        $filePath = $uploadDir . $fileName;
+        // Generate SEO-optimized filename
+        if (!empty($shortcode)) {
+            $fileName = generateSeoThumbnailFilename($shortcode, $title, $description, $imageType);
+        } else {
+            // Fallback to old format if no shortcode provided
+            $fileName = 'thumb_' . time() . '_' . uniqid() . '.' . $imageType;
+        }
         
-        // Save image
-        if (file_put_contents($filePath, $imageData)) {
-            $publicUrl = '/uploads/thumbs/' . $fileName;
-            error_log("✅ Thumbnail saved from data: {$publicUrl}");
+        $r2Key = 'thumbnails/' . $fileName; // Store in thumbnails folder on R2
+        
+        // Determine content type
+        $contentType = 'image/' . $imageType;
+        if ($imageType === 'jpg') {
+            $contentType = 'image/jpeg';
+        }
+        
+        error_log("📤 Uploading thumbnail from data to R2: {$r2Key}");
+        
+        // Upload to R2
+        $uploadResult = uploadToCloudflareR2($tempFile, $r2Key, $contentType, 'public');
+        
+        // Clean up temp file
+        @unlink($tempFile);
+        
+        if ($uploadResult['success']) {
+            $publicUrl = $uploadResult['url'];
+            error_log("✅ Thumbnail from data uploaded to R2: {$publicUrl}");
             return $publicUrl;
         } else {
-            error_log("❌ Failed to save thumbnail from data");
+            error_log("❌ Failed to upload thumbnail from data to R2: " . ($uploadResult['error'] ?? 'Unknown error'));
             return '';
         }
     } catch (Exception $e) {
@@ -1584,7 +2053,7 @@ function handleThumbnailFromData($base64Data, $videoName) {
 }
 
 /**
- * Handle thumbnail from URL (CORS fallback - fetch on server-side)
+ * Handle thumbnail from URL (CORS fallback - fetch on server-side) - Upload to R2 instead of local storage
  */
 function handleThumbnailFromUrl($thumbnailUrl, $videoName = 'video') {
     try {
@@ -1612,23 +2081,31 @@ function handleThumbnailFromUrl($thumbnailUrl, $videoName = 'video') {
         elseif (strpos($contentType, 'gif') !== false) $fileExt = 'gif';
         elseif (strpos($contentType, 'webp') !== false) $fileExt = 'webp';
         
-        // Create thumbs directory if it doesn't exist
-        $uploadDir = __DIR__ . '/../uploads/thumbs/';
-        if (!file_exists($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+        // Save to temporary file for R2 upload
+        $tempFile = sys_get_temp_dir() . '/thumb_' . time() . '_' . uniqid() . '.' . $fileExt;
+        if (!file_put_contents($tempFile, $imageData)) {
+            error_log("❌ Failed to save thumbnail to temp file");
+            return '';
         }
         
-        // Generate unique filename
-        $fileName = 'thumb_' . uniqid() . '.' . $fileExt;
-        $filePath = $uploadDir . $fileName;
+        // Generate unique filename for R2
+        $fileName = 'thumb_' . time() . '_' . uniqid() . '.' . $fileExt;
+        $r2Key = 'thumbnails/' . $fileName; // Store in thumbnails folder on R2
         
-        // Save image
-        if (file_put_contents($filePath, $imageData)) {
-            $publicUrl = '/uploads/thumbs/' . $fileName;
-            error_log("✅ Thumbnail fetched and saved from URL: {$publicUrl}");
+        error_log("📤 Uploading thumbnail from URL to R2: {$r2Key}");
+        
+        // Upload to R2
+        $uploadResult = uploadToCloudflareR2($tempFile, $r2Key, $contentType, 'public');
+        
+        // Clean up temp file
+        @unlink($tempFile);
+        
+        if ($uploadResult['success']) {
+            $publicUrl = $uploadResult['url'];
+            error_log("✅ Thumbnail fetched from URL and uploaded to R2: {$publicUrl}");
             return $publicUrl;
         } else {
-            error_log("❌ Failed to save thumbnail from URL");
+            error_log("❌ Failed to upload thumbnail from URL to R2: " . ($uploadResult['error'] ?? 'Unknown error'));
             return '';
         }
     } catch (Exception $e) {
@@ -1653,11 +2130,66 @@ function handleVideoUpdate() {
         // Build update data
         $updateData = [];
         
+        // Get existing video data for SEO thumbnail filename
+        $currentVideo = $db->get_row("SELECT short_link, title, description FROM IONLocalVideos WHERE id = ?", $videoId);
+        $videoShortLink = $currentVideo->short_link ?? '';
+        $currentTitle = $currentVideo->title ?? '';
+        $currentDescription = $currentVideo->description ?? '';
+        
         if (isset($_POST['title'])) $updateData['title'] = trim($_POST['title']);
         if (isset($_POST['description'])) $updateData['description'] = trim($_POST['description']);
-        if (isset($_POST['category'])) $updateData['category'] = trim($_POST['category']);
+        
+        // NEW: Handle category - look up slug (try array first, then database)
+        if (isset($_POST['category'])) {
+            $categoryName = trim($_POST['category']);
+            $categorySlug = null;
+            
+            // Try fast array lookup from ioncategories.php
+            if (function_exists('get_ion_category_slug')) {
+                $categorySlug = get_ion_category_slug($categoryName);
+                if ($categorySlug) {
+                    error_log('✅ Category slug resolved from array: ' . $categorySlug);
+                }
+            }
+            
+            // If array lookup failed, try database
+            if (!$categorySlug) {
+                $categoryVariations = [
+                    $categoryName,                              // Exact match
+                    $categoryName . '™ Network',               // ION Local → ION Local™ Network
+                    $categoryName . ' Network',                 // ION Local → ION Local Network
+                    $categoryName . '™',                        // ION Local → ION Local™
+                ];
+                
+                foreach ($categoryVariations as $variation) {
+                    $categoryNetworkData = $db->get_row(
+                        "SELECT slug FROM IONNetworks WHERE network_name = %s LIMIT 1",
+                        $variation
+                    );
+                    if ($categoryNetworkData && !empty($categoryNetworkData->slug)) {
+                        $categorySlug = strtolower($categoryNetworkData->slug);
+                        error_log('✅ Category slug resolved from database: ' . $categorySlug);
+                        break;
+                    }
+                }
+            }
+            
+            // Final fallback: create slug from category name
+            if (!$categorySlug) {
+                $categorySlug = strtolower(str_replace([' ', '™', '®'], ['-', '', ''], $categoryName));
+                $categorySlug = preg_replace('/[^a-z0-9-]/', '', $categorySlug);
+                error_log('⚠️ Category slug created from name: ' . $categorySlug);
+            }
+            
+            $updateData['ion_category'] = $categorySlug;
+        }
+        
         if (isset($_POST['tags'])) $updateData['tags'] = trim($_POST['tags']);
         if (isset($_POST['visibility'])) $updateData['visibility'] = trim($_POST['visibility']);
+        
+        // Use updated title/description if provided, otherwise use current
+        $seoTitle = $updateData['title'] ?? $currentTitle;
+        $seoDescription = $updateData['description'] ?? $currentDescription;
         
         // Handle thumbnail upload if provided
         error_log('🔍 UPDATE DEBUG: Checking for thumbnail...');
@@ -1670,7 +2202,7 @@ function handleVideoUpdate() {
         
         if (isset($_FILES['thumbnail']) && $_FILES['thumbnail']['error'] === UPLOAD_ERR_OK) {
             error_log('📸 UPDATE: Thumbnail file uploaded: ' . $_FILES['thumbnail']['name'] . ' (' . $_FILES['thumbnail']['size'] . ' bytes)');
-            $thumbnailUrl = handleThumbnailUpload($_FILES['thumbnail']);
+            $thumbnailUrl = handleThumbnailUpload($_FILES['thumbnail'], $videoShortLink, $seoTitle, $seoDescription);
             if ($thumbnailUrl) {
                 $updateData['thumbnail'] = $thumbnailUrl;
                 error_log('✅ UPDATE: Thumbnail saved at: ' . $thumbnailUrl);
@@ -1680,7 +2212,7 @@ function handleVideoUpdate() {
         } elseif (isset($_POST['thumbnail_data']) && !empty($_POST['thumbnail_data'])) {
             // Handle base64 thumbnail data (from frame capture)
             error_log('📸 UPDATE: Thumbnail data (base64) provided, length: ' . strlen($_POST['thumbnail_data']));
-            $thumbnailUrl = handleThumbnailFromData($_POST['thumbnail_data']);
+            $thumbnailUrl = handleThumbnailFromData($_POST['thumbnail_data'], '', $videoShortLink, $seoTitle, $seoDescription);
             if ($thumbnailUrl) {
                 $updateData['thumbnail'] = $thumbnailUrl;
                 error_log('✅ UPDATE: Thumbnail saved at: ' . $thumbnailUrl);
@@ -1688,7 +2220,61 @@ function handleVideoUpdate() {
                 error_log('❌ UPDATE: Thumbnail save from data failed');
             }
         } else {
-            error_log('⚠️ UPDATE: No thumbnail provided');
+            error_log('⚠️ UPDATE: No new thumbnail provided');
+            
+            // MIGRATION LOGIC: Check if existing thumbnail is local and migrate to R2
+            $currentVideo = $db->get_row("SELECT thumbnail FROM IONLocalVideos WHERE id = ?", $videoId);
+            if ($currentVideo && !empty($currentVideo->thumbnail)) {
+                $existingThumbnail = $currentVideo->thumbnail;
+                
+                // Check if thumbnail is a local /uploads/ path
+                $isLocalThumbnail = (
+                    strpos($existingThumbnail, '/uploads/') !== false &&
+                    strpos($existingThumbnail, 'http') === false // Not a full URL
+                );
+                
+                if ($isLocalThumbnail) {
+                    error_log("🔄 MIGRATION: Local thumbnail detected, migrating to R2: {$existingThumbnail}");
+                    
+                    // Build full file path
+                    $localFilePath = $_SERVER['DOCUMENT_ROOT'] . $existingThumbnail;
+                    
+                    if (file_exists($localFilePath)) {
+                        // Determine content type from file
+                        $fileExt = pathinfo($localFilePath, PATHINFO_EXTENSION);
+                        $contentType = 'image/jpeg'; // Default
+                        if ($fileExt === 'png') $contentType = 'image/png';
+                        elseif ($fileExt === 'gif') $contentType = 'image/gif';
+                        elseif ($fileExt === 'webp') $contentType = 'image/webp';
+                        
+                        // Generate unique R2 filename
+                        $fileName = 'thumb_' . time() . '_' . uniqid() . '.' . $fileExt;
+                        $r2Key = 'thumbnails/' . $fileName;
+                        
+                        error_log("📤 MIGRATION: Uploading to R2: {$r2Key}");
+                        
+                        // Upload to R2
+                        $uploadResult = uploadToCloudflareR2($localFilePath, $r2Key, $contentType, 'public');
+                        
+                        if ($uploadResult['success']) {
+                            $newR2Url = $uploadResult['url'];
+                            $updateData['thumbnail'] = $newR2Url;
+                            error_log("✅ MIGRATION: Thumbnail migrated to R2: {$newR2Url}");
+                            
+                            // Optionally delete local file after successful upload
+                            // Uncomment if you want to clean up local files:
+                            // @unlink($localFilePath);
+                            // error_log("🗑️ MIGRATION: Local file deleted: {$localFilePath}");
+                        } else {
+                            error_log("❌ MIGRATION: Failed to upload to R2: " . ($uploadResult['error'] ?? 'Unknown error'));
+                        }
+                    } else {
+                        error_log("⚠️ MIGRATION: Local file not found: {$localFilePath}");
+                    }
+                } else {
+                    error_log("ℹ️ MIGRATION: Thumbnail already on R2 or external URL, no migration needed");
+                }
+            }
         }
         
         // Handle channel updates
@@ -1701,7 +2287,18 @@ function handleVideoUpdate() {
                 // First channel = Primary (update slug)
                 $primaryChannelSlug = $selectedChannels[0];
                 $updateData['slug'] = $primaryChannelSlug;
-                error_log('✅ Primary channel updated to: ' . $primaryChannelSlug);
+                
+                // NEW: Look up and update ion_channel (descriptive name)
+                $channelData = $db->get_row(
+                    "SELECT channel_name, city_name FROM IONLocalNetwork WHERE slug = %s LIMIT 1",
+                    $primaryChannelSlug
+                );
+                if ($channelData) {
+                    $updateData['ion_channel'] = $channelData->channel_name ?: $channelData->city_name;
+                    error_log('✅ Primary channel updated to: ' . $primaryChannelSlug . ' (' . $updateData['ion_channel'] . ')');
+                } else {
+                    error_log('✅ Primary channel updated to: ' . $primaryChannelSlug);
+                }
                 
                 // Remove all existing distributed channels for this video
                 $db->query($db->prepare(
@@ -1743,6 +2340,75 @@ function handleVideoUpdate() {
                         error_log('✅ Video distributed to channel: ' . $channelSlug);
                     }
                 }
+            }
+        }
+        
+        // NEW: Handle network updates
+        if (isset($_POST['selected_networks'])) {
+            $selectedNetworks = json_decode($_POST['selected_networks'], true);
+            
+            if (is_array($selectedNetworks)) {
+                error_log('📡 Updating networks for video ' . $videoId);
+                
+                // First network = Primary (update ion_network field with SLUG)
+                if (!empty($selectedNetworks)) {
+                    $primaryNetworkKey = $selectedNetworks[0];
+                    
+                    // Look up network slug from IONNetworks
+                    $networkData = $db->get_row(
+                        "SELECT id, slug FROM IONNetworks WHERE network_key = %s LIMIT 1",
+                        $primaryNetworkKey
+                    );
+                    
+                    if ($networkData) {
+                        $updateData['ion_network'] = strtolower($networkData->slug);
+                        error_log('✅ Primary network slug updated to: ' . $updateData['ion_network']);
+                    }
+                }
+                
+                // Remove all existing network associations
+                $db->query($db->prepare(
+                    "DELETE FROM IONVideoNetworks WHERE video_id = %d",
+                    $videoId
+                ));
+                
+                // Add new network associations with is_primary flag
+                $priority = 1;
+                $networkIndex = 0; // Track actual network index
+                foreach ($selectedNetworks as $index => $networkKey) {
+                    $network = $db->get_row(
+                        "SELECT id FROM IONNetworks WHERE network_key = %s LIMIT 1",
+                        $networkKey
+                    );
+                    
+                    if ($network) {
+                        $isPrimary = ($networkIndex === 0) ? 1 : 0;
+                        
+                        $insertResult = $db->insert('IONVideoNetworks', [
+                            'video_id' => $videoId,
+                            'network_id' => $network->id,
+                            'is_primary' => $isPrimary,
+                            'priority' => $priority
+                        ]);
+                        
+                        if ($insertResult) {
+                            $primaryLabel = $isPrimary ? ' (PRIMARY)' : '';
+                            error_log('✅ Network association updated: ' . $networkKey . $primaryLabel);
+                            $networkIndex++; // Increment only on successful insert
+                        }
+                        $priority++;
+                    }
+                }
+            } elseif ($selectedNetworks === null || $selectedNetworks === []) {
+                // Networks explicitly cleared - remove ion_network and associations
+                $updateData['ion_network'] = null;
+                
+                $db->query($db->prepare(
+                    "DELETE FROM IONVideoNetworks WHERE video_id = %d",
+                    $videoId
+                ));
+                
+                error_log('✅ All networks removed from video ' . $videoId);
             }
         }
         
@@ -2177,5 +2843,145 @@ function generateShareTemplate($videoId, $shortLink, $title, $db) {
         error_log('❌ Error generating share template: ' . $e->getMessage());
         return ''; // Return empty string if generation fails
     }
+}
+
+/**
+ * Batch migrate all local thumbnails to R2
+ * Usage: Call with ?action=migrate_thumbnails_to_r2&limit=50
+ * This is a utility function to migrate existing local thumbnails
+ */
+if (isset($_GET['action']) && $_GET['action'] === 'migrate_thumbnails_to_r2') {
+    // Require authentication
+    if (!isset($_SESSION['user_email']) || empty($_SESSION['user_email'])) {
+        http_response_code(401);
+        die(json_encode(['error' => 'Authentication required']));
+    }
+    
+    // Only allow Owners/Admins
+    $user = $db->get_row("SELECT user_role FROM IONEERS WHERE email = ?", $_SESSION['user_email']);
+    if (!$user || !in_array($user->user_role, ['Owner', 'Admin'])) {
+        http_response_code(403);
+        die(json_encode(['error' => 'Permission denied. Only Owners/Admins can run migration.']));
+    }
+    
+    $limit = intval($_GET['limit'] ?? 50);
+    $dryRun = isset($_GET['dry_run']) && $_GET['dry_run'] === 'true';
+    
+    error_log("🔄 BATCH MIGRATION: Starting thumbnail migration (limit: $limit, dry_run: " . ($dryRun ? 'yes' : 'no') . ")");
+    
+    // Find all videos with local thumbnails
+    $videos = $db->get_results("
+        SELECT id, title, thumbnail 
+        FROM IONLocalVideos 
+        WHERE thumbnail LIKE '/uploads/%' 
+        AND thumbnail NOT LIKE 'http%'
+        LIMIT $limit
+    ");
+    
+    if (!$videos) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'No local thumbnails found to migrate',
+            'migrated' => 0,
+            'failed' => 0
+        ]);
+        exit;
+    }
+    
+    $results = [
+        'total' => count($videos),
+        'migrated' => 0,
+        'failed' => 0,
+        'skipped' => 0,
+        'details' => []
+    ];
+    
+    foreach ($videos as $video) {
+        $localFilePath = $_SERVER['DOCUMENT_ROOT'] . $video->thumbnail;
+        
+        if (!file_exists($localFilePath)) {
+            $results['skipped']++;
+            $results['details'][] = [
+                'video_id' => $video->id,
+                'title' => $video->title,
+                'status' => 'skipped',
+                'reason' => 'File not found: ' . $localFilePath
+            ];
+            continue;
+        }
+        
+        if ($dryRun) {
+            $results['details'][] = [
+                'video_id' => $video->id,
+                'title' => $video->title,
+                'status' => 'dry_run',
+                'local_path' => $video->thumbnail,
+                'file_exists' => true
+            ];
+            continue;
+        }
+        
+        // Determine content type
+        $fileExt = pathinfo($localFilePath, PATHINFO_EXTENSION);
+        $contentType = 'image/jpeg';
+        if ($fileExt === 'png') $contentType = 'image/png';
+        elseif ($fileExt === 'gif') $contentType = 'image/gif';
+        elseif ($fileExt === 'webp') $contentType = 'image/webp';
+        
+        // Generate R2 filename
+        $fileName = 'thumb_' . time() . '_' . uniqid() . '.' . $fileExt;
+        $r2Key = 'thumbnails/' . $fileName;
+        
+        // Upload to R2
+        $uploadResult = uploadToCloudflareR2($localFilePath, $r2Key, $contentType, 'public');
+        
+        if ($uploadResult['success']) {
+            // Update database
+            $updateResult = $db->update(
+                'IONLocalVideos',
+                ['thumbnail' => $uploadResult['url']],
+                ['id' => $video->id]
+            );
+            
+            if ($updateResult !== false) {
+                $results['migrated']++;
+                $results['details'][] = [
+                    'video_id' => $video->id,
+                    'title' => $video->title,
+                    'status' => 'success',
+                    'old_url' => $video->thumbnail,
+                    'new_url' => $uploadResult['url']
+                ];
+                error_log("✅ MIGRATION: Video {$video->id} thumbnail migrated to R2");
+            } else {
+                $results['failed']++;
+                $results['details'][] = [
+                    'video_id' => $video->id,
+                    'title' => $video->title,
+                    'status' => 'failed',
+                    'reason' => 'Database update failed'
+                ];
+            }
+        } else {
+            $results['failed']++;
+            $results['details'][] = [
+                'video_id' => $video->id,
+                'title' => $video->title,
+                'status' => 'failed',
+                'reason' => 'R2 upload failed: ' . ($uploadResult['error'] ?? 'Unknown error')
+            ];
+        }
+        
+        // Small delay to avoid rate limiting
+        usleep(100000); // 0.1 second
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'message' => "Migration complete. Migrated: {$results['migrated']}, Failed: {$results['failed']}, Skipped: {$results['skipped']}",
+        'results' => $results,
+        'dry_run' => $dryRun
+    ], JSON_PRETTY_PRINT);
+    exit;
 }
 ?>

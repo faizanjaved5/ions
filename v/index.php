@@ -18,8 +18,17 @@ $slug = $_GET['link'] ?? '';
 // Fallback: extract from URL path if rewrite parameter not available
 if (empty($slug)) {
     $request_path = $_SERVER['REQUEST_URI'];
+    
+    // Skip if this is a direct PHP file request (like test files)
+    if (preg_match('#/v/[^/]+\.php#', $request_path)) {
+        error_log("Skipping slug extraction for PHP file: $request_path");
+        return; // Let the PHP file execute normally
+    }
+    
+    // Extract shortlink from URL (matches /v/abc123 or /v/abc123-title)
     if (preg_match('#/v/([^/?]+)#', $request_path, $matches)) {
         $slug = $matches[1];
+        error_log("Extracted slug from path: $slug");
     }
 }
 
@@ -28,11 +37,16 @@ if (!empty($slug)) {
     // Extract just the alphanumeric shortcode (6-8 chars)
     if (preg_match('/^([a-zA-Z0-9]{6,8})(?:-.*)?$/i', $slug, $matches)) {
         $slug = strtolower($matches[1]); // Normalize to lowercase for case-insensitive lookup
+        error_log("Cleaned slug: $slug");
+    } else {
+        error_log("Invalid slug format: $slug (expected 6-8 alphanumeric chars)");
+        $slug = ''; // Reset if invalid format
     }
 }
 
 // If no valid slug provided, redirect to main page
 if (empty($slug)) {
+    error_log("No valid slug found, redirecting to home");
     header('Location: /');
     exit();
 }
@@ -43,6 +57,52 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../app/shortlink-manager.php';
 require_once __DIR__ . '/../share/enhanced-share-manager.php';
+require_once __DIR__ . '/../includes/ioncategories.php'; // For fast category slug lookups
+
+/**
+ * Convert category/network value to proper slug for URL
+ * Handles both existing slugs and legacy names
+ */
+function ensureSlug($value, $db) {
+    if (empty($value)) return null;
+    
+    $value = trim($value);
+    
+    // Check if already a slug (lowercase, no spaces, hyphens only)
+    if (preg_match('/^[a-z0-9-]+$/', $value)) {
+        return $value; // Already a slug
+    }
+    
+    // Has spaces or special characters - it's a name, convert to slug
+    // Try fast array lookup first
+    if (function_exists('get_ion_category_slug')) {
+        $slug = get_ion_category_slug($value);
+        if ($slug) {
+            return $slug;
+        }
+    }
+    
+    // Try database lookup
+    try {
+        $pdo = $db->getPDO();
+        $stmt = $pdo->prepare("SELECT slug FROM IONNetworks WHERE network_name = ? LIMIT 1");
+        $stmt->execute([$value]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($result && !empty($result['slug'])) {
+            return strtolower($result['slug']);
+        }
+    } catch (Exception $e) {
+        error_log('Error looking up slug for: ' . $value . ' - ' . $e->getMessage());
+    }
+    
+    // Fallback: create slug from value
+    $slug = strtolower($value);
+    $slug = str_replace(['™', '®', ' on ion', ' network'], ['', '', '', ''], $slug);
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+    $slug = trim($slug, '-');
+    
+    return $slug;
+}
 
 // Initialize shortlink manager
 $shortlink_manager = new VideoShortlinkManager($db);
@@ -253,14 +313,15 @@ if ($video_type_info && ($source_type === 'upload' || $is_self_hosted)) {
             break;
             
         case 'drive':
+            // Google Drive preview - autoplay not fully supported but try
             $player_config['drive_id'] = $video->video_id;
             $player_type = 'drive';
             break;
             
         case 'muvi':
-            // Ensure Muvi embed has proper parameters (autoplay off, but allow user control)
+            // Ensure Muvi embed has proper parameters (autoplay on, muted required for browsers)
             $separator = (strpos($video_url, '?') !== false) ? '&' : '?';
-            $player_config['iframe_src'] = $video_url . $separator . 'autoplay=0&muted=0';
+            $player_config['iframe_src'] = $video_url . $separator . 'autoplay=1&muted=1';
             $player_type = 'iframe';
             break;
             
@@ -275,9 +336,9 @@ if ($video_type_info && ($source_type === 'upload' || $is_self_hosted)) {
             break;
             
         case 'loom':
-            // Loom embed with proper parameters
+            // Loom embed with proper parameters (autoplay enabled, muted required for browsers)
             $separator = (strpos($video_url, '?') !== false) ? '&' : '?';
-            $player_config['iframe_src'] = $video_url . $separator . 'autoplay=0&muted=0&hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true';
+            $player_config['iframe_src'] = $video_url . $separator . 'autoplay=1&muted=1&hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true';
             $player_type = 'iframe';
             break;
             
@@ -290,7 +351,9 @@ if ($video_type_info && ($source_type === 'upload' || $is_self_hosted)) {
                 ];
                 $player_type = 'videojs';
             } else {
-                $player_config['iframe_src'] = $video_url;
+                // Generic iframe - try to add autoplay parameters
+                $separator = (strpos($video_url, '?') !== false) ? '&' : '?';
+                $player_config['iframe_src'] = $video_url . $separator . 'autoplay=1&muted=1';
                 $player_type = 'iframe';
             }
             break;
@@ -406,110 +469,14 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
             font-size: 1.75rem;
             font-weight: bold;
             margin-bottom: 12px;
-            color: #e2e8f0 !important;
+            color: #e2e8f0;
             line-height: 1.3;
         }
         
-        .video-header-meta {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
-            padding: 10px 0;
-        }
-        
-        .video-meta {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 0.875rem;
-            color: #94a3b8;
-            flex-wrap: wrap;
-        }
-        
-        .video-meta span:not(:last-child)::after {
-            content: '•';
-            margin-left: 12px;
-            color: #475569;
-        }
-        
-        .video-creator {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .creator-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #b28254;
-            flex-shrink: 0;
-        }
-        
-        .creator-avatar img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-        
-        .creator-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        
-        .creator-label {
-            font-size: 0.75rem;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .creator-link {
-            font-size: 1rem;
-            color: #b28254;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .creator-link:hover {
-            color: #d4a574;
-        }
-        
-        .creator-link:hover span {
-            color: #94a3b8;
-        }
-        
-        .video-player-container {
-            background: #1e293b;
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
-        
-        .video-player {
-            width: 100%;
-            aspect-ratio: 16/9;
-            background: #000;
-        }
-        
-        .video-player iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        
-        .video-js {
-            width: 100%;
-            height: 100%;
+        h3 {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #e2e8f0;
         }
         
         .video-info {
@@ -519,19 +486,13 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
             margin-bottom: 20px;
         }
         
-        .video-info h3 {
-            color: #e2e8f0;
-            margin-bottom: 15px;
-            font-size: 1.3rem;
-        }
-        
         .video-description {
             color: #cbd5e1;
             line-height: 1.7;
             margin-bottom: 20px;
         }
         
-        .video-tags {
+        .video-description p {
             color: #94a3b8;
         }
         
@@ -539,13 +500,13 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
             background: #1e293b;
             border-radius: 12px;
             padding: 30px;
+            margin-bottom: 30px;
             text-align: center;
         }
         
         .share-title {
+            margin-bottom: 20px;
             color: #e2e8f0;
-            margin-bottom: 15px;
-            font-size: 1.2rem;
         }
         
         /* Enhanced Share Button Styling */
@@ -553,9 +514,9 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
             padding: 14px 32px !important;
             font-size: 16px !important;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            border: none !important;
+            border-radius: 8px !important;
             color: white !important;
-            border-radius: 10px !important;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
             transition: all 0.3s ease !important;
         }
         
@@ -576,45 +537,201 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
             color: white !important;
         }
         
-        /* Old share styles removed - using Enhanced Share System now */
-        
-        .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #334155;
-            color: #64748b;
+        .video-player-container {
+            position: relative;
+            background: #1e293b;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
         
+        .video-player {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #000;
+        }
+        
+        .video-player iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .video-player video {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .video-meta-below {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 0px 0;
+            margin-bottom: 20px;
+            font-size: 0.65rem;
+            color: #94a3b8;
+        }
+        
+        .video-meta-below span {
+            white-space: nowrap;
+        }
+        
+        .video-meta-below .separator {
+            color: #475569;
+            font-size: 0.6rem;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #334155;
+            text-align: center;
+        }
+        
+        .footer p {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            margin: 0;
+        }
+        
+        .video-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            flex-wrap: wrap;
+        }
+        
+        .video-breadcrumb a {
+            color: #b28254;
+            text-decoration: underline;
+            text-decoration-color: rgba(178, 130, 84, 0.3);
+            text-underline-offset: 3px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .video-breadcrumb a:hover {
+            color: #d4a574;
+            text-decoration-color: #d4a574;
+        }
+        
+        .video-breadcrumb .separator {
+            color: #475569;
+            font-weight: bold;
+        }
+        
+        .video-meta {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 20px;
+            font-size: 0.875rem;
+            color: #94a3b8;
+            width: 100%;
+            padding: 15px 0;
+        }
+        
+        /* Creator on left */
+        .video-creator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0; /* Allow flex items to shrink */
+        }
+        
+        .video-meta .video-creator {
+            justify-self: start;
+        }
+        
+        .creator-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            flex-shrink: 0; /* Don't shrink avatar */
+        }
+        
+        .creator-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 0; /* Allow text to wrap if needed */
+        }
+        
+        .creator-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+        
+        .creator-link {
+            color: #b28254;
+            text-decoration: none;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .creator-link:hover {
+            color: #d4a574;
+        }
+        
+        /* Breadcrumb centered */
+        .video-meta .video-breadcrumb {
+            justify-self: center;
+            text-align: center;
+        }
+        
+        /* Reactions on right */
+        .video-meta .video-reactions {
+            justify-self: end;
+        }
+        
+        /* Mobile responsive breakpoint */
         @media (max-width: 768px) {
-            .container {
-                padding: 10px 15px;
+            .video-meta {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+                gap: 12px;
+                padding: 12px 0;
+            }
+            
+            /* Stack vertically on mobile */
+            .video-meta .video-creator {
+                justify-self: start;
+                order: 1;
+            }
+            
+            .video-meta .video-breadcrumb {
+                justify-self: start;
+                text-align: left;
+                order: 2;
+            }
+            
+            .video-meta .video-reactions {
+                justify-self: start;
+                order: 3;
+            }
+            
+            .video-breadcrumb {
+                font-size: 0.75rem;
             }
             
             .video-title {
                 font-size: 1.35rem;
                 margin-bottom: 10px;
-                color: #e2e8f0 !important;
             }
             
-            .video-header-meta {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 12px;
-                padding: 12px 0;
-            }
-            
-            .video-meta {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 6px;
-                width: 100%;
+            .container {
+                padding: 10px 15px;
             }
             
             .video-info, .share-section {
                 padding: 15px;
             }
-            
         }
         
         /* ============================================ */
@@ -749,6 +866,16 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
             color: #c92a2a !important;
         }
         
+        /* Video Meta Below */
+        body[data-theme="light"] .video-meta-below {
+            color: #495057 !important;
+            border-bottom-color: #dee2e6 !important;
+        }
+        
+        body[data-theme="light"] .video-meta-below .separator {
+            color: #adb5bd !important;
+        }
+        
         /* Footer */
         body[data-theme="light"] .footer {
             border-top: 1px solid #dee2e6 !important;
@@ -772,6 +899,31 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
         
         body[data-theme="light"] .share-section .ion-share-button svg {
             stroke: white !important;
+        }
+        
+        /* Light mode breadcrumb */
+        body[data-theme="light"] .video-breadcrumb {
+            color: #6c757d !important;
+        }
+        
+        body[data-theme="light"] .video-breadcrumb a {
+            color: #b28254 !important;
+        }
+        
+        body[data-theme="light"] .video-breadcrumb a:hover {
+            color: #8b5e3c !important;
+        }
+        
+        body[data-theme="light"] .video-breadcrumb .separator {
+            color: #adb5bd !important;
+        }
+        
+        body[data-theme="light"] .video-meta-below {
+            color: #6c757d !important;
+        }
+        
+        body[data-theme="light"] .video-meta-below span:not(:last-child)::after {
+            color: #adb5bd !important;
         }
         
         /* Light mode mobile overrides */
@@ -892,39 +1044,7 @@ if (!isset($root)) {
             });
         }
         
-        // WORKAROUND: Add theme toggle button to navbar after it loads
-        setTimeout(() => {
-            const navbar = document.getElementById('ion-navbar-root');
-            if (navbar) {
-                // Check if navbar already has theme toggle
-                const existingToggle = navbar.querySelector('[aria-label*="theme" i], [onclick*="theme" i]');
-                if (!existingToggle) {
-                    console.log('⚠️ Navbar has no theme toggle - adding one manually');
-                    
-                    // Create theme toggle button
-                    const themeBtn = document.createElement('button');
-                    themeBtn.innerHTML = `
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="5"></circle>
-                            <line x1="12" y1="1" x2="12" y2="3"></line>
-                            <line x1="12" y1="21" x2="12" y2="23"></line>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                            <line x1="1" y1="12" x2="3" y2="12"></line>
-                            <line x1="21" y1="12" x2="23" y2="12"></line>
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                        </svg>
-                    `;
-                    themeBtn.onclick = window.toggleTheme;
-                    themeBtn.style.cssText = 'position: fixed; top: 15px; right: 5px; z-index: 10001; background: transparent; border: none; color: #f59e0b; cursor: pointer; padding: 8px; display: flex; align-items: center; transition: transform 0.2s;';
-                    themeBtn.onmouseover = () => themeBtn.style.transform = 'scale(1.1)';
-                    themeBtn.onmouseout = () => themeBtn.style.transform = 'scale(1)';
-                    themeBtn.title = 'Toggle light/dark theme';
-                    document.body.appendChild(themeBtn);
-                }
-            }
-        }, 1000); // Wait for navbar to fully load
+        // Theme toggle is handled by the navbar - no need for additional button
     })();
 </script>
 
@@ -933,49 +1053,132 @@ if (!isset($root)) {
             <h1 class="video-title"><?= htmlspecialchars($video->title) ?></h1>
             
             <div class="video-header-meta">
-                <?php if (!empty($video->creator_handle)): ?>
+                <div class="video-meta">
+                    <!-- Creator Info (Left Column) - Always present to maintain grid alignment -->
                     <div class="video-creator">
-                        <?php if (!empty($video->creator_photo)): ?>
-                            <img src="<?= htmlspecialchars($video->creator_photo) ?>" alt="<?= htmlspecialchars($video->creator_name ?: $video->creator_handle) ?>" class="creator-avatar">
-                        <?php else: ?>
+                        <?php if (!empty($video->creator_handle)): ?>
+                            <?php if (!empty($video->creator_photo)): ?>
+                                <img src="<?= htmlspecialchars($video->creator_photo) ?>" alt="<?= htmlspecialchars($video->creator_name ?: $video->creator_handle) ?>" class="creator-avatar">
+                            <?php else: ?>
+                                <div class="creator-avatar" style="background: linear-gradient(135deg, #b28254 0%, #8b6239 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">
+                                    <?= strtoupper(substr($video->creator_handle, 0, 1)) ?>
+                                </div>
+                            <?php endif; ?>
+                            <div class="creator-info">
+                                <span class="creator-label">Published by</span>
+                                <a href="/@<?= htmlspecialchars($video->creator_handle) ?>" class="creator-link" title="View <?= htmlspecialchars($video->creator_name ?: '@' . $video->creator_handle) ?>'s profile">
+                                    <?php if (!empty($video->creator_name)): ?>
+                                        <?= htmlspecialchars($video->creator_name) ?> <span style="color: #64748b;">@<?= htmlspecialchars($video->creator_handle) ?></span>
+                                    <?php else: ?>
+                                        @<?= htmlspecialchars($video->creator_handle) ?>
+                                    <?php endif; ?>
+                                </a>
+                            </div>
+                        <?php elseif (!empty($video->creator_name)): ?>
                             <div class="creator-avatar" style="background: linear-gradient(135deg, #b28254 0%, #8b6239 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">
-                                <?= strtoupper(substr($video->creator_handle, 0, 1)) ?>
+                                <?= strtoupper(substr($video->creator_name, 0, 1)) ?>
+                            </div>
+                            <div class="creator-info">
+                                <span class="creator-label">Published by</span>
+                                <span class="creator-link" style="cursor: default;">
+                                    <?= htmlspecialchars($video->creator_name) ?>
+                                </span>
                             </div>
                         <?php endif; ?>
-                        <div class="creator-info">
-                            <span class="creator-label">Published by</span>
-                            <a href="/@<?= htmlspecialchars($video->creator_handle) ?>" class="creator-link" title="View <?= htmlspecialchars($video->creator_name ?: '@' . $video->creator_handle) ?>'s profile">
-                                <?php if (!empty($video->creator_name)): ?>
-                                    <?= htmlspecialchars($video->creator_name) ?> <span style="color: #64748b;">@<?= htmlspecialchars($video->creator_handle) ?></span>
-                                <?php else: ?>
-                                    @<?= htmlspecialchars($video->creator_handle) ?>
-                                <?php endif; ?>
-                            </a>
-                        </div>
+                        <!-- Empty div maintains grid column even when no creator exists -->
                     </div>
-                <?php elseif (!empty($video->creator_name)): ?>
-                    <div class="video-creator">
-                        <div class="creator-avatar" style="background: linear-gradient(135deg, #b28254 0%, #8b6239 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">
-                            <?= strtoupper(substr($video->creator_name, 0, 1)) ?>
-                        </div>
-                        <div class="creator-info">
-                            <span class="creator-label">Published by</span>
-                            <span class="creator-link" style="cursor: default;">
-                                <?= htmlspecialchars($video->creator_name) ?>
-                            </span>
-                        </div>
-                    </div>
-                <?php endif; ?>
-                
-                <div class="video-meta">
-                    <span>Published: <?= date('M j, Y', strtotime($video->date_added ?? $video->published_at ?? 'now')) ?></span>
-                    <span>Category: <?= htmlspecialchars($video->category ?? 'General') ?></span>
-                    <?php if ($resolution['clicks'] > 0): ?>
-                        <span>Views: <?= number_format($resolution['clicks']) ?></span>
-                    <?php endif; ?>
                     
-                    <!-- Like/Dislike Reactions -->
-                    <span class="reactions-separator"></span>
+                    <!-- Breadcrumb Navigation (Center Column) -->
+                    <div class="video-breadcrumb">
+                        <?php if (!empty($video->ion_channel)): ?>
+                            <?php 
+                            // Get channel slug from video (already stored) - ensure lowercase
+                            $channelSlug = strtolower($video->slug ?? 'ions');
+                            ?>
+                            <a href="/<?= htmlspecialchars($channelSlug) ?>"><?= htmlspecialchars($video->ion_channel) ?></a>
+                        <?php endif; ?>
+                        
+                        <?php if (!empty($video->ion_category)): ?>
+                            <?php if (!empty($video->ion_channel)): ?>
+                                <span class="separator">|</span>
+                            <?php endif; ?>
+                            <?php 
+                            // Convert category to slug (handles both slugs and names)
+                            $categorySlug = ensureSlug($video->ion_category, $db);
+                            $categoryDisplayName = $video->ion_category;
+                            
+                            // If the value was a slug, look up the display name
+                            if ($categorySlug === $video->ion_category) {
+                                // Try fast array lookup first
+                                if (function_exists('get_ion_category_name_from_slug')) {
+                                    $arrayName = get_ion_category_name_from_slug($categorySlug);
+                                    if ($arrayName) {
+                                        $categoryDisplayName = $arrayName;
+                                    }
+                                }
+                                
+                                // Fallback to database if not found in array
+                                if ($categoryDisplayName === $video->ion_category) {
+                                    try {
+                                        $pdo = $db->getPDO();
+                                        $stmt = $pdo->prepare("SELECT network_name FROM IONNetworks WHERE slug = ? LIMIT 1");
+                                        $stmt->execute([$categorySlug]);
+                                        $catResult = $stmt->fetch(PDO::FETCH_ASSOC);
+                                        if ($catResult && !empty($catResult['network_name'])) {
+                                            $categoryDisplayName = $catResult['network_name'];
+                                        }
+                                    } catch (Exception $e) {
+                                        error_log('Error looking up category name: ' . $e->getMessage());
+                                    }
+                                }
+                            }
+                            // else: value was a name, display it as-is, but use slug for URL
+                            ?>
+                            <a href="/<?= htmlspecialchars($categorySlug) ?>"><?= htmlspecialchars($categoryDisplayName) ?></a>
+                        <?php endif; ?>
+                        
+                        <?php 
+                        // Only show network if it's different from category to avoid duplication
+                        $showNetwork = !empty($video->ion_network);
+                        if ($showNetwork && !empty($video->ion_category)) {
+                            // Check if they're the same (compare slugs to handle both slug and name formats)
+                            $catSlugCheck = ensureSlug($video->ion_category, $db);
+                            $netSlugCheck = ensureSlug($video->ion_network, $db);
+                            if (strtolower($catSlugCheck) === strtolower($netSlugCheck)) {
+                                $showNetwork = false; // Skip network if it's the same as category
+                            }
+                        }
+                        ?>
+                        <?php if ($showNetwork): ?>
+                            <?php if (!empty($video->ion_channel) || !empty($video->ion_category)): ?>
+                                <span class="separator">|</span>
+                            <?php endif; ?>
+                            <?php 
+                            // Convert network to slug (handles both slugs and names)
+                            $networkSlug = ensureSlug($video->ion_network, $db);
+                            $networkDisplayName = $video->ion_network;
+                            
+                            // If the value was a slug, look up the display name
+                            if ($networkSlug === $video->ion_network) {
+                                try {
+                                    $pdo = $db->getPDO();
+                                    $stmt = $pdo->prepare("SELECT network_name FROM IONNetworks WHERE slug = ? LIMIT 1");
+                                    $stmt->execute([$networkSlug]);
+                                    $netResult = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    if ($netResult && !empty($netResult['network_name'])) {
+                                        $networkDisplayName = $netResult['network_name'];
+                                    }
+                                } catch (Exception $e) {
+                                    error_log('Error looking up network name: ' . $e->getMessage());
+                                }
+                            }
+                            // else: value was a name, display it as-is, but use slug for URL
+                            ?>
+                            <a href="/<?= htmlspecialchars($networkSlug) ?>"><?= htmlspecialchars($networkDisplayName) ?></a>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Like/Dislike Reactions (Right Column) -->
                     <?php 
                     // Debug: Log what we're outputting to HTML
                     error_log("HTML OUTPUT: data-video-id='{$video->id}' data-user-action='" . htmlspecialchars($user_reaction ?? '') . "'");
@@ -1014,6 +1217,7 @@ if (!isset($root)) {
             </div>
         </div>
         
+        <!-- Video Player -->
         <div class="video-player-container">
             <div class="video-player">
                 <?php if ($player_type === 'videojs'): ?>
@@ -1023,6 +1227,8 @@ if (!isset($root)) {
                         class="video-js vjs-default-skin"
                         controls
                         preload="metadata"
+                        autoplay
+                        muted
                         data-setup='{"responsive": true, "fluid": true}'
                         poster="<?= htmlspecialchars($player_config['poster']) ?>"
                     >
@@ -1038,7 +1244,7 @@ if (!isset($root)) {
                 <?php elseif ($player_type === 'youtube'): ?>
                     <!-- YouTube Embed -->
                     <iframe 
-                        src="https://www.youtube.com/embed/<?= htmlspecialchars($player_config['youtube_id']) ?>?autoplay=0&rel=0"
+                        src="https://www.youtube.com/embed/<?= htmlspecialchars($player_config['youtube_id']) ?>?autoplay=1&rel=0"
                         allowfullscreen
                         allow="autoplay; encrypted-media">
                     </iframe>
@@ -1046,22 +1252,23 @@ if (!isset($root)) {
                 <?php elseif ($player_type === 'vimeo'): ?>
                     <!-- Vimeo Embed -->
                     <iframe 
-                        src="https://player.vimeo.com/video/<?= htmlspecialchars($player_config['vimeo_id']) ?>?autoplay=0"
+                        src="https://player.vimeo.com/video/<?= htmlspecialchars($player_config['vimeo_id']) ?>?autoplay=1&muted=1"
                         allowfullscreen
                         allow="autoplay; fullscreen">
                     </iframe>
                     
                 <?php elseif ($player_type === 'drive'): ?>
-                    <!-- Google Drive Embed -->
+                    <!-- Google Drive Embed (autoplay limited by Google) -->
                     <iframe 
-                        src="https://drive.google.com/file/d/<?= htmlspecialchars($player_config['drive_id']) ?>/preview"
-                        allowfullscreen>
+                        src="https://drive.google.com/file/d/<?= htmlspecialchars($player_config['drive_id']) ?>/preview?autoplay=1"
+                        allowfullscreen
+                        allow="autoplay; encrypted-media">
                     </iframe>
                     
                 <?php elseif ($player_type === 'wistia'): ?>
                     <!-- Wistia Embed -->
                     <iframe 
-                        src="https://fast.wistia.net/embed/iframe/<?= htmlspecialchars($player_config['wistia_id']) ?>?autoplay=0&controls=1"
+                        src="https://fast.wistia.net/embed/iframe/<?= htmlspecialchars($player_config['wistia_id']) ?>?autoplay=1&muted=1&controls=1"
                         allowfullscreen
                         allow="autoplay; encrypted-media">
                     </iframe>
@@ -1069,7 +1276,7 @@ if (!isset($root)) {
                 <?php elseif ($player_type === 'rumble'): ?>
                     <!-- Rumble Embed -->
                     <iframe 
-                        src="https://rumble.com/embed/v<?= htmlspecialchars($player_config['rumble_id']) ?>/?autoplay=0"
+                        src="https://rumble.com/embed/v<?= htmlspecialchars($player_config['rumble_id']) ?>/?autoplay=2"
                         allowfullscreen
                         allow="autoplay; encrypted-media">
                     </iframe>
@@ -1085,14 +1292,21 @@ if (!isset($root)) {
             </div>
         </div>
         
-        <?php if (!empty($video->description) || !empty($video->tags)): ?>
+        <!-- Published Date and Views (below video player) -->
+        <div class="video-meta-below">
+            <span>Published: <?= date('M j, Y', strtotime($video->date_added ?? $video->published_at ?? 'now')) ?></span>
+            <?php if ($resolution['clicks'] > 0): ?>
+                <span class="separator">•</span>
+                <span>Views: <?= number_format($resolution['clicks']) ?></span>
+            <?php endif; ?>
+        </div>
+        
+        <?php if (!empty($video->description)): ?>
             <div class="video-info">
-                <?php if (!empty($video->description)): ?>
-                    <h3>Description</h3>
-                    <div class="video-description">
-                        <?= nl2br(htmlspecialchars($video->description)) ?>
-                    </div>
-                <?php endif; ?>
+                <h3>Description</h3>
+                <div class="video-description">
+                    <?= nl2br(htmlspecialchars($video->description)) ?>
+                </div>
                 
                 <?php if (!empty($video->tags)): ?>
                     <div class="video-tags">
@@ -1114,9 +1328,15 @@ if (!isset($root)) {
             </div>
         </div>
         
-        <div class="footer">
-            <p>&copy; <?= date('Y') ?> ION Local Network.</p>
-        </div>
+        <?php
+        // Include the ION Footer
+        $footer_path = $root . '/includes/ionfooter.php';
+        if (file_exists($footer_path)) {
+            require $footer_path;
+        } else {
+            echo '<div class="footer"><p>&copy; ' . date('Y') . ' <a href="/">ION Local Network</a>. All rights reserved.</p></div>';
+        }
+        ?>
     </div>
     
     <!-- Video.js JavaScript -->
@@ -1218,6 +1438,25 @@ if (!isset($root)) {
                 'nativeTextTracks' => false
             ]
         ]) ?>
+        
+        // Ensure autoplay works when Video.js is ready
+        (function() {
+            const player = videojs('video-player');
+            
+            player.ready(function() {
+                // Try to autoplay (muted)
+                const playPromise = this.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('✅ Video autoplay started successfully');
+                    }).catch(error => {
+                        console.warn('⚠️ Autoplay was prevented by browser:', error);
+                        // Show a play button overlay or notification if needed
+                    });
+                }
+            });
+        })();
     </script>
     <?php endif; ?>
     

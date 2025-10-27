@@ -139,13 +139,11 @@ unset($_SESSION['message'], $_SESSION['message_type']);
 </div>
 <div class="title">ION Console</div>
 <div class="subtitle">Welcome back!</div>
-
-<div id="messageBox"><?php echo !empty($message) ? htmlspecialchars($message) : ''; ?></div>
     
     
     <center>
       <div class="social-buttons">
-        <?php if ($google_client_id && $google_redirect_uri && $google_oauth_url): ?>
+        <!--?php if ($google_client_id && $google_redirect_uri && $google_oauth_url): ?-->
           <a href="<?= htmlspecialchars($google_oauth_url) ?>" class="inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 no-underline border-2 border-google-border text-google-text bg-transparent hover:bg-google-bg/10 px-6 py-3 text-sm gap-3 flex-row">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 48 48" class="flex-shrink-0">
               <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
@@ -155,51 +153,40 @@ unset($_SESSION['message'], $_SESSION['message_type']);
             </svg>
             Continue with Google
           </a>
-          <br>
-        <?php endif; ?>
-        <?php if ($discord_client_id && $discord_redirect_uri): ?>
+          <br><br>
+        <!--?php endif; ?-->
+        <!--?php if ($discord_client_id && $discord_redirect_uri): ?-->
           <a href="discord-oauth.php" class="inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 no-underline border-2 border-discord-border text-discord-text bg-transparent hover:bg-discord-bg/10 px-6 py-3 text-sm gap-3 flex-row">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0">
               <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028 14.09 14.09 0 003.233-.917.077.077 0 00.01-.11 11.98 11.98 0 011.609 1.116.08.08 0 00.087.022 19.856 19.856 0 005.994-3.03.077.077 0 00.031-.054c.527-5.49-.949-9.045-3.993-13.65a.07.07 0 00-.032-.028zm-6.812 7.874a4.246 4.246 0 01-6.24 4.235 4.266 4.266 0 01-4.235-6.24 4.266 4.266 0 016.24-4.235 4.266 4.266 0 014.235 6.24zm4.227 0a4.246 4.246 0 01-6.24 4.235 4.266 4.266 0 01-4.235-6.24 4.266 4.266 0 016.24-4.235 4.266 4.266 0 014.235 6.24z" fill="#5865F2"></path>
             </svg>
             Continue with Discord
           </a>
-          <br>
-        <?php endif; ?>
+          <br><br>
+        <!--?php endif; ?-->
       </div>
-      <?php if ($google_oauth_url || ($discord_client_id && $discord_redirect_uri)): ?>
+      <!--?php if ($google_oauth_url || ($discord_client_id && $discord_redirect_uri)): ?-->
 <p>-or-<br><br></p>
-      <?php endif; ?>
-      
-      <!-- Email Form -->
-      <form id="emailForm" method="POST" action="sendotp.php" autocomplete="off">
-        <input type="email" name="email" id="emailInput" placeholder="Enter your email" required autocomplete="email">
+      <!--?php endif; ?-->
+      <form id="emailForm" method="POST" action="sendotp.php">
+        <input type="email" name="email" id="emailInput" placeholder="Enter your email" required>
         <button class="btn" type="submit">🔐 Continue with Email</button>
       </form>
-      
-      <!-- OTP Form (hidden by default) -->
-      <form id="otpForm" class="hidden" method="POST" action="verifyotp.php">
-        <input type="hidden" name="email" id="otpEmail">
-        <div class="otp-boxes">
-          <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
-          <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
-          <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
-          <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
-          <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
-          <input type="text" class="otp-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
-        </div>
-        <div class="timer">
-          Expires in <span id="countdown">10:00</span>
-        </div>
-        <button class="btn" type="submit">Verify Code</button>
-      </form>
-      
       <div class="join-link">
         Don't have an account? <a href="/join/">Create one</a>
       </div>
     </center>
     
-  </div>
+    
+      
+      
+        
+          
+        
+      
+      Expires in 10:00
+      <button class="btn" type="submit">Verify Code</button>
+    
   
   <script>
     const emailForm = document.getElementById('emailForm');
@@ -210,21 +197,22 @@ unset($_SESSION['message'], $_SESSION['message_type']);
     const messageBox = document.getElementById('messageBox');
 
     // Set initial message color if there's a predefined message
-    <?php if (!empty($message) && !empty($message_type)): ?>
-      <?php if ($message_type === 'timeout'): ?>
+    
+      
         messageBox.style.color = '#d97706'; // Mustard/amber color for session timeouts
-      <?php elseif ($message_type === 'error'): ?>
+      
         messageBox.style.color = '#ff4d4d'; // Red for actual errors
-      <?php elseif ($message_type === 'success'): ?>
+      
         messageBox.style.color = '#00cc66'; // Green for success
-      <?php endif; ?>
-    <?php endif; ?>
+      
+    
 
     // Handle OAuth error messages
     const urlParams = new URLSearchParams(window.location.search);
     const errorParam = urlParams.get('error');
     if (errorParam) {
       console.log('OAuth Error Parameter:', errorParam);
+
       if (errorParam === 'no_code') {
         messageBox.style.color = '#ff4d4d';
         messageBox.textContent = '❌ Google OAuth failed: No authorization code received. Please try again.';
@@ -235,23 +223,23 @@ unset($_SESSION['message'], $_SESSION['message_type']);
     }
 
     // Check if we should show OTP form immediately
-    <?php if (isset($_SESSION['show_otp_form']) && $_SESSION['show_otp_form']): ?>
+    
       document.addEventListener('DOMContentLoaded', function() {
         emailForm.classList.add('hidden');
         otpForm.classList.remove('hidden');
-        emailInput.value = '<?php echo htmlspecialchars($_SESSION['otp_email'] ?? ''); ?>';
-        otpEmail.value = '<?php echo htmlspecialchars($_SESSION['otp_email'] ?? ''); ?>';
+        emailInput.value = '';
+        otpEmail.value = '';
         startCountdown();
         addResendButton();
         otpDigits[0].focus();
 
-        <?php if (isset($_SESSION['otp_error'])): ?>
+        
           messageBox.style.color = "#ff4d4d";
-          messageBox.textContent = "<?php echo htmlspecialchars($_SESSION['otp_error']); ?>";
-          <?php unset($_SESSION['otp_error']); ?>
-        <?php endif; ?>
+          messageBox.textContent = "";
+          
+        
       });
-    <?php endif; ?>
+    
 
     function addResendButton() {
       if (document.getElementById('resend-btn')) return;
@@ -289,10 +277,10 @@ unset($_SESSION['message'], $_SESSION['message_type']);
       submitBtn.style.backgroundColor = '#6c757d'; // Gray color
       submitBtn.style.cursor = 'not-allowed';
       submitBtn.innerHTML = `
-        <svg style="display: inline-block; width: 16px; height: 16px; animation: spin 1s linear infinite; margin-right: 8px;" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" opacity="0.25"></circle>
-          <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor"></path>
-        </svg>
+        
+          
+          
+        
         Sending email...
       `;
       

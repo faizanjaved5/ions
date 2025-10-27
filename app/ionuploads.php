@@ -6,6 +6,7 @@ $config = require_once __DIR__ . '/../config/config.php';
 
 // Load ION categories early (needed for JavaScript config)
 require_once __DIR__ . '/../includes/ioncategories.php';
+require_once __DIR__ . '/../includes/ionnetworks.php';
 
 session_start();
 $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
@@ -33,6 +34,7 @@ if ($isEditMode) {
         'tags' => $_GET['tags'] ?? '',
         'badges' => $_GET['badges'] ?? '', // ION Badges (comma-separated)
         'channels' => $_GET['channels'] ?? '[]', // ION Channels (JSON array of slugs)
+        'networks' => $_GET['networks'] ?? '[]', // ION Networks (JSON array of network keys)
         'visibility' => $_GET['visibility'] ?? 'public',
         'thumbnail' => $_GET['thumbnail'] ?? '',
         'source' => $_GET['source'] ?? '',
@@ -732,7 +734,33 @@ if ($isEditMode) {
             echo json_encode($ion_categories_js); 
         ?>;
         
+        // ION NETWORKS - Centralized network list from ionnetworks.php
+        const ION_NETWORKS = <?php 
+            $ion_networks_flat = get_ion_networks(); // Flattened array
+            $ion_networks_js = [];
+            foreach ($ion_networks_flat as $key => $network) {
+                $network_data = [
+                    'key' => $key,
+                    'name' => $network['name'],
+                    'slug' => $network['slug'],
+                    'level' => $network['level'],
+                    'parent' => $network['parent'],
+                    'icon' => $network['icon'] ?? null,
+                    'description' => $network['description'] ?? null
+                ];
+                // Add hierarchy path for display
+                if ($network['parent']) {
+                    $network_data['hierarchy'] = get_ion_network_path_display($key);
+                } else {
+                    $network_data['hierarchy'] = null;
+                }
+                $ion_networks_js[] = $network_data;
+            }
+            echo json_encode($ion_networks_js); 
+        ?>;
+        
         console.log('📁 ION Categories loaded:', ION_CATEGORIES.length, 'categories');
+        console.log('📺 ION Networks loaded:', ION_NETWORKS.length, 'networks');
     </script>
     <!-- Google APIs -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -1000,7 +1028,10 @@ if ($isEditMode) {
                         <!-- ION Category and Badges - Side by Side -->
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="videoCategory">ION Networks Category</label>
+                                <label for="videoCategory">
+                                    ION Category
+                                    <span class="tooltip" title="High-level content type (Business, Sports, News, Entertainment, etc.)">?</span>
+                                </label>
                                 <select id="videoCategory" class="form-input">
                                     <option value="">Select category...</option>
                                     <?php
@@ -1042,28 +1073,49 @@ if ($isEditMode) {
                             </div>
                             <?php endif; ?>
                         </div>
-                       
-                        <div class="form-group">
-                            <label for="channelSearch">
-                                ION Channels 
-                                <span class="tooltip" title="Search and select channels where this video will appear. First channel = Primary.">?</span>
-                            </label>
-                            <div class="channel-search-container">
-                                <input type="text" 
-                                       id="channelSearch" 
-                                       class="form-input" 
-                                       placeholder="Search channels by city, state, or zip..."
-                                       autocomplete="off">
-                                <div id="channelSearchResults" class="channel-search-results"></div>
+                        
+                        <!-- ION Networks and Channels - Side by Side -->
+                        <div class="form-row">
+                            <!-- ION Networks -->
+                            <div class="form-group">
+                                <label for="networkSearch">
+                                    ION Networks, Shows & Initiatives
+                                    <span class="tooltip" title="Search and select shows/branded content (e.g., Hall of Fame Show, Leagues on ION). First selected = Featured Network.">?</span>
+                                </label>
+                                <div class="network-search-container">
+                                    <input type="text" 
+                                           id="networkSearch" 
+                                           class="form-input" 
+                                           placeholder="Search networks..."
+                                           autocomplete="off">
+                                    <div id="networkSearchResults" class="network-search-results"></div>
+                                </div>
+                                
+                                <!-- Selected Networks List -->
+                                <div id="selectedNetworks" class="selected-items-list"></div>
                             </div>
                             
-                            <!-- Selected Channels List -->
-                            <div id="selectedChannelsList" class="selected-channels-list" style="margin-top: 12px;">
-                                <!-- Selected channels will appear here -->
+                            <!-- ION Channels -->
+                            <div class="form-group">
+                                <label for="channelSearch">
+                                    ION Channels 
+                                    <span class="tooltip" title="Search and select channels by city, state, or zip where this video will appear. First channel = Primary.">?</span>
+                                </label>
+                                <div class="channel-search-container">
+                                    <input type="text" 
+                                           id="channelSearch" 
+                                           class="form-input" 
+                                           placeholder="Search channels..."
+                                           autocomplete="off">
+                                    <div id="channelSearchResults" class="channel-search-results"></div>
+                                </div>
+                                
+                                <!-- Selected Channels List -->
+                                <div id="selectedChannelsList" class="selected-channels-list"></div>
+                                
+                                <!-- Hidden input to store selected channels for form submission -->
+                                <input type="hidden" id="selectedChannels" name="selected_channels" value="">
                             </div>
-                            
-                            <!-- Hidden input to store selected channels for form submission -->
-                            <input type="hidden" id="selectedChannels" name="selected_channels" value="">
                         </div>
                        
                         <div class="form-group">
@@ -1096,11 +1148,20 @@ if ($isEditMode) {
                     <div class="bulk-common-properties">
                         <div class="bulk-common-grid">
                             <div class="bulk-common-field">
-                                <label class="bulk-common-label">ION Networks Category *</label>
+                                <label class="bulk-common-label">ION Category *</label>
                                 <select class="bulk-common-select" id="bulkCommonCategory">
                                     <option value="">Select category</option>
                                     <?php echo generate_ion_category_options('', false); ?>
                                 </select>
+                            </div>
+                            
+                            <div class="bulk-common-field">
+                                <label class="bulk-common-label">ION Networks, Shows & Initiatives</label>
+                                <input type="text" 
+                                       class="bulk-common-input" 
+                                       id="bulkNetworkSearch" 
+                                       placeholder="Search networks (optional)"
+                                       style="background: #1e293b; border: 1px solid #334155; color: white; padding: 10px 14px; border-radius: 6px; width: 100%;">
                             </div>
                             
                             <div class="bulk-common-field">
@@ -1174,17 +1235,26 @@ if ($isEditMode) {
                             <h4 style="margin: 0 0 8px 0; font-size: 0.9375rem; font-weight: 600; color: #e2e8f0;">Global Settings</h4>
                             <p style="margin: 0; font-size: 0.8125rem; color: #94a3b8;">These settings apply to videos that don't have specific values in the CSV file</p>
                         </div>
-                        <div class="bulk-common-grid">
-                            <div class="bulk-common-field">
-                                <label class="bulk-common-label">ION Networks Category</label>
-                                <select class="bulk-common-select" id="csvGlobalCategory">
-                                    <option value="">None (use CSV data)</option>
-                                    <?php echo generate_ion_category_options('', false); ?>
-                                </select>
-                            </div>
-                            
-                            <div class="bulk-common-field">
-                                <label class="bulk-common-label">ION Channels</label>
+                    <div class="bulk-common-grid">
+                        <div class="bulk-common-field">
+                            <label class="bulk-common-label">ION Category</label>
+                            <select class="bulk-common-select" id="csvGlobalCategory">
+                                <option value="">None (use CSV data)</option>
+                                <?php echo generate_ion_category_options('', false); ?>
+                            </select>
+                        </div>
+                        
+                        <div class="bulk-common-field">
+                            <label class="bulk-common-label">ION Networks, Shows & Initiatives</label>
+                            <input type="text" 
+                                   class="bulk-common-input" 
+                                   id="csvNetworkSearch" 
+                                   placeholder="Search networks (optional)"
+                                   style="background: #1e293b; border: 1px solid #334155; color: white; padding: 10px 14px; border-radius: 6px; width: 100%;">
+                        </div>
+                        
+                        <div class="bulk-common-field">
+                            <label class="bulk-common-label">ION Channels</label>
                                 <input type="text" 
                                        class="bulk-common-input" 
                                        id="csvGlobalChannels" 
@@ -1570,6 +1640,7 @@ if ($isEditMode) {
             <?php if ($isEditMode && !empty($editVideoData['id'])): ?>
                 console.log('📺 Edit mode detected, loading data for video ID: <?= $editVideoData['id'] ?>');
                 console.log('📺 Channels from URL params: <?= htmlspecialchars($editVideoData['channels'], ENT_QUOTES) ?>');
+                console.log('📡 Networks from URL params: <?= htmlspecialchars($editVideoData['networks'] ?? '[]', ENT_QUOTES) ?>');
                 console.log('🏷️ Badges from URL params: <?= htmlspecialchars($editVideoData['badges'], ENT_QUOTES) ?>');
                 
                 // Load badges in edit mode
@@ -1648,11 +1719,60 @@ if ($isEditMode) {
                     }
                 }
                 
+                // Wait for network search to be ready, then load networks
+                function loadEditModeNetworks() {
+                    if (typeof addNetwork !== 'function' || !ION_NETWORKS) {
+                        console.log('⏳ Waiting for network search to initialize...');
+                        setTimeout(loadEditModeNetworks, 100);
+                        return;
+                    }
+                    
+                    console.log('✅ Network search ready, loading networks from URL params...');
+                    
+                    try {
+                        // Parse networks from URL parameters (JSON array of network keys)
+                        const networksJson = <?= json_encode($editVideoData['networks'] ?? '[]') ?>;
+                        const networkKeys = JSON.parse(networksJson);
+                        
+                        console.log('📡 Parsed network keys:', networkKeys);
+                        
+                        if (networkKeys && networkKeys.length > 0) {
+                            console.log('📡 Loading ' + networkKeys.length + ' network(s):', networkKeys);
+                            
+                            // Add each network to selectedNetworks
+                            networkKeys.forEach(networkKey => {
+                                const network = ION_NETWORKS.find(n => n.key === networkKey);
+                                if (network) {
+                                    // Check if not already added
+                                    if (!selectedNetworks.find(n => n.key === networkKey)) {
+                                        selectedNetworks.push(network);
+                                        console.log('📡 Added network:', network.name);
+                                    }
+                                } else {
+                                    console.warn('⚠️ Network not found:', networkKey);
+                                }
+                            });
+                            
+                            // Update display
+                            updateSelectedNetworksDisplay();
+                            console.log('✅ Networks loaded successfully');
+                        } else {
+                            console.log('ℹ️ No networks to load for this video');
+                        }
+                    } catch (error) {
+                        console.error('❌ Failed to parse networks:', error);
+                        console.log('📡 Raw networks value: <?= htmlspecialchars($editVideoData['networks'] ?? '[]', ENT_QUOTES) ?>');
+                    }
+                }
+                
                 // Load badges immediately (doesn't need to wait)
                 loadEditModeBadges();
                 
                 // Start loading channels
                 loadEditModeChannels();
+                
+                // Start loading networks
+                loadEditModeNetworks();
             <?php endif; ?>
         });
     </script>

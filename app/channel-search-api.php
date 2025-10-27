@@ -12,12 +12,6 @@ header('Content-Type: application/json');
 // Include database connection
 require_once '../config/database.php';
 
-// Check authentication
-if (!isset($_SESSION['user_email']) || empty($_SESSION['user_email'])) {
-    echo json_encode(['success' => false, 'error' => 'User not authenticated']);
-    exit();
-}
-
 // Only handle GET requests for search
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     echo json_encode(['success' => false, 'error' => 'Invalid request method']);
@@ -25,7 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    // Get user role for permission check
+    // Get user role for permission check (allow guest/unauthenticated users)
+    $is_authenticated = isset($_SESSION['user_email']) && !empty($_SESSION['user_email']);
     $user_role = $_SESSION['user_role'] ?? 'Guest';
     
     $search_term = trim($_GET['q'] ?? '');
@@ -115,6 +110,7 @@ try {
         'channels' => $formatted_channels,
         'count' => count($formatted_channels),
         'user_role' => $user_role,
+        'is_authenticated' => $is_authenticated,
         'can_multi_select' => in_array($user_role, ['Admin', 'Owner'])
     ]);
     

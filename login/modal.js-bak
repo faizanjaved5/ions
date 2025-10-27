@@ -1,15 +1,15 @@
 /**
  * ION Login Modal - Frameless centered dialog
  * - OTP login works entirely in modal
- * - OAuth opens minimal popup (Google/Discord blocks OAuth in iframes)
+ * - OAuth opens minimal popup (Google blocks OAuth in iframes)
  */
+
 let loginPopup = null;
 let currentReturnUrl = null;
 
 function showLoginModal(returnUrl = null) {
     currentReturnUrl = returnUrl || window.location.href;
     sessionStorage.setItem('login_return_url', currentReturnUrl);
-    
     // Ensure shared login styles are present for visual parity with /login
     try {
         const needShared = !document.querySelector('link[href*="shared-login.css"]');
@@ -22,77 +22,68 @@ function showLoginModal(returnUrl = null) {
     } catch (e) {
         // ignore failures; modal will still function
     }
-   
+    
     // Create modal overlay
     const overlay = document.createElement('div');
     overlay.id = 'ion-login-modal-overlay';
     overlay.className = 'ion-login-modal-overlay active';
-   
+    
     overlay.innerHTML = `
         <div class="ion-login-modal">
             <button class="ion-login-close" onclick="closeLoginModal()">&times;</button>
             <div class="ion-login-content">
                 <div class="ion-login-logo">
-                    <img src="https://ions.com/menu/ion-logo-gold.png" alt="ION Logo" style="width:180px;height:auto;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3));" />
+                    <img src="https://ions.com/menu/ion-logo-gold.png" alt="ION Logo" style="width:auto;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.3));" />
                 </div>
                 <div class="ion-login-heading">ION Console</div>
                 <div class="ion-login-subtitle">Welcome back!</div>
-               
-                <div class="ion-login-social-buttons">
-                    <button class="ion-login-google-btn" onclick="handleGoogleLogin()">
-                        <svg width="20" height="20" viewBox="0 0 48 48" class="flex-shrink-0">
-                            <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
-                            <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
-                            <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
-                            <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
-                        </svg>
-                        <span>Continue with Google</span>
-                    </button>
-                   
-                    <button class="ion-login-discord-btn" onclick="handleDiscordLogin()">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="flex-shrink-0">
-                            <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028 14.09 14.09 0 003.233-.917.077.077 0 00.01-.11 11.98 11.98 0 011.609 1.116.08.08 0 00.087.022 19.856 19.856 0 005.994-3.03.077.077 0 00.031-.054c.527-5.49-.949-9.045-3.993-13.65a.07.07 0 00-.032-.028zm-6.812 7.874a4.246 4.246 0 01-6.24 4.235 4.266 4.266 0 01-4.235-6.24 4.266 4.266 0 016.24-4.235 4.266 4.266 0 014.235 6.24zm4.227 0a4.246 4.246 0 01-6.24 4.235 4.266 4.266 0 01-4.235-6.24 4.266 4.266 0 016.24-4.235 4.266 4.266 0 014.235 6.24z" fill="#5865F2"/>
-                        </svg>
-                        <span>Continue with Discord</span>
-                    </button>
-                </div>
-               
+                
+                <button class="ion-login-google-btn" onclick="handleGoogleLogin()">
+                    <svg width="20" height="20" viewBox="0 0 48 48" class="flex-shrink-0">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                    </svg>
+                    <span>Continue with Google</span>
+                </button>
+                
                 <div class="ion-login-divider"><span>or</span></div>
-               
+                
                 <form id="ion-otp-form" onsubmit="handleOTPRequest(event)">
                     <div class="ion-login-input-group">
-                        <input type="email" id="ion-email-input" placeholder="Enter your email" required autocomplete="email" />
+                        <input type="email" id="ion-email-input" placeholder="Enter your email" required />
                     </div>
                     <button type="submit" class="ion-login-submit-btn">
                         <span>🔐</span> Continue with Email
                     </button>
                 </form>
-               
+                
                 <div id="ion-otp-section" class="ion-otp-section" style="display: none;">
                     <p class="ion-otp-sent-msg">We sent a code to <strong id="ion-email-display"></strong></p>
                     <form id="ion-verify-form" onsubmit="handleOTPVerify(event)">
                         <div class="ion-otp-inputs">
-                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="0" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="1" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="2" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="3" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="4" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
-                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="5" inputmode="numeric" pattern="[0-9]" autocomplete="off" />
+                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="0" />
+                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="1" />
+                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="2" />
+                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="3" />
+                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="4" />
+                            <input type="text" maxlength="1" class="ion-otp-digit" data-index="5" />
                         </div>
                         <button type="submit" class="ion-login-submit-btn">Verify Code</button>
                         <button type="button" class="ion-login-back-btn" onclick="backToEmail()">← Back</button>
                     </form>
                 </div>
-               
+                
                 <div id="ion-login-error" class="ion-login-error"></div>
                 <div class="ion-login-join">Don't have an account? <a href="/join/">Create one</a></div>
             </div>
         </div>
     `;
-   
+    
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
-   
+    
     // Setup OTP digit inputs auto-advance
     setupOTPInputs();
 }
@@ -111,31 +102,14 @@ function handleGoogleLogin() {
     const height = 600;
     const left = (window.screen.width - width) / 2;
     const top = (window.screen.height - height) / 2;
-    const url = `/login/?oauth=1&return_to=${encodeURIComponent(currentReturnUrl)}`;
-    
-    loginPopup = window.open(
-        url,
-        'IONOAuth',
-        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,location=no`
-    );
-   
-    if (loginPopup) loginPopup.focus();
-}
 
-function handleDiscordLogin() {
-    // Open Discord OAuth flow in a centered popup via /login?discord_oauth=1
-    const width = 500;
-    const height = 600;
-    const left = (window.screen.width - width) / 2;
-    const top = (window.screen.height - height) / 2;
-    const url = `/login/?discord_oauth=1&return_to=${encodeURIComponent(currentReturnUrl)}`;
-    
+    const url = `/login/?oauth=1&return_to=${encodeURIComponent(currentReturnUrl)}`;
     loginPopup = window.open(
         url,
         'IONOAuth',
         `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,location=no`
     );
-   
+    
     if (loginPopup) loginPopup.focus();
 }
 
@@ -144,7 +118,7 @@ async function handleOTPRequest(e) {
     const email = document.getElementById('ion-email-input').value;
     const errorDiv = document.getElementById('ion-login-error');
     const submitBtn = e.target.querySelector('button[type="submit"]');
-   
+    
     // Disable button and show loading state
     submitBtn.disabled = true;
     submitBtn.style.backgroundColor = '#6c757d'; // Gray color
@@ -158,25 +132,25 @@ async function handleOTPRequest(e) {
     `;
     errorDiv.textContent = 'Sending OTP code to your email...';
     errorDiv.style.color = '#ccc';
-   
+    
     try {
         const response = await fetch('/login/sendotp.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `email=${encodeURIComponent(email)}`
         });
-       
+        
         const result = await response.json();
-       
+        
         if (result.status === 'success') {
             document.getElementById('ion-email-display').textContent = email;
             document.getElementById('ion-otp-form').style.display = 'none';
             document.getElementById('ion-otp-section').style.display = 'block';
-            document.querySelector('.ion-login-social-buttons').style.display = 'none';
+            document.querySelector('.ion-login-google-btn').style.display = 'none';
             document.querySelector('.ion-login-divider').style.display = 'none';
             document.querySelector('.ion-otp-digit').focus();
             errorDiv.textContent = '';
-           
+            
             // Reset button state after 60 seconds (in case user goes back)
             setTimeout(() => {
                 submitBtn.disabled = false;
@@ -187,7 +161,7 @@ async function handleOTPRequest(e) {
         } else {
             errorDiv.textContent = result.message || 'Failed to send code';
             errorDiv.style.color = '#ff4d4d';
-           
+            
             // Re-enable button on error after 3 seconds
             setTimeout(() => {
                 submitBtn.disabled = false;
@@ -199,7 +173,7 @@ async function handleOTPRequest(e) {
     } catch (error) {
         errorDiv.textContent = 'Network error. Please try again.';
         errorDiv.style.color = '#ff4d4d';
-       
+        
         // Re-enable button on error after 3 seconds
         setTimeout(() => {
             submitBtn.disabled = false;
@@ -216,21 +190,21 @@ async function handleOTPVerify(e) {
     const otp = Array.from(digits).map(d => d.value).join('');
     const email = document.getElementById('ion-email-input').value;
     const errorDiv = document.getElementById('ion-login-error');
-   
+    
     if (otp.length !== 6) {
         errorDiv.textContent = 'Please enter the 6-digit code';
         return;
     }
-   
+    
     try {
         const response = await fetch('/login/verifyotp.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: `email=${encodeURIComponent(email)}&otp=${otp}`
         });
-       
+        
         const text = await response.text();
-       
+        
         // Success - reload page
         if (text.includes('login-success') || response.redirected) {
             closeLoginModal();
@@ -248,10 +222,10 @@ async function handleOTPVerify(e) {
 function backToEmail() {
     document.getElementById('ion-otp-section').style.display = 'none';
     document.getElementById('ion-otp-form').style.display = 'block';
-    document.querySelector('.ion-login-social-buttons').style.display = 'flex';
+    document.querySelector('.ion-login-google-btn').style.display = 'flex';
     document.querySelector('.ion-login-divider').style.display = 'flex';
     document.querySelectorAll('.ion-otp-digit').forEach(d => d.value = '');
-   
+    
     // Reset submit button state when going back
     const submitBtn = document.querySelector('#ion-otp-form button[type="submit"]');
     if (submitBtn) {
@@ -318,3 +292,4 @@ document.addEventListener('keydown', (e) => {
 
 window.showLoginModal = showLoginModal;
 window.closeLoginModal = closeLoginModal;
+

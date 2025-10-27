@@ -1,5 +1,5 @@
 {
-  "isLoggedIn": false,
+  "isLoggedIn": true,
   "user": {
     "name": "John Smith",
     "email": "john@demo.com",
@@ -65,7 +65,7 @@
     },
     "signIn": {
       "label": "Sign In",
-      "link": "/signin123",
+      "link": "/signin",
       "visible": true
     }
   }

@@ -1,0 +1,391 @@
+/* ION Geographic Hierarchy Styles */
+/* Base styles and theme variables */
+:root {
+  /* Light mode colors */
+  --background: 220 20% 97%;
+  --foreground: 220 15% 15%;
+  --card: 220 20% 100%;
+  --card-foreground: 220 15% 15%;
+  --primary: 30 50% 45%;
+  --primary-foreground: 30 5% 98%;
+  --muted: 220 15% 93%;
+  --muted-foreground: 220 10% 40%;
+  --border: 220 15% 88%;
+}
+
+.dark {
+  /* Dark mode colors */
+  --background: 220 20% 12%;
+  --foreground: 220 10% 90%;
+  --card: 220 20% 15%;
+  --card-foreground: 220 10% 90%;
+  --primary: 30 50% 55%;
+  --primary-foreground: 30 5% 10%;
+  --muted: 220 15% 20%;
+  --muted-foreground: 220 10% 65%;
+  --border: 220 15% 25%;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+  background: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--background)), hsl(var(--muted) / 0.2));
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.container {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--border));
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 100;
+}
+
+.theme-toggle:hover {
+  border-color: hsl(var(--primary));
+  transform: scale(1.1);
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+  stroke: hsl(var(--foreground));
+}
+
+/* Back Link */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: hsl(var(--primary));
+  text-decoration: none;
+  margin-bottom: 2rem;
+  transition: color 0.3s ease;
+}
+
+.back-link:hover {
+  color: hsl(var(--primary) / 0.8);
+}
+
+.back-link svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.back-link:hover svg {
+  transform: translateX(-4px);
+}
+
+/* Header */
+.header {
+  margin-bottom: 3rem;
+}
+
+.header-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.header-flag {
+  font-size: 3rem;
+}
+
+.header-title {
+  font-size: 3rem;
+  font-weight: bold;
+  font-family: 'Bebas Neue', sans-serif;
+  background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--primary) / 0.6));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-subtitle {
+  font-size: 1.125rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(1, 1fr);
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(1, 1fr);
+}
+
+.grid-cols-4 {
+  grid-template-columns: repeat(1, 1fr);
+}
+
+@media (min-width: 640px) {
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .grid-cols-4 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Mobile Responsive Improvements */
+@media (max-width: 640px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .header {
+    margin-bottom: 1.5rem;
+  }
+  
+  .header-title-wrapper {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .header-flag img {
+    width: 2.5rem !important;
+    height: 1.875rem !important;
+  }
+  
+  .header-title {
+    font-size: 1.75rem;
+  }
+  
+  .header-subtitle {
+    font-size: 0.875rem;
+  }
+  
+  .card-header {
+    padding: 1rem;
+  }
+  
+  .card-title {
+    font-size: 1rem;
+  }
+  
+  .card-description {
+    font-size: 0.75rem;
+  }
+  
+  .card-meta {
+    font-size: 0.75rem;
+  }
+  
+  /* Country cards remain readable on mobile */
+  .country-card .card-header {
+    padding: 1.25rem;
+  }
+  
+  .country-card .card-title {
+    font-size: 1.25rem;
+  }
+  
+  /* Pagination responsive */
+  .pagination {
+    gap: 4px !important;
+  }
+  
+  .pagination .page-btn {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    min-width: 36px !important;
+  }
+  
+  .pagination span {
+    padding: 4px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* Card */
+.card {
+  background: linear-gradient(to bottom right, hsl(var(--card)), hsl(var(--card) / 0.5));
+  border: 2px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: block;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+.card.featured {
+  border-color: hsl(var(--primary) / 0.3);
+  background: linear-gradient(to bottom right, hsl(var(--card)), hsl(var(--primary) / 0.05));
+}
+
+.card-header {
+  padding: 1.5rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-header-compact {
+  padding: 1rem;
+  min-height: 88px;
+}
+
+.card-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom right, hsl(var(--primary) / 0.05), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.card:hover .card-gradient {
+  opacity: 1;
+}
+
+.card-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  z-index: 10;
+}
+
+.card-flag {
+  font-size: 1.5rem;
+}
+
+.card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: hsl(var(--card-foreground));
+  transition: color 0.3s ease;
+}
+
+.card-title-large {
+  font-size: 1.5rem;
+}
+
+.card:hover .card-title {
+  color: hsl(var(--primary));
+}
+
+.card-description {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.5rem;
+  position: relative;
+  z-index: 10;
+}
+
+.card-meta {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  z-index: 10;
+}
+
+.card-meta-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: hsl(var(--primary) / 0.7);
+}
+
+.card-meta-dot-small {
+  width: 0.375rem;
+  height: 0.375rem;
+}
+
+.card-link {
+  font-size: 0.75rem;
+  color: hsl(var(--primary));
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 10;
+}
+
+.card:hover .card-link {
+  opacity: 1;
+}
+
+/* Country Cards (larger) */
+.country-card .card-header {
+  padding: 1.5rem;
+}
+
+.country-card .card-flag {
+  font-size: 2rem;
+}
+
+.country-card .card-title {
+  font-size: 1.5rem;
+}
+
+.country-card .card-description {
+  font-size: 1rem;
+}
+

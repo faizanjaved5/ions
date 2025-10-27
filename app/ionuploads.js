@@ -1198,7 +1198,8 @@ async function processSingleUpload() {
             category: document.getElementById('videoCategory')?.value || 'General',
             tags: document.getElementById('videoTags')?.value || '',
             visibility: document.getElementById('videoVisibility')?.value || 'public',
-            selected_channels: document.getElementById('selectedChannels')?.value || '' // CRITICAL: Include selected channels
+            selected_channels: document.getElementById('selectedChannels')?.value || '', // CRITICAL: Include selected channels
+            selected_networks: getSelectedNetworksString() // Include selected networks
         };
         
         // Try R2 multipart upload first (if available)
@@ -2272,6 +2273,13 @@ function getFormMetadata() {
     if (selectedChannelsValue) {
         formData.append('selected_channels', selectedChannelsValue);
         console.log('📝 Selected channels:', selectedChannelsValue);
+    }
+    
+    // Include selected networks
+    const selectedNetworksValue = getSelectedNetworksString();
+    if (selectedNetworksValue) {
+        formData.append('selected_networks', selectedNetworksValue);
+        console.log('📡 Selected networks:', selectedNetworksValue);
     }
     
     // Add thumbnail if available (CRITICAL: must be named 'thumbnail' to match backend)
@@ -4426,6 +4434,7 @@ function startUpload() {
                 visibility: document.getElementById('videoVisibility')?.value || 'public',
                 badges: document.getElementById('videoBadges')?.value || '',
                 selected_channels: document.getElementById('selectedChannels')?.value || '', // CRITICAL: Include selected channels
+                selected_networks: getSelectedNetworksString(), // Include selected networks
                 thumbnailBlob: window.capturedThumbnailBlob || null
             };
             
@@ -4512,7 +4521,8 @@ function startFileUpload() {
         visibility: visibility,
         badges: badges,
         thumbnail: window.capturedThumbnailBlob || null,
-        selected_channels: document.getElementById('selectedChannels')?.value || '' // CRITICAL: Include selected channels
+        selected_channels: document.getElementById('selectedChannels')?.value || '', // CRITICAL: Include selected channels
+        selected_networks: getSelectedNetworksString() // Include selected networks
     };
     
     // Check file size - use R2MultipartUploader for large files (>100MB)
@@ -4840,6 +4850,14 @@ function startRegularUpload(file, metadata) {
         console.log('📺 No channels selected for this upload');
     }
     
+    // Add selected networks
+    if (metadata.selected_networks) {
+        formData.append('selected_networks', metadata.selected_networks);
+        console.log('📡 NETWORKS ADDED TO FORMDATA:', metadata.selected_networks);
+    } else {
+        console.log('📡 No networks selected for this upload');
+    }
+    
     // Add thumbnail if available
     if (metadata.thumbnail) {
         formData.append('thumbnail', metadata.thumbnail, 'thumbnail.jpg');
@@ -4970,6 +4988,11 @@ function startImportProcess() {
     formData.append('selected_channels', selectedChannels); // CRITICAL: Include selected channels
     
     console.log('📺 Import channels being sent:', selectedChannels);
+    
+    // Include selected networks
+    const selectedNetworks = getSelectedNetworksString();
+    formData.append('selected_networks', selectedNetworks);
+    console.log('📡 Import networks being sent:', selectedNetworks);
     
     // Add thumbnail if available (blob or URL)
     if (window.capturedThumbnailBlob) {
@@ -5326,6 +5349,11 @@ async function uploadSingleFileR2(file, index) {
     // For channels, use common channel as default
     const selectedChannelsJson = document.getElementById(`bulkSelectedChannels_${index}`)?.value || 
                                   (commonChannel ? JSON.stringify([commonChannel]) : '[]');
+    
+    // For networks, get common networks (from global network search if used)
+    const commonNetworks = getSelectedNetworksString(); // Get currently selected networks from UI
+    const selectedNetworksJson = document.getElementById(`bulkSelectedNetworks_${index}`)?.value || commonNetworks || '[]';
+    
     const badges = ''; // Bulk upload doesn't have badge selector yet
     
     const metadata = {
@@ -5336,7 +5364,8 @@ async function uploadSingleFileR2(file, index) {
         visibility: visibility,
         badges: badges,
         thumbnail: window.bulkThumbnails?.[index] || null,
-        selected_channels: selectedChannelsJson
+        selected_channels: selectedChannelsJson,
+        selected_networks: selectedNetworksJson
     };
     
     console.log(`📝 Metadata for file ${index}:`, {
@@ -5512,6 +5541,7 @@ async function uploadBulkFileWithRegular(file, index, metadata) {
         formData.append('visibility', metadata.visibility);
         formData.append('badges', metadata.badges);
         formData.append('selected_channels', metadata.selected_channels);
+        formData.append('selected_networks', metadata.selected_networks || '');
         
         // Add thumbnail if available
         if (metadata.thumbnail) {
@@ -5988,6 +6018,12 @@ async function importCSVVideo(data, index) {
     if (data.channels) {
         const channels = data.channels.split(',').map(c => c.trim()).filter(c => c);
         formData.append('selected_channels', JSON.stringify(channels));
+    }
+    
+    // Add networks if specified
+    if (data.networks) {
+        const networks = data.networks.split(',').map(n => n.trim()).filter(n => n);
+        formData.append('selected_networks', JSON.stringify(networks));
     }
     
     // Add IONEER if specified (assign video to specific user)
@@ -8485,6 +8521,244 @@ function setupUploadInterfaceHandlers() {
     
     console.log('✅ Upload interface event handlers set up');
 }
+
+// ==================== ION NETWORKS SEARCH & MANAGEMENT ====================
+// Array to store selected networks (first = featured)
+let selectedNetworks = [];
+
+/**
+ * Initialize Network Search functionality
+ */
+function initNetworkSearch() {
+    const networkSearch = document.getElementById('networkSearch');
+    const networkSearchResults = document.getElementById('networkSearchResults');
+    
+    if (!networkSearch || !networkSearchResults) {
+        console.log('⚠️ Network search elements not found');
+        return;
+    }
+    
+    console.log('🔍 Initializing Network Search with', ION_NETWORKS.length, 'networks');
+    
+    // Input event - search as user types
+    networkSearch.addEventListener('input', function(e) {
+        const query = e.target.value.trim().toLowerCase();
+        
+        if (query.length === 0) {
+            networkSearchResults.classList.remove('show');
+            networkSearchResults.innerHTML = '';
+            return;
+        }
+        
+        // Search networks by name, slug, or description
+        const results = ION_NETWORKS.filter(network => {
+            return network.name.toLowerCase().includes(query) ||
+                   network.slug.toLowerCase().includes(query) ||
+                   (network.description && network.description.toLowerCase().includes(query)) ||
+                   (network.hierarchy && network.hierarchy.toLowerCase().includes(query));
+        });
+        
+        displayNetworkSearchResults(results);
+    });
+    
+    // Click outside to close
+    document.addEventListener('click', function(e) {
+        if (!networkSearch.contains(e.target) && !networkSearchResults.contains(e.target)) {
+            networkSearchResults.classList.remove('show');
+        }
+    });
+    
+    // Focus to show all results if empty
+    networkSearch.addEventListener('focus', function() {
+        if (networkSearch.value.trim().length === 0) {
+            displayNetworkSearchResults(ION_NETWORKS);
+        }
+    });
+    
+    console.log('✅ Network search initialized');
+}
+
+/**
+ * Display network search results
+ */
+function displayNetworkSearchResults(results) {
+    const networkSearchResults = document.getElementById('networkSearchResults');
+    
+    if (results.length === 0) {
+        networkSearchResults.innerHTML = '<div class="network-search-result-item" style="color: #94a3b8; cursor: default;">No networks found</div>';
+        networkSearchResults.classList.add('show');
+        return;
+    }
+    
+    networkSearchResults.innerHTML = results.map(network => {
+        // Check if already selected
+        const isSelected = selectedNetworks.some(n => n.key === network.key);
+        const selectedStyle = isSelected ? 'opacity: 0.5; pointer-events: none;' : '';
+        
+        return `
+            <div class="network-search-result-item" 
+                 data-network-key="${network.key}"
+                 style="${selectedStyle}"
+                 onclick="addNetwork('${network.key}')">
+                <div class="network-result-name">
+                    ${network.icon ? `<span class="network-result-icon">${network.icon}</span>` : ''}
+                    <span>${network.name}</span>
+                </div>
+                ${network.hierarchy ? `<div class="network-result-hierarchy">${network.hierarchy}</div>` : ''}
+                ${network.description ? `<div class="network-result-description">${network.description}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+    
+    networkSearchResults.classList.add('show');
+}
+
+/**
+ * Add network to selected list
+ */
+function addNetwork(networkKey) {
+    const network = ION_NETWORKS.find(n => n.key === networkKey);
+    
+    if (!network) {
+        console.error('❌ Network not found:', networkKey);
+        return;
+    }
+    
+    // Check if already added
+    if (selectedNetworks.some(n => n.key === networkKey)) {
+        console.log('⚠️ Network already selected:', network.name);
+        return;
+    }
+    
+    // Add to selected networks
+    selectedNetworks.push(network);
+    console.log('✅ Added network:', network.name, '(Total:', selectedNetworks.length + ')');
+    
+    // Clear search
+    const networkSearch = document.getElementById('networkSearch');
+    if (networkSearch) {
+        networkSearch.value = '';
+    }
+    const networkSearchResults = document.getElementById('networkSearchResults');
+    if (networkSearchResults) {
+        networkSearchResults.classList.remove('show');
+    }
+    
+    // Update display
+    updateSelectedNetworksDisplay();
+}
+
+/**
+ * Remove network from selected list
+ */
+function removeNetwork(networkKey) {
+    const index = selectedNetworks.findIndex(n => n.key === networkKey);
+    
+    if (index === -1) {
+        console.error('❌ Network not found in selected list:', networkKey);
+        return;
+    }
+    
+    const removed = selectedNetworks.splice(index, 1)[0];
+    console.log('🗑️ Removed network:', removed.name);
+    
+    // Update display
+    updateSelectedNetworksDisplay();
+}
+
+/**
+ * Move network up in the list (higher priority)
+ */
+function moveNetworkUp(networkKey) {
+    const index = selectedNetworks.findIndex(n => n.key === networkKey);
+    
+    if (index <= 0) return; // Already at top or not found
+    
+    // Swap with previous item
+    [selectedNetworks[index - 1], selectedNetworks[index]] = 
+    [selectedNetworks[index], selectedNetworks[index - 1]];
+    
+    updateSelectedNetworksDisplay();
+}
+
+/**
+ * Move network down in the list (lower priority)
+ */
+function moveNetworkDown(networkKey) {
+    const index = selectedNetworks.findIndex(n => n.key === networkKey);
+    
+    if (index === -1 || index === selectedNetworks.length - 1) return; // Not found or already at bottom
+    
+    // Swap with next item
+    [selectedNetworks[index], selectedNetworks[index + 1]] = 
+    [selectedNetworks[index + 1], selectedNetworks[index]];
+    
+    updateSelectedNetworksDisplay();
+}
+
+/**
+ * Update the display of selected networks
+ */
+function updateSelectedNetworksDisplay() {
+    const container = document.getElementById('selectedNetworks');
+    
+    if (!container) {
+        console.error('❌ Selected networks container not found');
+        return;
+    }
+    
+    if (selectedNetworks.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    container.innerHTML = selectedNetworks.map((network, index) => {
+        return `
+            <div class="selected-network-item" data-network-key="${network.key}">
+                <div class="network-item-info">
+                    ${network.icon ? `<span class="network-item-icon">${network.icon}</span>` : ''}
+                    <span class="network-item-name">${network.name}</span>
+                </div>
+                <div class="network-item-actions">
+                    ${index > 0 ? `<button type="button" class="network-item-move" onclick="moveNetworkUp('${network.key}')" title="Move up">↑</button>` : ''}
+                    ${index < selectedNetworks.length - 1 ? `<button type="button" class="network-item-move" onclick="moveNetworkDown('${network.key}')" title="Move down">↓</button>` : ''}
+                    <button type="button" class="network-item-remove" onclick="removeNetwork('${network.key}')" title="Remove">✕</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Get selected network keys as array (for form submission)
+ */
+function getSelectedNetworkKeys() {
+    return selectedNetworks.map(n => n.key);
+}
+
+/**
+ * Get selected network keys as JSON string (for backend compatibility)
+ */
+function getSelectedNetworksString() {
+    return JSON.stringify(selectedNetworks.map(n => n.key));
+}
+
+// Expose network functions to global scope
+window.addNetwork = addNetwork;
+window.removeNetwork = removeNetwork;
+window.moveNetworkUp = moveNetworkUp;
+window.moveNetworkDown = moveNetworkDown;
+window.getSelectedNetworkKeys = getSelectedNetworkKeys;
+window.getSelectedNetworksString = getSelectedNetworksString;
+
+// Initialize network search when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNetworkSearch);
+} else {
+    initNetworkSearch();
+}
+
+// ==================== END ION NETWORKS ====================
 
 // Expose critical functions to global scope for ionuploaderpro.js
 window.checkNextButton = checkNextButton;

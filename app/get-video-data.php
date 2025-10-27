@@ -143,6 +143,28 @@ foreach ($distributed_channels as $ch) {
 $channels_string = json_encode(array_values(array_unique($all_channels)));
 error_log("GET-VIDEO-DATA: Video ID $video_id_int has final channels array: " . $channels_string);
 
+// Fetch networks for this video (from IONVideoNetworks junction table)
+error_log("GET-VIDEO-DATA: Fetching networks for video_id: " . $video_id_int);
+
+$video_networks = $wpdb->get_results($wpdb->prepare(
+    "SELECT n.network_key, n.network_name, vn.priority 
+     FROM IONVideoNetworks vn
+     JOIN IONNetworks n ON vn.network_id = n.id
+     WHERE vn.video_id = %d
+     ORDER BY vn.priority ASC",
+    $video_id_int
+));
+
+error_log("GET-VIDEO-DATA: Found " . count($video_networks) . " networks");
+if (!empty($video_networks)) {
+    error_log("GET-VIDEO-DATA: Network data: " . json_encode($video_networks));
+}
+
+// Extract network keys (for frontend compatibility)
+$network_keys = array_map(function($n) { return $n->network_key; }, $video_networks);
+$networks_string = json_encode($network_keys);
+error_log("GET-VIDEO-DATA: Video ID $video_id_int has networks array: " . $networks_string);
+
 // Return video data in expected format
 echo json_encode([
     'success' => true,
@@ -154,6 +176,7 @@ echo json_encode([
         'tags' => $video->tags,
         'badges' => $badges_string,
         'channels' => $channels_string,
+        'networks' => $networks_string, // ION Networks associated with this video
         'visibility' => $video->visibility ?? 'public',
         'thumbnail' => $video->thumbnail,
         'video_link' => $video->video_link,

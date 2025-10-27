@@ -80,7 +80,7 @@
 .ion-login-subtitle {
     font-size: 16px;
     color: #cccccc;
-    margin-bottom: 60px;
+    margin-bottom: 30px;
     font-weight: 400;
 }
 
@@ -98,7 +98,16 @@
     font-family: system-ui, -apple-system, sans-serif;
 }
 
-.ion-login-google-btn {
+.ion-login-social-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.ion-login-google-btn,
+.ion-login-discord-btn {
     width: 100%;
     padding: 12px 24px;
     background: transparent;
@@ -115,7 +124,10 @@
     transition: all 0.2s ease;
 }
 
-.ion-login-google-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.ion-login-google-btn:hover,
+.ion-login-discord-btn:hover { 
+    background: rgba(255, 255, 255, 0.1); 
+}
 
 .ion-login-divider {
     display: flex;

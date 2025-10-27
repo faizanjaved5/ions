@@ -119,6 +119,39 @@ if ($is_viewer_logged_in) {
     }
 }
 
+// Pagination setup
+$videos_per_page = 24;
+$current_page = isset($_GET['page']) && is_numeric($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$offset = ($current_page - 1) * $videos_per_page;
+
+// Search filter
+$search_query = isset($_GET['q']) ? trim($_GET['q']) : '';
+$search_condition = '';
+$search_param = [];
+
+if (!empty($search_query)) {
+    $search_condition = " AND v.title LIKE :search";
+    $search_param[':search'] = '%' . $search_query . '%';
+}
+
+// Get total count for pagination
+$countSql = "SELECT COUNT(*) as total
+             FROM IONLocalVideos v
+             WHERE v.user_id = :uid
+               AND v.visibility = 'Public'
+               AND v.status = 'Approved'"
+               . $search_condition;
+
+$stmt = $pdo->prepare($countSql);
+$countParams = [':uid' => (int)$user['user_id']];
+if (!empty($search_query)) {
+    $countParams[':search'] = '%' . $search_query . '%';
+}
+$stmt->execute($countParams);
+$total_videos = (int)$stmt->fetchColumn();
+$total_pages = ceil($total_videos / $videos_per_page);
+
+// Fetch videos with pagination (use direct insertion for LIMIT/OFFSET since PDO doesn't handle them well with named params)
 $sqlVid = "SELECT v.id, v.slug, v.short_link, v.title, v.thumbnail, v.video_link, v.published_at, 
                   v.view_count, v.layout, v.source, v.status, v.visibility, v.videotype, v.video_id,
                   v.likes, v.dislikes,
@@ -127,18 +160,22 @@ $sqlVid = "SELECT v.id, v.slug, v.short_link, v.title, v.thumbnail, v.video_link
            " . ($is_viewer_logged_in ? "LEFT JOIN IONVideoLikes vl ON v.id = vl.video_id AND vl.user_id = :viewer_id" : "") . "
            WHERE v.user_id = :uid
              AND v.visibility = 'Public'
-             AND v.status = 'Approved'
+             AND v.status = 'Approved'"
+             . $search_condition . "
            ORDER BY COALESCE(v.published_at, v.date_added) DESC
-           LIMIT 100";
+           LIMIT " . (int)$videos_per_page . " OFFSET " . (int)$offset;
 
 // Debug logging
 error_log("PROFILE SQL: " . $sqlVid);
-error_log("PROFILE PARAMS: uid={$user['user_id']}, viewer_id=" . ($is_viewer_logged_in ? $current_user_id : 'NOT SET'));
+error_log("PROFILE PARAMS: uid={$user['user_id']}, page={$current_page}, search=" . ($search_query ?: 'NONE'));
 
 $stmt = $pdo->prepare($sqlVid);
-$params = [':uid' => (int)$user['user_id']]; // Ensure integer type
+$params = [':uid' => (int)$user['user_id']];
 if ($is_viewer_logged_in) {
-    $params[':viewer_id'] = (int)$current_user_id; // Ensure integer type
+    $params[':viewer_id'] = (int)$current_user_id;
+}
+if (!empty($search_query)) {
+    $params[':search'] = '%' . $search_query . '%';
 }
 $stmt->execute($params);
 $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -440,11 +477,166 @@ $version = '1.0.' . filemtime(__FILE__);
         body[data-layout="three-column"] .about {
             display: none !important;
         }
+        
+        /* Reduce avatar size on tablets */
+        .avatar {
+            width: 240px;
+            height: 240px;
+        }
+        
+        .header {
+            gap: 30px;
+        }
     }
+    
+    /* Tablet adjustments */
+    @media (max-width: 768px) {
+        .wrap {
+            padding: 24px 16px;
+        }
+        
+        .avatar {
+            width: 200px;
+            height: 200px;
+        }
+        
+        .name {
+            font-size: 24px;
+        }
+        
+        .bio {
+            font-size: 13px;
+        }
+    }
+    
+    /* Mobile adjustments */
     @media (max-width:640px){ 
-        .header{grid-template-columns:1fr;grid-auto-rows:auto} 
+        .header{
+            grid-template-columns:1fr;
+            grid-auto-rows:auto;
+            gap: 20px;
+        }
+        
         .topbar{justify-content:flex-start} 
-        .videos-section h2{margin:20px 0 8px 0;font-size:16px;}
+        
+        .videos-section h2{
+            margin:20px 0 8px 0;
+            font-size:16px;
+        }
+        
+        /* Mobile-friendly avatar */
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 12px;
+            margin: 0 auto;
+        }
+        
+        .left-column {
+            text-align: center;
+            align-items: center;
+        }
+        
+        .name {
+            font-size: 20px;
+        }
+        
+        .sub {
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .bio {
+            font-size: 13px;
+            text-align: left;
+            max-width: 100%;
+        }
+        
+        /* Mobile pagination improvements */
+        .pagination {
+            gap: 4px;
+            padding: 0 8px;
+        }
+        
+        .pagination .page-btn {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+            min-width: 36px !important;
+        }
+        
+        .pagination .page-btn:not(.active):not(.disabled) {
+            display: none;
+        }
+        
+        .pagination .page-btn.active,
+        .pagination span:contains('...'),
+        .pagination .page-btn:first-child,
+        .pagination .page-btn:last-child {
+            display: inline-flex !important;
+        }
+        
+        /* Show current page and navigation only on mobile */
+        .pagination a[href*='page=1'],
+        .pagination a[href*='page=' + currentPage],
+        .pagination span {
+            display: inline-flex !important;
+        }
+        
+        /* Search bar mobile adjustments */
+        .videos-section > div:first-child h2 {
+            font-size: 15px;
+        }
+        
+        .videos-section > div:first-child h2 span {
+            display: block;
+            margin-left: 0 !important;
+            margin-top: 4px;
+        }
+        
+        #video-search {
+            font-size: 14px;
+            padding: 10px 40px 10px 12px;
+        }
+        
+        /* Make grid single column on very small screens */
+        @media (max-width: 480px) {
+            .grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+        
+        /* Improve card spacing on mobile */
+        .card {
+            margin-bottom: 8px;
+        }
+        
+        .meta {
+            padding: 8px 10px;
+        }
+        
+        .title {
+            font-size: 13px;
+            line-height: 1.3;
+        }
+        
+        .row {
+            font-size: 11px;
+        }
+        
+        /* Reaction buttons mobile optimization */
+        .video-reactions.compact {
+            gap: 6px;
+        }
+        
+        .reaction-btn {
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+        
+        .reaction-btn svg {
+            width: 14px;
+            height: 14px;
+        }
     }
     a.card, a.title { text-decoration:none; }
     
@@ -508,6 +700,69 @@ $version = '1.0.' . filemtime(__FILE__);
         color: #475569 !important;
     }
     
+    /* Pagination Styles */
+    .pagination .page-btn:hover:not(.disabled):not(.active) {
+        background: var(--chip);
+        border-color: #3b82f6;
+        color: #3b82f6;
+    }
+    
+    .pagination .page-btn.active {
+        cursor: default;
+    }
+    
+    /* Search Box Focus State */
+    #video-search:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* AJAX Loading States */
+    .grid {
+        transition: opacity 0.2s ease;
+    }
+    
+    #video-search {
+        transition: opacity 0.2s ease;
+    }
+    
+    /* Loading spinner for search input */
+    #video-search.loading {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='%233b82f6' d='M12,1A11,11,0,1,0,23,12,11,11,0,0,0,12,1Zm0,19a8,8,0,1,1,8-8A8,8,0,0,1,12,20Z' opacity='.25'/%3E%3Cpath fill='%233b82f6' d='M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z'%3E%3CanimateTransform attributeName='transform' type='rotate' dur='0.75s' values='0 12 12;360 12 12' repeatCount='indefinite'/%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        background-size: 18px;
+    }
+    
+    /* Smooth fade for video cards */
+    .grid .card {
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* Mobile Responsive Adjustments for Search */
+    @media (max-width: 640px) {
+        .videos-section > div:first-child {
+            flex-direction: column;
+            align-items: stretch !important;
+        }
+        
+        .videos-section form {
+            max-width: 100% !important;
+        }
+    }
+    
     /* Dark Mode: Ensure proper contrast - FROM ionprofile1.php */
     body[data-theme="dark"] {
         background: #0f1216 !important;
@@ -561,292 +816,11 @@ $version = '1.0.' . filemtime(__FILE__);
         }
     }
 </style>
-
-<!-- Theme Switcher & Layout Toggle JavaScript -->
-<script>
-    // VERSION: <?= $version ?>
-    console.log('🔄 ION Profile - Version: <?= $version ?>');
-    console.log('🎨 Initial theme from PHP: <?= $theme ?>');
-    
-    // Initialize theme from session/cookie/query
-    let currentTheme = '<?= $theme ?>';
-    
-    // Initialize layout from localStorage (default: stacked)
-    let currentLayout = localStorage.getItem('profile-layout') || 'stacked';
-    console.log('📐 Initial layout:', currentLayout);
-    
-    // Apply initial layout
-    document.body.setAttribute('data-layout', currentLayout === 'three-column' ? 'three-column' : 'stacked');
-    console.log('✅ Body data-theme attribute set to:', document.body.getAttribute('data-theme'));
-    console.log('✅ Body data-layout attribute set to:', document.body.getAttribute('data-layout'));
-    
-    // Toggle theme function
-    function toggleTheme() {
-        console.log('🎨 toggleTheme() called');
-        console.log('   Current theme BEFORE toggle:', currentTheme);
-        
-        // Toggle between light and dark
-        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        console.log('   New theme AFTER toggle:', currentTheme);
-        
-        // Update body data-theme attribute
-        document.body.setAttribute('data-theme', currentTheme);
-        console.log('   Body data-theme attribute updated to:', document.body.getAttribute('data-theme'));
-        
-        // Debug: Check CSS variable values
-        const bodyStyles = window.getComputedStyle(document.body);
-        const bgColor = bodyStyles.getPropertyValue('--bg');
-        const textColor = bodyStyles.getPropertyValue('--text');
-        console.log('   CSS Variables after toggle:');
-        console.log('     --bg:', bgColor);
-        console.log('     --text:', textColor);
-        console.log('     background-color:', bodyStyles.backgroundColor);
-        
-        // Update theme icon in navbar
-        if (typeof window.updateThemeIcon === 'function') {
-            window.updateThemeIcon();
-        }
-        
-        // Save preference to cookie
-        document.cookie = `theme=${currentTheme}; path=/; max-age=31536000`; // 1 year
-        console.log('   Theme saved to cookie');
-        
-        // Optional: Save to session via AJAX
-        fetch('/api/set-theme.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ theme: currentTheme })
-        }).then(() => console.log('   Theme saved to server'))
-        .catch(err => console.warn('   Theme save to server failed:', err));
-    }
-    
-    // Toggle layout function
-    function toggleLayout() {
-        // Toggle between stacked and three-column
-        currentLayout = currentLayout === 'stacked' ? 'three-column' : 'stacked';
-        
-        // Update body data-layout attribute
-        document.body.setAttribute('data-layout', currentLayout);
-        
-        // Move about card to appropriate position
-        const aboutCard = document.querySelector('.about');
-        const header = document.querySelector('.header');
-        const leftColumn = document.querySelector('.left-column');
-        
-        if (currentLayout === 'three-column') {
-            // Move about card to be direct child of header (third column)
-            if (aboutCard && header && aboutCard.parentElement !== header) {
-                header.appendChild(aboutCard);
-            }
-        } else {
-            // Move about card back to left column
-            if (aboutCard && leftColumn && aboutCard.parentElement !== leftColumn) {
-                leftColumn.appendChild(aboutCard);
-            }
-        }
-        
-        // Save preference to localStorage
-        localStorage.setItem('profile-layout', currentLayout);
-        
-        console.log('Layout switched to:', currentLayout);
-    }
-    
-    // Expose globally for navbar/other components
-    window.toggleTheme = toggleTheme;
-    window.IONToggleTheme = toggleTheme; // Alternative name
-    window.switchTheme = toggleTheme; // Another alternative
-    window.toggleLayout = toggleLayout;
-    window.IONToggleLayout = toggleLayout;
-    
-    // Also expose on document for easy access
-    document.toggleTheme = toggleTheme;
-    document.toggleLayout = toggleLayout;
-    
-    // Debug helper function
-    window.debugTheme = function() {
-        console.log('=== THEME DEBUG INFO ===');
-        console.log('Version: <?= $version ?>');
-        console.log('Current theme:', currentTheme);
-        console.log('Body data-theme:', document.body.getAttribute('data-theme'));
-        console.log('Body data-layout:', document.body.getAttribute('data-layout'));
-        
-        const bodyStyles = window.getComputedStyle(document.body);
-        console.log('CSS Variables:');
-        console.log('  --bg:', bodyStyles.getPropertyValue('--bg'));
-        console.log('  --panel:', bodyStyles.getPropertyValue('--panel'));
-        console.log('  --text:', bodyStyles.getPropertyValue('--text'));
-        console.log('  --muted:', bodyStyles.getPropertyValue('--muted'));
-        console.log('Computed styles:');
-        console.log('  background-color:', bodyStyles.backgroundColor);
-        console.log('  color:', bodyStyles.color);
-        
-        // Check if CSS rules exist
-        const styleSheets = Array.from(document.styleSheets);
-        const hasLightMode = styleSheets.some(sheet => {
-            try {
-                const rules = Array.from(sheet.cssRules || []);
-                return rules.some(rule => 
-                    rule.selectorText && rule.selectorText.includes('data-theme="light"')
-                );
-            } catch(e) {
-                return false;
-            }
-        });
-        console.log('Light mode CSS rules found:', hasLightMode);
-        console.log('======================');
-    };
-    
-    // Initialize layout on page load (move about card if needed)
-    document.addEventListener('DOMContentLoaded', function() {
-        const aboutCard = document.querySelector('.about');
-        const header = document.querySelector('.header');
-        const leftColumn = document.querySelector('.left-column');
-        
-        if (currentLayout === 'three-column') {
-            // Move about card to header (third column)
-            if (aboutCard && header && aboutCard.parentElement !== header) {
-                header.appendChild(aboutCard);
-            }
-        }
-    });
-    
-    // Watch for theme changes made by other systems (like navbar)
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
-                const newTheme = document.body.getAttribute('data-theme');
-                if (newTheme && newTheme !== currentTheme) {
-                    currentTheme = newTheme;
-                }
-            }
-            
-            // Auto-correct if background doesn't match theme
-            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                const bgColor = window.getComputedStyle(document.body).backgroundColor;
-                const rgb = bgColor.match(/\d+/g);
-                if (rgb) {
-                    const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
-                    
-                    if (brightness > 128 && currentTheme === 'dark') {
-                        currentTheme = 'light';
-                        document.body.setAttribute('data-theme', 'light');
-                    } else if (brightness <= 128 && currentTheme === 'light') {
-                        currentTheme = 'dark';
-                        document.body.setAttribute('data-theme', 'dark');
-                    }
-                }
-            }
-        });
-    });
-    
-    // Start observing
-    observer.observe(document.body, { 
-        attributes: true, 
-        attributeFilter: ['data-theme', 'style', 'class'] 
-    });
-</script>
 </head>
-<body data-theme="<?= $theme ?>">
+<body>
 
-<!-- ION Navbar Embed: fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-<link rel="preload" as="style" href="/menu/ion-navbar.css">
-
-<!-- ION Navbar (React component loaded via JavaScript) -->
-<div id="ion-navbar-root"></div>
-
-<!-- ION Navbar Embed: script setup -->
-<script>
-    // Minimal globals expected by some libraries
-    window.process = window.process || {
-        env: {
-            NODE_ENV: 'production'
-        }
-    };
-    window.global = window.global || window;
-</script>
-<script src="/menu/ion-navbar.iife.js"></script>
-<script>
-    (function() {
-        if (window.IONNavbar && typeof window.IONNavbar.mount === 'function') {
-            window.IONNavbar.mount('#ion-navbar-root', {
-                useShadowDom: true,
-                cssHref: '/menu/ion-navbar.css'
-            });
-        }
-        
-        // WORKAROUND: Add theme & layout toggle buttons to navbar after it loads
-        setTimeout(() => {
-            const navbar = document.getElementById('ion-navbar-root');
-            if (navbar) {
-                // Remove white border line from navbar (check both shadow DOM and regular DOM)
-                try {
-                    // Try to access shadow root
-                    if (navbar.shadowRoot) {
-                        const style = document.createElement('style');
-                        style.textContent = `
-                            * { border-top: none !important; border-bottom: none !important; }
-                            nav { border-top: none !important; border-bottom: none !important; }
-                            header { border-top: none !important; border-bottom: none !important; }
-                        `;
-                        navbar.shadowRoot.appendChild(style);
-                    }
-                    // Also remove from regular elements
-                    navbar.style.borderTop = 'none';
-                    navbar.style.borderBottom = 'none';
-                } catch (e) {
-                    console.log('Could not remove navbar border:', e);
-                }
-                
-                // Check if navbar already has theme toggle
-                const existingToggle = navbar.querySelector('[aria-label*="theme" i], [onclick*="theme" i]');
-                if (!existingToggle) {
-                    // Create a theme toggle button
-                    const themeBtn = document.createElement('button');
-                    themeBtn.setAttribute('aria-label', 'Toggle theme');
-                    themeBtn.innerHTML = `
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="5"></circle>
-                            <line x1="12" y1="1" x2="12" y2="3"></line>
-                            <line x1="12" y1="21" x2="12" y2="23"></line>
-                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                            <line x1="1" y1="12" x2="3" y2="12"></line>
-                            <line x1="21" y1="12" x2="23" y2="12"></line>
-                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                        </svg>
-                    `;
-                    themeBtn.onclick = window.toggleTheme;
-                    themeBtn.style.cssText = 'position: fixed; top: 15px; right: 5px; z-index: 10001; background: transparent; border: none; color: #f59e0b; cursor: pointer; padding: 8px; display: flex; align-items: center; transition: transform 0.2s;';
-                    themeBtn.onmouseover = () => themeBtn.style.transform = 'scale(1.1)';
-                    themeBtn.onmouseout = () => themeBtn.style.transform = 'scale(1)';
-                    themeBtn.title = 'Toggle light/dark theme';
-                    document.body.appendChild(themeBtn);
-                    
-                    // Create layout toggle button
-                    const layoutBtn = document.createElement('button');
-                    layoutBtn.setAttribute('aria-label', 'Toggle layout');
-                    layoutBtn.innerHTML = `
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="9" y1="3" x2="9" y2="21"></line>
-                            <line x1="15" y1="3" x2="15" y2="21"></line>
-                        </svg>
-                    `;
-                    layoutBtn.onclick = window.toggleLayout;
-                    layoutBtn.style.cssText = 'position: fixed; top: 15px; right: 45px; z-index: 10001; background: transparent; border: none; color: #3b82f6; cursor: pointer; padding: 8px; display: flex; align-items: center; transition: transform 0.2s;';
-                    layoutBtn.onmouseover = () => layoutBtn.style.transform = 'scale(1.1)';
-                    layoutBtn.onmouseout = () => layoutBtn.style.transform = 'scale(1)';
-                    layoutBtn.title = 'Toggle profile layout (2 or 3 columns)';
-                    document.body.appendChild(layoutBtn);
-                }
-            }
-        }, 1000); // Wait for navbar to fully load
-    })();
-</script>
+<?php $ION_NAVBAR_BASE_URL = '/menu/'; ?>
+<?php require_once $root . '/menu/ion-navbar-embed.php'; ?>
 
 <div class="wrap">
 
@@ -889,7 +863,7 @@ $version = '1.0.' . filemtime(__FILE__);
 
     <?php
     // Include and render ION Featured Videos carousel for this profile
-    $carousel_path = $root . '/includes/featured-videos.php';
+    $carousel_path = $root . '/includes/featuredvideos.php';
     if (file_exists($carousel_path)) {
         require_once $carousel_path;
         renderFeaturedVideosCarousel($pdo, 'profile', $user['user_id']);
@@ -899,12 +873,35 @@ $version = '1.0.' . filemtime(__FILE__);
     ?>
 
     <div class="videos-section">
-        <h2 style="margin:26px 0 8px 0;font-size:16px;">
-            Videos
-            <?php if (count($videos) > 1): ?>
-                <span class="scroll-hint" style="display:none;font-size:12px;color:var(--muted);font-weight:400;margin-left:8px;">← Scroll to see more →</span>
-            <?php endif; ?>
-        </h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:26px 0 16px 0;gap:16px;flex-wrap:wrap;">
+            <h2 style="margin:0;font-size:16px;">
+                Videos
+                <?php if ($total_videos > 0): ?>
+                    <span style="font-size:12px;color:var(--muted);font-weight:400;margin-left:8px;">(<?php echo number_format($total_videos); ?> total)</span>
+                <?php endif; ?>
+            </h2>
+            
+            <!-- Search Box -->
+            <form method="GET" action="" style="display:flex;gap:8px;align-items:center;flex:1;max-width:400px;">
+                <input type="hidden" name="handle" value="<?php echo h($handle); ?>">
+                <div style="position:relative;flex:1;">
+                    <input 
+                        type="search" 
+                        name="q" 
+                        id="video-search"
+                        value="<?php echo h($search_query); ?>" 
+                        placeholder="Search videos..."
+                        style="width:100%;padding:8px 36px 8px 12px;background:var(--panel);border:1px solid var(--ring);border-radius:8px;color:var(--text);font-size:13px;"
+                    >
+                    <svg style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--muted);pointer-events:none;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <?php if (!empty($search_query)): ?>
+                    <a href="?handle=<?php echo urlencode($handle); ?>" style="padding:8px 12px;background:var(--chip);border:1px solid var(--ring);border-radius:6px;color:var(--muted);text-decoration:none;font-size:13px;white-space:nowrap;">Clear</a>
+                <?php endif; ?>
+            </form>
+        </div>
 
         <section class="grid">
         <?php if (!$videos): ?>
@@ -971,26 +968,26 @@ $version = '1.0.' . filemtime(__FILE__);
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
                             </svg>
-                            <span class="like-count"><?php echo ($v['likes'] ?? 0) > 0 ? number_format($v['likes']) : ''; ?></span>
+                            <span class="like-count"><?php echo (int)($v['likes'] ?? 0) > 0 ? number_format((int)$v['likes']) : ''; ?></span>
                         </button>
                         <button class="reaction-btn dislike-btn" title="Dislike this video">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
                             </svg>
-                            <span class="dislike-count"><?php echo ($v['dislikes'] ?? 0) > 0 ? number_format($v['dislikes']) : ''; ?></span>
+                            <span class="dislike-count"><?php echo (int)($v['dislikes'] ?? 0) > 0 ? number_format((int)$v['dislikes']) : ''; ?></span>
                         </button>
                     <?php else: ?>
                         <button class="reaction-btn like-btn" title="Login to like this video" onclick="showLoginModal()">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
                             </svg>
-                            <span class="like-count"><?php echo ($v['likes'] ?? 0) > 0 ? number_format($v['likes']) : ''; ?></span>
+                            <span class="like-count"><?php echo (int)($v['likes'] ?? 0) > 0 ? number_format((int)$v['likes']) : ''; ?></span>
                         </button>
                         <button class="reaction-btn dislike-btn" title="Login to dislike this video" onclick="showLoginModal()">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                 <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path>
                             </svg>
-                            <span class="dislike-count"><?php echo ($v['dislikes'] ?? 0) > 0 ? number_format($v['dislikes']) : ''; ?></span>
+                            <span class="dislike-count"><?php echo (int)($v['dislikes'] ?? 0) > 0 ? number_format((int)$v['dislikes']) : ''; ?></span>
                         </button>
                     <?php endif; ?>
                     <div class="reaction-feedback"></div>
@@ -1007,6 +1004,98 @@ $version = '1.0.' . filemtime(__FILE__);
         </div>
         <?php endforeach; endif; ?>
         </section>
+        
+        <!-- Pagination Controls -->
+        <?php if ($total_pages > 1): ?>
+        <div class="pagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:32px;flex-wrap:wrap;">
+            <?php
+            // Build base URL for pagination
+            $base_url = '?handle=' . urlencode($handle);
+            if (!empty($search_query)) {
+                $base_url .= '&q=' . urlencode($search_query);
+            }
+            
+            // Previous button
+            if ($current_page > 1):
+            ?>
+                <a href="<?php echo $base_url . '&page=' . ($current_page - 1); ?>" 
+                   class="page-btn" 
+                   style="padding:8px 12px;background:var(--panel);border:1px solid var(--ring);border-radius:6px;color:var(--text);text-decoration:none;font-size:13px;transition:all 0.2s;">
+                    ← Previous
+                </a>
+            <?php else: ?>
+                <span class="page-btn disabled" 
+                      style="padding:8px 12px;background:var(--chip);border:1px solid var(--ring);border-radius:6px;color:var(--muted);font-size:13px;cursor:not-allowed;">
+                    ← Previous
+                </span>
+            <?php endif; ?>
+            
+            <?php
+            // Page numbers with smart truncation
+            $page_range = 2; // Show 2 pages on each side of current
+            $start_page = max(1, $current_page - $page_range);
+            $end_page = min($total_pages, $current_page + $page_range);
+            
+            // Always show first page
+            if ($start_page > 1):
+            ?>
+                <a href="<?php echo $base_url . '&page=1'; ?>" 
+                   class="page-btn" 
+                   style="padding:8px 12px;background:var(--panel);border:1px solid var(--ring);border-radius:6px;color:var(--text);text-decoration:none;font-size:13px;min-width:40px;text-align:center;transition:all 0.2s;">
+                    1
+                </a>
+                <?php if ($start_page > 2): ?>
+                    <span style="color:var(--muted);">...</span>
+                <?php endif; ?>
+            <?php endif; ?>
+            
+            <?php
+            // Page numbers
+            for ($page = $start_page; $page <= $end_page; $page++):
+                if ($page == $current_page):
+            ?>
+                    <span class="page-btn active" 
+                          style="padding:8px 12px;background:#3b82f6;border:1px solid #3b82f6;border-radius:6px;color:white;font-size:13px;font-weight:600;min-width:40px;text-align:center;">
+                        <?php echo $page; ?>
+                    </span>
+                <?php else: ?>
+                    <a href="<?php echo $base_url . '&page=' . $page; ?>" 
+                       class="page-btn" 
+                       style="padding:8px 12px;background:var(--panel);border:1px solid var(--ring);border-radius:6px;color:var(--text);text-decoration:none;font-size:13px;min-width:40px;text-align:center;transition:all 0.2s;">
+                        <?php echo $page; ?>
+                    </a>
+                <?php endif; ?>
+            <?php endfor; ?>
+            
+            <?php
+            // Always show last page
+            if ($end_page < $total_pages):
+                if ($end_page < $total_pages - 1):
+            ?>
+                    <span style="color:var(--muted);">...</span>
+                <?php endif; ?>
+                <a href="<?php echo $base_url . '&page=' . $total_pages; ?>" 
+                   class="page-btn" 
+                   style="padding:8px 12px;background:var(--panel);border:1px solid var(--ring);border-radius:6px;color:var(--text);text-decoration:none;font-size:13px;min-width:40px;text-align:center;transition:all 0.2s;">
+                    <?php echo $total_pages; ?>
+                </a>
+            <?php endif; ?>
+            
+            <!-- Next button -->
+            <?php if ($current_page < $total_pages): ?>
+                <a href="<?php echo $base_url . '&page=' . ($current_page + 1); ?>" 
+                   class="page-btn" 
+                   style="padding:8px 12px;background:var(--panel);border:1px solid var(--ring);border-radius:6px;color:var(--text);text-decoration:none;font-size:13px;transition:all 0.2s;">
+                    Next →
+                </a>
+            <?php else: ?>
+                <span class="page-btn disabled" 
+                      style="padding:8px 12px;background:var(--chip);border:1px solid var(--ring);border-radius:6px;color:var(--muted);font-size:13px;cursor:not-allowed;">
+                    Next →
+                </span>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -1243,6 +1332,248 @@ function initializeVideoHoverPreviews() {
     });
 }
 </script>
+
+<!-- Profile Search Functionality - AJAX Version -->
+<script>
+// Mobile pagination optimization (global function)
+function optimizeMobilePagination() {
+    if (window.innerWidth <= 640) {
+        const pagination = document.querySelector('.pagination');
+        if (!pagination) return;
+        
+        const currentPageBtn = pagination.querySelector('.page-btn.active');
+        if (!currentPageBtn) return;
+        
+        // Hide all middle page numbers on mobile except current page
+        const allPageBtns = pagination.querySelectorAll('.page-btn:not(:first-child):not(:last-child)');
+        allPageBtns.forEach(btn => {
+            if (!btn.classList.contains('active') && !btn.textContent.includes('Previous') && !btn.textContent.includes('Next')) {
+                btn.style.display = 'none';
+            }
+        });
+        
+        // Show current page and immediate neighbors if they exist
+        if (currentPageBtn.previousElementSibling && !currentPageBtn.previousElementSibling.textContent.includes('Previous')) {
+            currentPageBtn.previousElementSibling.style.display = 'inline-flex';
+        }
+        if (currentPageBtn.nextElementSibling && !currentPageBtn.nextElementSibling.textContent.includes('Next')) {
+            currentPageBtn.nextElementSibling.style.display = 'inline-flex';
+        }
+        
+        console.log('📱 Mobile pagination optimized');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('video-search');
+    const searchForm = searchInput?.closest('form');
+    const videoGrid = document.querySelector('.grid');
+    const videosSection = document.querySelector('.videos-section');
+    const handle = '<?php echo addslashes($handle); ?>';
+    
+    if (!searchInput || !searchForm || !videoGrid) return;
+    
+    let searchTimeout;
+    const DEBOUNCE_DELAY = 500; // 500ms delay before auto-search
+    let currentPage = <?php echo $current_page; ?>;
+    let isLoading = false;
+    
+    // Prevent default form submission
+    searchForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+    });
+    
+    // AJAX search function
+    function performSearch(query, page = 1) {
+        if (isLoading) return;
+        
+        isLoading = true;
+        query = query.trim();
+        
+        console.log('🔍 AJAX Search:', query, 'Page:', page);
+        
+        // Show loading state
+        searchInput.classList.add('loading');
+        videoGrid.style.opacity = '0.5';
+        videoGrid.style.pointerEvents = 'none';
+        
+        // Build URL
+        const url = new URL(window.location.href);
+        url.searchParams.set('handle', handle);
+        url.searchParams.set('ajax', '1');
+        if (query) {
+            url.searchParams.set('q', query);
+        } else {
+            url.searchParams.delete('q');
+        }
+        url.searchParams.set('page', page);
+        
+        // Fetch results
+        fetch(url.toString())
+            .then(response => response.text())
+            .then(html => {
+                // Parse the response
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Extract new video grid
+                const newGrid = doc.querySelector('.grid');
+                const newPagination = doc.querySelector('.pagination');
+                const newVideoCount = doc.querySelector('.videos-section h2 span');
+                
+                if (newGrid) {
+                    videoGrid.innerHTML = newGrid.innerHTML;
+                    
+                    // Update pagination
+                    const existingPagination = document.querySelector('.pagination');
+                    if (newPagination && existingPagination) {
+                        existingPagination.replaceWith(newPagination);
+                        attachPaginationListeners();
+                    } else if (!newPagination && existingPagination) {
+                        existingPagination.remove();
+                    } else if (newPagination && !existingPagination) {
+                        videosSection.appendChild(newPagination);
+                        attachPaginationListeners();
+                    }
+                    
+                    // Update video count
+                    const countSpan = document.querySelector('.videos-section h2 span');
+                    if (newVideoCount && countSpan) {
+                        countSpan.textContent = newVideoCount.textContent;
+                    }
+                    
+                    // Update URL without reload
+                    const newUrl = new URL(window.location.href);
+                    if (query) {
+                        newUrl.searchParams.set('q', query);
+                    } else {
+                        newUrl.searchParams.delete('q');
+                    }
+                    newUrl.searchParams.set('page', page);
+                    window.history.pushState({}, '', newUrl);
+                    
+                    // Reinitialize video features after DOM update
+                    setTimeout(() => {
+                        // Reinitialize video hover previews
+                        initializeVideoHoverPreviews();
+                        
+                        // CRITICAL: Reinitialize video reactions (like/dislike buttons)
+                        if (typeof window.videoReactions !== 'undefined' && window.videoReactions.initAll) {
+                            console.log('🔄 Reinitializing video reactions...');
+                            window.videoReactions.initAll();
+                        } else {
+                            console.warn('⚠️ videoReactions not found - buttons may not work');
+                        }
+                        
+                        // Enhanced share buttons use inline onclick handlers, so they should work automatically
+                        // But we can ensure the global modal is ready
+                        if (typeof window.EnhancedIONShare !== 'undefined') {
+                            console.log('✅ Enhanced share system ready');
+                        }
+                        
+                        // Optimize mobile pagination after AJAX update
+                        optimizeMobilePagination();
+                        
+                        console.log('✅ Search results updated with all features reinitialized');
+                    }, 50); // Small delay to ensure DOM is fully rendered
+                }
+                
+                // Reset loading state
+                searchInput.classList.remove('loading');
+                videoGrid.style.opacity = '1';
+                videoGrid.style.pointerEvents = 'auto';
+                isLoading = false;
+                currentPage = page;
+            })
+            .catch(error => {
+                console.error('❌ Search error:', error);
+                searchInput.classList.remove('loading');
+                videoGrid.style.opacity = '1';
+                videoGrid.style.pointerEvents = 'auto';
+                isLoading = false;
+            });
+    }
+    
+    // Auto-search with debouncing
+    searchInput.addEventListener('input', function(e) {
+        const query = e.target.value;
+        
+        // Clear existing timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        
+        // Debounce: Wait for user to stop typing
+        searchTimeout = setTimeout(() => {
+            performSearch(query, 1);
+        }, DEBOUNCE_DELAY);
+    });
+    
+    // Handle Enter key press
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            
+            // Clear debounce timeout
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            // Search immediately
+            performSearch(e.target.value, 1);
+        }
+    });
+    
+    // Attach pagination click handlers
+    function attachPaginationListeners() {
+        const paginationLinks = document.querySelectorAll('.pagination a.page-btn');
+        paginationLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Extract page number from URL
+                const url = new URL(this.href);
+                const page = parseInt(url.searchParams.get('page')) || 1;
+                const query = searchInput.value;
+                
+                // Perform AJAX search with new page
+                performSearch(query, page);
+                
+                // Smooth scroll to videos section
+                videosSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+    }
+    
+    // Initial pagination listeners
+    attachPaginationListeners();
+    
+    // Handle clear button click
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('a[href*="handle="]') && e.target.textContent.includes('Clear')) {
+            e.preventDefault();
+            searchInput.value = '';
+            performSearch('', 1);
+        }
+    });
+    
+    console.log('✅ Profile AJAX search initialized');
+    
+    // Run mobile pagination optimization on load and resize
+    optimizeMobilePagination();
+    window.addEventListener('resize', optimizeMobilePagination);
+});
+</script>
+
+<?php
+// Include the ION Footer
+$footer_path = $root . '/includes/ionfooter.php';
+if (file_exists($footer_path)) {
+    require $footer_path;
+} else {
+    echo '<div class="footer"><p><font color=#ff0000">&copy; ' . date('Y') . ' ION Local Network.</font></p></div>';
+}
+?>
 
 <!-- Pollybot Chatbot Widget -->
 <script 

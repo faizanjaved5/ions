@@ -1017,6 +1017,8 @@ $uploader_filter = isset($_GET['uploader']) ? $_GET['uploader'] : '';
 $type_filter = isset($_GET['type']) ? $_GET['type'] : '';
 $source_filter = $_GET['source'] ?? '';
 $category_filter = $_GET['category'] ?? '';
+$category_filter_breadcrumb = $_GET['category_filter'] ?? ''; // From breadcrumb click
+$network_filter = $_GET['network_filter'] ?? ''; // From breadcrumb click
 $date_from = $_GET['date_from'] ?? '';
 $date_to = $_GET['date_to'] ?? '';
 $date_field = $_GET['date_field'] ?? '';
@@ -1119,10 +1121,27 @@ if (!empty($source_filter)) {
     $params[] = $source_filter;
 }
 
-// Category filter
+// Category filter (from dropdown)
 if (!empty($category_filter)) {
     $where_conditions[] = "v.category = %s";
     $params[] = $category_filter;
+}
+
+// Category filter (from breadcrumb click)
+if (!empty($category_filter_breadcrumb)) {
+    $where_conditions[] = "v.category = %s";
+    $params[] = $category_filter_breadcrumb;
+}
+
+// Network filter (from breadcrumb click)
+if (!empty($network_filter)) {
+    // Join with IONVideoNetworks to filter by network
+    $where_conditions[] = "EXISTS (
+        SELECT 1 FROM IONVideoNetworks vn
+        JOIN IONNetworks n ON vn.network_id = n.id
+        WHERE vn.video_id = v.id AND n.network_key = %s
+    )";
+    $params[] = $network_filter;
 }
 
 // Status filter
@@ -1253,6 +1272,92 @@ if (!empty($params)) {
 // VERIFICATION: Log the actual result for confirmation
 error_log("FINAL RESULT: Found " . count($user_videos ?? []) . " videos for role: " . $user_role);
 
+// Helper function to get video breadcrumb (Category | Featured Network, Channels)
+function getVideoBreadcrumb($video_id, $category) {
+    global $wpdb;
+    
+    $breadcrumb = [];
+    
+    // Store category data
+    $breadcrumb['category'] = $category;
+    $breadcrumb['category_display'] = $category ? 'ION ' . $category : '';
+    
+    // Get featured network (first network by priority) with network_key
+    $featured_network = $wpdb->get_row($wpdb->prepare(
+        "SELECT n.network_name, n.network_key
+         FROM IONVideoNetworks vn
+         JOIN IONNetworks n ON vn.network_id = n.id
+         WHERE vn.video_id = %d
+         ORDER BY vn.priority ASC
+         LIMIT 1",
+        $video_id
+    ));
+    
+    // Store network data
+    if ($featured_network && !empty($featured_network->network_name)) {
+        $breadcrumb['network'] = $featured_network->network_name;
+        $breadcrumb['network_key'] = $featured_network->network_key;
+    } else {
+        $breadcrumb['network'] = '';
+        $breadcrumb['network_key'] = '';
+    }
+    
+    // Build first line: ION Category | Featured Network
+    if (!empty($breadcrumb['network'])) {
+        $breadcrumb['line1'] = $breadcrumb['category_display'] . ' | ' . $breadcrumb['network'];
+    } else {
+        $breadcrumb['line1'] = $breadcrumb['category_display'];
+    }
+    
+    // Get channels from IONLocalBlast (distributed channels)
+    $distributed_channels = $wpdb->get_results($wpdb->prepare(
+        "SELECT DISTINCT lb.channel_slug, ln.name as channel_name
+         FROM IONLocalBlast lb
+         LEFT JOIN IONLocalNetwork ln ON lb.channel_slug = ln.slug
+         WHERE lb.video_id = %d AND lb.status = 'active'
+         ORDER BY lb.id ASC",
+        $video_id
+    ));
+    
+    // Get primary channel from IONLocalVideos
+    $video = $wpdb->get_row($wpdb->prepare(
+        "SELECT v.slug, ln.name as channel_name
+         FROM IONLocalVideos v
+         LEFT JOIN IONLocalNetwork ln ON v.slug = ln.slug
+         WHERE v.id = %d",
+        $video_id
+    ));
+    
+    $channels = [];
+    
+    // Add primary channel first
+    if ($video && !empty($video->channel_name)) {
+        $channels[] = $video->channel_name;
+    }
+    
+    // Add distributed channels
+    foreach ($distributed_channels as $ch) {
+        if (!empty($ch->channel_name) && !in_array($ch->channel_name, $channels)) {
+            $channels[] = $ch->channel_name;
+        }
+    }
+    
+    // Build second line: ION Channels
+    if (count($channels) > 0) {
+        if (count($channels) <= 2) {
+            $breadcrumb['line2'] = implode(', ', $channels);
+        } else {
+            $displayed = array_slice($channels, 0, 2);
+            $remaining = count($channels) - 2;
+            $breadcrumb['line2'] = implode(', ', $displayed) . ' (and ' . $remaining . ' other' . ($remaining > 1 ? 's' : '') . ')';
+        }
+    } else {
+        $breadcrumb['line2'] = '';
+    }
+    
+    return $breadcrumb;
+}
+
 // DEBUG: Check for videos with different upload_status values
 $upload_status_debug = $wpdb->get_results("SELECT upload_status, COUNT(*) as count FROM IONLocalVideos GROUP BY upload_status");
 if ($upload_status_debug) {
@@ -1346,6 +1451,76 @@ error_log("User: $user_email (UID: $user_unique_id), Role: $user_role, Videos: "
     .reaction-btn:hover {
         opacity: 0.8;
         transform: translateY(-1px);
+    }
+    
+    /* Video Breadcrumb Styles */
+    .video-breadcrumb,
+    .table-video-breadcrumb {
+        opacity: 0;
+        max-height: 0;
+        overflow: hidden;
+        transition: opacity 0.2s ease, max-height 0.2s ease;
+        margin-bottom: 0;
+    }
+    
+    .carousel-item:hover .video-breadcrumb,
+    .videos-table tbody tr:hover .table-video-breadcrumb {
+        opacity: 1;
+        max-height: 60px;
+        margin-bottom: 8px;
+    }
+    
+    .breadcrumb-line1 {
+        font-size: 12px;
+        font-weight: 600;
+        color: #3b82f6;
+        margin-bottom: 3px;
+        line-height: 1.2;
+    }
+    
+    .breadcrumb-line2 {
+        font-size: 11px;
+        font-weight: 500;
+        color: #64748b;
+        line-height: 1.2;
+    }
+    
+    .video-breadcrumb a:hover .breadcrumb-line1,
+    .table-video-breadcrumb a:hover .breadcrumb-line1 {
+        color: #2563eb;
+    }
+    
+    .video-breadcrumb a:hover .breadcrumb-line2,
+    .table-video-breadcrumb a:hover .breadcrumb-line2 {
+        color: #475569;
+    }
+    
+    /* Breadcrumb Node Clickable Styles */
+    .breadcrumb-node {
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+    
+    .breadcrumb-node:hover {
+        background: rgba(59, 130, 246, 0.15);
+        color: #2563eb !important;
+    }
+    
+    .breadcrumb-separator {
+        color: #64748b;
+        padding: 0 4px;
+        pointer-events: none;
+    }
+    
+    .breadcrumb-category:hover {
+        background: rgba(59, 130, 246, 0.15);
+    }
+    
+    .breadcrumb-network:hover {
+        background: rgba(147, 51, 234, 0.15);
+        color: #9333ea !important;
     }
     </style>
     <style>
@@ -2384,6 +2559,29 @@ include 'headers.php';
             <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0; font-size: 0.85rem; white-space: nowrap;">
                 <?= $pagination_text ?>
             </p>
+            <?php if (!empty($category_filter_breadcrumb) || !empty($network_filter)): ?>
+                <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                    <?php if (!empty($category_filter_breadcrumb)): ?>
+                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                            📁 ION <?= htmlspecialchars($category_filter_breadcrumb, ENT_QUOTES, 'UTF-8') ?>
+                            <a href="creators.php" style="color: inherit; text-decoration: none; margin-left: 4px; opacity: 0.8; hover: opacity: 1;" title="Clear filter">✕</a>
+                        </span>
+                    <?php endif; ?>
+                    <?php if (!empty($network_filter)): ?>
+                        <?php 
+                        // Get network name for display
+                        $network_display = $wpdb->get_var($wpdb->prepare(
+                            "SELECT network_name FROM IONNetworks WHERE network_key = %s LIMIT 1",
+                            $network_filter
+                        ));
+                        ?>
+                        <span style="display: inline-flex; align-items: center; gap: 0.25rem; background: rgba(147, 51, 234, 0.15); color: #9333ea; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
+                            📡 <?= htmlspecialchars($network_display ?: $network_filter, ENT_QUOTES, 'UTF-8') ?>
+                            <a href="creators.php" style="color: inherit; text-decoration: none; margin-left: 4px; opacity: 0.8; hover: opacity: 1;" title="Clear filter">✕</a>
+                        </span>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
         
         <!-- Center Block: Filters -->
@@ -2542,23 +2740,32 @@ include 'headers.php';
                         
                         // Generate preview URL for hover
                         $preview_url = '';
-                        if ($video_type === 'youtube' && $video_id) {
+                        
+                        // Normalize video type (handle various capitalizations)
+                        $video_type_normalized = strtolower(trim($video_type));
+                        
+                        if ($video_type_normalized === 'youtube' && !empty($video_id)) {
                             $preview_url = 'https://www.youtube.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&mute=1&controls=0&loop=1&playlist=' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8');
-                        } elseif ($video_type === 'vimeo' && $video_id) {
+                        } elseif ($video_type_normalized === 'vimeo' && !empty($video_id)) {
                             $preview_url = 'https://player.vimeo.com/video/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&background=1';
-                        } elseif ($video_type === 'wistia' && $video_id) {
+                        } elseif ($video_type_normalized === 'wistia' && !empty($video_id)) {
                             $preview_url = 'https://fast.wistia.net/embed/iframe/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&controls=0';
-                        } elseif ($video_type === 'rumble' && $video_id) {
+                        } elseif ($video_type_normalized === 'rumble' && !empty($video_id)) {
                             $preview_url = 'https://rumble.com/embed/v' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '/?autoplay=1&muted=1';
-                        } elseif ($video_type === 'muvi' && $video_id) {
+                        } elseif ($video_type_normalized === 'muvi' && !empty($video_id)) {
                             $preview_url = 'https://embed.muvi.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1';
-                        } elseif ($video_type === 'loom' && $video_id) {
+                        } elseif ($video_type_normalized === 'loom' && !empty($video_id)) {
                             $preview_url = 'https://www.loom.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true';
-                        } elseif (($video_type === 'local' || $video_type === 'upload') && $video_url) {
+                        } elseif (($video_type_normalized === 'local' || $video_type_normalized === 'upload') && !empty($video_url)) {
                             // FIXED: Check for both 'local' and 'upload' (since source can be 'Upload')
                             // For local/uploaded videos, we'll use a data attribute that JavaScript will handle
                             // Store the video URL to be used by Video.js on hover
                             $preview_url = 'local:' . htmlspecialchars($video_url, ENT_QUOTES, 'UTF-8');
+                        }
+                        
+                        // Log when preview URL cannot be generated (for debugging)
+                        if (empty($preview_url)) {
+                            error_log("⚠️ No preview URL for video ID {$video->id}: type={$video_type_normalized}, video_id=" . ($video_id ?: 'EMPTY') . ", video_url=" . ($video_url ? 'EXISTS' : 'EMPTY'));
                         }
                     ?>
                         <div class="carousel-item" data-video-id="<?= htmlspecialchars($video->id, ENT_QUOTES, 'UTF-8') ?>">
@@ -2582,7 +2789,43 @@ include 'headers.php';
                                 <?php 
                                 // Generate video page URL using short_link
                                 $video_page_url = !empty($video->short_link) ? '/v/' . htmlspecialchars($video->short_link, ENT_QUOTES, 'UTF-8') : '#';
+                                
+                                // Get breadcrumb information
+                                $breadcrumb = getVideoBreadcrumb($video->id, $video->category);
                                 ?>
+                                
+                                <!-- Video Breadcrumb (shown on hover) -->
+                                <?php if (!empty($breadcrumb['line1']) || !empty($breadcrumb['line2'])): ?>
+                                <div class="video-breadcrumb">
+                                    <?php if (!empty($breadcrumb['category_display']) || !empty($breadcrumb['network'])): ?>
+                                        <div class="breadcrumb-line1">
+                                            <?php if (!empty($breadcrumb['category'])): ?>
+                                                <span class="breadcrumb-node breadcrumb-category" 
+                                                      data-category="<?= htmlspecialchars($breadcrumb['category'], ENT_QUOTES, 'UTF-8') ?>"
+                                                      onclick="filterByCategory('<?= htmlspecialchars($breadcrumb['category'], ENT_QUOTES, 'UTF-8') ?>')"
+                                                      title="Filter by <?= htmlspecialchars($breadcrumb['category'], ENT_QUOTES, 'UTF-8') ?> category">
+                                                    <?= htmlspecialchars($breadcrumb['category_display'], ENT_QUOTES, 'UTF-8') ?>
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if (!empty($breadcrumb['network'])): ?>
+                                                <?php if (!empty($breadcrumb['category'])): ?>
+                                                    <span class="breadcrumb-separator"> | </span>
+                                                <?php endif; ?>
+                                                <span class="breadcrumb-node breadcrumb-network" 
+                                                      data-network-key="<?= htmlspecialchars($breadcrumb['network_key'], ENT_QUOTES, 'UTF-8') ?>"
+                                                      onclick="filterByNetwork('<?= htmlspecialchars($breadcrumb['network_key'], ENT_QUOTES, 'UTF-8') ?>')"
+                                                      title="Filter by <?= htmlspecialchars($breadcrumb['network'], ENT_QUOTES, 'UTF-8') ?> network">
+                                                    <?= htmlspecialchars($breadcrumb['network'], ENT_QUOTES, 'UTF-8') ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($breadcrumb['line2'])): ?>
+                                        <div class="breadcrumb-line2"><?= htmlspecialchars($breadcrumb['line2'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
+                                
                                 <p><a href="<?= $video_page_url ?>" style="color: inherit; text-decoration: none;" onclick="window.open(this.href, '_blank'); return false;" title="Open video page"><?= html_entity_decode($video->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></a></p>
                                 <?php if (!empty($video->description)): ?>
                                     <small style="color: #a4b3d0; display: block; margin-top: 0.35rem; line-height: 1.3;">
@@ -2827,22 +3070,31 @@ include 'headers.php';
                                 
                                 // Generate preview URL for hover
                                 $preview_url = '';
-                                if ($video_type === 'youtube' && $video_id) {
+                                
+                                // Normalize video type (handle various capitalizations)
+                                $video_type_normalized = strtolower(trim($video_type));
+                                
+                                if ($video_type_normalized === 'youtube' && !empty($video_id)) {
                                     $preview_url = 'https://www.youtube.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&mute=1&controls=0&loop=1&playlist=' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8');
-                                } elseif ($video_type === 'vimeo' && $video_id) {
+                                } elseif ($video_type_normalized === 'vimeo' && !empty($video_id)) {
                                     $preview_url = 'https://player.vimeo.com/video/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&background=1';
-                                } elseif ($video_type === 'wistia' && $video_id) {
+                                } elseif ($video_type_normalized === 'wistia' && !empty($video_id)) {
                                     $preview_url = 'https://fast.wistia.net/embed/iframe/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoPlay=true&muted=true';
-                                } elseif ($video_type === 'rumble' && $video_id) {
+                                } elseif ($video_type_normalized === 'rumble' && !empty($video_id)) {
                                     $preview_url = 'https://rumble.com/embed/v' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '/?autoplay=1&muted=1';
-                                } elseif ($video_type === 'muvi' && $video_id) {
+                                } elseif ($video_type_normalized === 'muvi' && !empty($video_id)) {
                                     $preview_url = 'https://embed.muvi.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1';
-                                } elseif ($video_type === 'loom' && $video_id) {
+                                } elseif ($video_type_normalized === 'loom' && !empty($video_id)) {
                                     $preview_url = 'https://www.loom.com/embed/' . htmlspecialchars($video_id, ENT_QUOTES, 'UTF-8') . '?autoplay=1&muted=1&hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true';
-                                } elseif (($video_type === 'local' || $video_type === 'upload') && $video_url) {
+                                } elseif (($video_type_normalized === 'local' || $video_type_normalized === 'upload') && !empty($video_url)) {
                                     // FIXED: Check for both 'local' and 'upload' (since source can be 'Upload')
                                     // For local/uploaded videos, we'll use a data attribute that JavaScript will handle
                                     $preview_url = 'local:' . htmlspecialchars($video_url, ENT_QUOTES, 'UTF-8');
+                                }
+                                
+                                // Log when preview URL cannot be generated (for debugging)
+                                if (empty($preview_url)) {
+                                    error_log("⚠️ No preview URL for video ID {$video->id}: type={$video_type_normalized}, video_id=" . ($video_id ?: 'EMPTY') . ", video_url=" . ($video_url ? 'EXISTS' : 'EMPTY'));
                                 }
                             ?>
                             <tr class="video-row" data-video-id="<?= $video->id ?>">
@@ -2875,7 +3127,43 @@ include 'headers.php';
                                         <?php 
                                         // Generate video page URL using short_link
                                         $video_page_url = !empty($video->short_link) ? '/v/' . htmlspecialchars($video->short_link, ENT_QUOTES, 'UTF-8') : '#';
+                                        
+                                        // Get breadcrumb information
+                                        $breadcrumb = getVideoBreadcrumb($video->id, $video->category);
                                         ?>
+                                        
+                                        <!-- Video Breadcrumb (shown on hover) -->
+                                        <?php if (!empty($breadcrumb['line1']) || !empty($breadcrumb['line2'])): ?>
+                                        <div class="table-video-breadcrumb">
+                                            <?php if (!empty($breadcrumb['category_display']) || !empty($breadcrumb['network'])): ?>
+                                                <div class="breadcrumb-line1">
+                                                    <?php if (!empty($breadcrumb['category'])): ?>
+                                                        <span class="breadcrumb-node breadcrumb-category" 
+                                                              data-category="<?= htmlspecialchars($breadcrumb['category'], ENT_QUOTES, 'UTF-8') ?>"
+                                                              onclick="filterByCategory('<?= htmlspecialchars($breadcrumb['category'], ENT_QUOTES, 'UTF-8') ?>')"
+                                                              title="Filter by <?= htmlspecialchars($breadcrumb['category'], ENT_QUOTES, 'UTF-8') ?> category">
+                                                            <?= htmlspecialchars($breadcrumb['category_display'], ENT_QUOTES, 'UTF-8') ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($breadcrumb['network'])): ?>
+                                                        <?php if (!empty($breadcrumb['category'])): ?>
+                                                            <span class="breadcrumb-separator"> | </span>
+                                                        <?php endif; ?>
+                                                        <span class="breadcrumb-node breadcrumb-network" 
+                                                              data-network-key="<?= htmlspecialchars($breadcrumb['network_key'], ENT_QUOTES, 'UTF-8') ?>"
+                                                              onclick="filterByNetwork('<?= htmlspecialchars($breadcrumb['network_key'], ENT_QUOTES, 'UTF-8') ?>')"
+                                                              title="Filter by <?= htmlspecialchars($breadcrumb['network'], ENT_QUOTES, 'UTF-8') ?> network">
+                                                            <?= htmlspecialchars($breadcrumb['network'], ENT_QUOTES, 'UTF-8') ?>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            <?php if (!empty($breadcrumb['line2'])): ?>
+                                                <div class="breadcrumb-line2"><?= htmlspecialchars($breadcrumb['line2'], ENT_QUOTES, 'UTF-8') ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endif; ?>
+                                        
                                         <div class="table-video-title"><a href="<?= $video_page_url ?>" style="color: inherit; text-decoration: none;" onclick="window.open(this.href, '_blank'); return false;" title="Open video page"><?= html_entity_decode($video->title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></a></div>
                                         <?php if (!empty($video->description)): ?>
                                             <div class="table-video-description">
@@ -3313,6 +3601,22 @@ include 'headers.php';
         function initializeLazyPreviews() {
             // Get both card view and list view thumbnails
             const videoThumbs = document.querySelectorAll('.video-thumb, .table-video-thumb');
+            console.log('📹 Initializing hover previews for', videoThumbs.length, 'videos');
+            
+            // Count videos with/without preview URLs
+            let withPreview = 0;
+            let withoutPreview = 0;
+            videoThumbs.forEach(thumb => {
+                const previewUrl = thumb.getAttribute('data-preview-url') || 
+                                  thumb.dataset.previewUrl ||
+                                  thumb.querySelector('.preview-iframe-container')?.getAttribute('data-preview-url');
+                if (previewUrl) {
+                    withPreview++;
+                } else {
+                    withoutPreview++;
+                }
+            });
+            console.log(`📊 Preview availability: ${withPreview} videos with preview URLs, ${withoutPreview} without`);
             
             // Use Intersection Observer to only initialize previews for visible videos
             const observer = new IntersectionObserver((entries) => {
@@ -3345,9 +3649,18 @@ include 'headers.php';
             // If no preview container exists, check if we have a preview URL and create one
             if (!previewContainer) {
                 const previewUrl = thumb.getAttribute('data-preview-url') || thumb.dataset.previewUrl;
-                if (!previewUrl) return; // No preview available
+                if (!previewUrl) {
+                    // Log missing preview for debugging
+                    const videoId = thumb.getAttribute('data-video-id') || 
+                                   thumb.closest('[data-video-id]')?.getAttribute('data-video-id') || 
+                                   'unknown';
+                    const videoType = thumb.getAttribute('data-video-type') || 'unknown';
+                    console.log(`⚠️ No preview URL for video ${videoId} (type: ${videoType})`);
+                    return; // No preview available
+                }
                 
                 // Create preview container dynamically
+                console.log(`🔧 Creating dynamic preview container for video (URL: ${previewUrl.substring(0, 50)}...)`);
                 previewContainer = document.createElement('div');
                 previewContainer.className = 'dynamic-preview-container';
                 previewContainer.setAttribute('data-preview-url', previewUrl);
@@ -4762,6 +5075,7 @@ include 'headers.php';
                 tags: videoData.tags || '',
                 badges: videoData.badges || '',
                 channels: videoData.channels || '[]',
+                networks: videoData.networks || '[]',
                 visibility: videoData.privacy || videoData.visibility || 'public',
                 thumbnail: videoData.thumbnail || '',
                 source: videoData.source || '',
@@ -5527,6 +5841,44 @@ window.testShareModal = function(videoId = 51272) {
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(debugAllFunctions, 1000); // Wait 1 second for everything to load
 });
+
+// ==================== BREADCRUMB FILTERING ====================
+/**
+ * Filter videos by category
+ */
+function filterByCategory(category) {
+    console.log('🔍 Filtering by category:', category);
+    
+    // Get current URL and add/update category filter
+    const url = new URL(window.location.href);
+    url.searchParams.set('category_filter', category);
+    url.searchParams.delete('network_filter'); // Clear network filter
+    url.searchParams.set('page', '1'); // Reset to page 1
+    
+    // Reload page with filter
+    window.location.href = url.toString();
+}
+
+/**
+ * Filter videos by network
+ */
+function filterByNetwork(networkKey) {
+    console.log('🔍 Filtering by network:', networkKey);
+    
+    // Get current URL and add/update network filter
+    const url = new URL(window.location.href);
+    url.searchParams.set('network_filter', networkKey);
+    url.searchParams.delete('category_filter'); // Clear category filter
+    url.searchParams.set('page', '1'); // Reset to page 1
+    
+    // Reload page with filter
+    window.location.href = url.toString();
+}
+
+// Expose functions globally
+window.filterByCategory = filterByCategory;
+window.filterByNetwork = filterByNetwork;
+// ==================== END BREADCRUMB FILTERING ====================
 </script>
 
 <?php 

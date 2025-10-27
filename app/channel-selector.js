@@ -206,10 +206,8 @@ class IONChannelSelector {
         const container = document.getElementById('selectedChannelsList');
         
         if (this.selectedChannels.length === 0) {
-            const helpText = this.canMultiSelect 
-                ? 'No channels selected. Search to add multiple channels.' 
-                : 'No channels selected. Search to add your primary channel.';
-            container.innerHTML = `<div style="color: var(--text-secondary); font-size: 13px; padding: 8px 0;">${helpText}</div>`;
+            // Hide placeholder message to save space
+            container.innerHTML = '';
             return;
         }
 

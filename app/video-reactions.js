@@ -197,35 +197,9 @@ class VideoReactions {
         if (normalizedAction === 'like') {
             likeBtn.classList.add('active');
             console.log(`✅ Added 'active' class to LIKE button for video ${videoId}`);
-            console.log(`   Button classes: ${likeBtn.className}`);
-            
-            // Verify the style is applied
-            setTimeout(() => {
-                const computedStyle = window.getComputedStyle(likeBtn);
-                const color = computedStyle.color;
-                const expectedColor = 'rgb(16, 185, 129)'; // #10b981
-                if (color !== expectedColor) {
-                    console.warn(`⚠️ LIKE button for video ${videoId} has active class but wrong color!`);
-                    console.warn(`   Expected: ${expectedColor}, Got: ${color}`);
-                    console.warn(`   Background: ${computedStyle.backgroundColor}`);
-                }
-            }, 100);
         } else if (normalizedAction === 'dislike') {
             dislikeBtn.classList.add('active');
             console.log(`✅ Added 'active' class to DISLIKE button for video ${videoId}`);
-            console.log(`   Button classes: ${dislikeBtn.className}`);
-            
-            // Verify the style is applied
-            setTimeout(() => {
-                const computedStyle = window.getComputedStyle(dislikeBtn);
-                const color = computedStyle.color;
-                const expectedColor = 'rgb(239, 68, 68)'; // #ef4444
-                if (color !== expectedColor) {
-                    console.warn(`⚠️ DISLIKE button for video ${videoId} has active class but wrong color!`);
-                    console.warn(`   Expected: ${expectedColor}, Got: ${color}`);
-                    console.warn(`   Background: ${computedStyle.backgroundColor}`);
-                }
-            }, 100);
         } else {
             console.log(`ℹ️ No active state for video ${videoId} (normalizedAction: "${normalizedAction}", original: "${userAction}")`);
         }
@@ -307,4 +281,3 @@ if (document.readyState === 'loading') {
 } else {
     window.videoReactions.initAll();
 }
-

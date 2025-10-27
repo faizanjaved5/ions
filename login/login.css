@@ -32,12 +32,37 @@ body {
   max-width: 400px;
   text-align: center;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+/* Prevent layout shift from password managers like LastPass */
+input[type="email"] {
+  position: relative;
+}
+
+/* Hide LastPass, 1Password, and other password manager icons that cause shifts */
+input[type="email"]::-ms-reveal,
+input[type="email"]::-ms-clear {
+  display: none;
+}
+
+/* LastPass specific */
+div[id^="__lpform_"],
+div[data-lastpass-icon-root] {
+  position: absolute !important;
+  right: 10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 999 !important;
 }
 
 .logo img {
   width: 180px;
   height: auto;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
 }
 
@@ -70,7 +95,11 @@ form {
 }
 
 form.hidden {
-  display: none;
+  display: none !important;
+}
+
+.hidden {
+  display: none !important;
 }
 
 input[type="email"] {
@@ -86,6 +115,21 @@ input[type="email"] {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Create a stable container for the input to prevent shifts */
+form {
+  width: 100%;
+  position: relative;
+}
+
+/* Ensure password manager dropdowns don't affect layout */
+input[type="email"] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 input[type="email"]:focus {
@@ -231,6 +275,7 @@ input[type="email"]::placeholder {
   
   .container {
     padding: 30px 25px;
+    min-height: 480px;
   }
   
   .logo img {
@@ -257,6 +302,7 @@ input[type="email"]::placeholder {
     padding: 25px 20px;
     margin: 0;
     max-width: 100%;
+    min-height: 480px;
   }
   
   .logo img {
@@ -322,6 +368,7 @@ input[type="email"]::placeholder {
 @media screen and (max-width: 375px) {
   .container {
     padding: 20px 15px;
+    min-height: 450px;
   }
   
   .logo img {
@@ -357,6 +404,7 @@ input[type="email"]::placeholder {
   
   .container {
     padding: 20px 25px;
+    min-height: auto;
   }
   
   .logo img {
@@ -401,4 +449,27 @@ input[type="email"]::placeholder {
   .otp-digit {
     font-size: 16px !important;
   }
+}
+
+/* Comprehensive password manager handling */
+/* LastPass */
+div[id^="__lpform_"] {
+  position: absolute !important;
+}
+
+/* Generic password manager overlay prevention */
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+}
+
+/* Prevent autocomplete dropdown from shifting layout */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.05) inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  transition: background-color 5000s ease-in-out 0s;
 }

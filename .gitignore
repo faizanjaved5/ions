@@ -19,3 +19,4 @@ wp-includes/checkout/classes/DirectStripeIntegration.php
 *.zip
 
 config/config.php
+/uploads/*
