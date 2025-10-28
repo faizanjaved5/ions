@@ -1008,45 +1008,9 @@ $theme = $_SESSION['theme'] ?? $_COOKIE['theme'] ?? $_GET['theme'] ?? 'dark';
     </script>
 </head>
 <body data-theme="<?= $theme ?>">
-<?php 
-// Ensure $root is defined (safety check from index2.php)
-if (!isset($root)) {
-    $root = dirname(__DIR__);
-}
-?>
+<?php $ION_NAVBAR_BASE_URL = '/menu/'; ?>
+<?php require_once $root . '/menu/ion-navbar-embed.php'; ?>
 
-<!-- ION Navbar Embed: fonts -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
-<link rel="preload" as="style" href="/menu/ion-navbar.css">
-
-<!-- ION Navbar (React component loaded via JavaScript) -->
-<div id="ion-navbar-root"></div>
-
-<!-- ION Navbar Embed: script setup -->
-<script>
-    // Minimal globals expected by some libraries
-    window.process = window.process || {
-        env: {
-            NODE_ENV: 'production'
-        }
-    };
-    window.global = window.global || window;
-</script>
-<script src="/menu/ion-navbar.iife.js"></script>
-<script>
-    (function() {
-        if (window.IONNavbar && typeof window.IONNavbar.mount === 'function') {
-            window.IONNavbar.mount('#ion-navbar-root', {
-                useShadowDom: true,
-                cssHref: '/menu/ion-navbar.css'
-            });
-        }
-        
-        // Theme toggle is handled by the navbar - no need for additional button
-    })();
-</script>
 
     <div class="container">
         <div class="video-header">
