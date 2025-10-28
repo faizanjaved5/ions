@@ -1,0 +1,193 @@
+{
+  "categories": [
+    {
+      "name": "Ball & Team Sports",
+      "emoji": "🏀",
+      "sports": [
+        { "name": "ION Basketball", "url": "/ion-basketball", "icon": "ion-basketball" },
+        { "name": "ION Baseball", "url": "/ion-baseball", "icon": "ion-baseball" },
+        { "name": "ION Softball", "url": "/ion-softball", "icon": "ion-baseball" },
+        { "name": "ION Cricket", "url": "/ion-cricket", "icon": "ion-cricket" },
+        { "name": "ION Soccer", "url": "/ion-soccer", "icon": "ion-soccer" },
+        { "name": "ION Football", "url": "/ion-football", "icon": "ion-football" },
+        { "name": "ION Rugby", "url": "/ion-rugby", "icon": "ion-rugby" },
+        { "name": "ION Volleyball", "url": "/ion-volleyball", "icon": "ion-volleyball" },
+        { "name": "ION Beach Volleyball", "url": "/ion-beach-volleyball", "icon": "ion-beach-volleyball" },
+        { "name": "ION Netball", "url": "/ion-netball", "icon": "ion-netball" },
+        { "name": "ION Field Hockey", "url": "/ion-field-hockey", "icon": "ion-field-hockey" },
+        { "name": "ION Hockey", "url": "/ion-hockey", "icon": "ion-hockey" },
+        { "name": "ION Lacrosse", "url": "/ion-lacrosse", "icon": "ion-lacrosse" },
+        { "name": "ION Handball", "url": "/ion-handball", "icon": "ion-handball" },
+        { "name": "ION Goalball", "url": "/ion-goalball", "icon": "ion-goalball" },
+        { "name": "ION Dodgeball", "url": "/ion-dodgeball", "icon": "ion-baseball" },
+        { "name": "ION Water Polo", "url": "/ion-water-polo", "icon": "ion-water-polo" },
+        { "name": "ION Kickball", "url": "/ion-kickball", "icon": "ion-soccer" },
+        { "name": "ION Wiffleball", "url": "/ion-wiffleball", "icon": "ion-baseball" },
+        { "name": "ION Broomball", "url": "/ion-broomball", "icon": "ion-hockey" },
+        { "name": "ION Spikeball", "url": "/ion-spikeball", "icon": "ion-volleyball" },
+        { "name": "ION Korfball", "url": "/ion-korfball", "icon": "ion-basketball" },
+        { "name": "ION Wallyball", "url": "/ion-wallyball", "icon": "ion-volleyball" }
+      ]
+    },
+    {
+      "name": "Racket & Paddle Sports",
+      "emoji": "🎾",
+      "sports": [
+        { "name": "ION Tennis", "url": "/ion-tennis", "icon": "ion-tennis" },
+        { "name": "ION Table Tennis", "url": "/ion-table-tennis", "icon": "ion-table-tennis" },
+        { "name": "ION Badminton", "url": "/ion-badminton", "icon": "ion-badminton" },
+        { "name": "ION Pickleball", "url": "/ion-pickleball", "icon": "ion-tennis" },
+        { "name": "ION Racquetball", "url": "/ion-racquetball", "icon": "ion-tennis" },
+        { "name": "ION Squash", "url": "/ion-squash", "icon": "ion-tennis" },
+        { "name": "ION Paddle Boarding", "url": "/ion-paddle-boarding", "icon": "ion-surfing" },
+        { "name": "ION Stand-up Paddle", "url": "/ion-stand-up-paddle", "icon": "ion-surfing" },
+        { "name": "ION Beach Tennis", "url": "/ion-beach-tennis", "icon": "ion-tennis" },
+        { "name": "ION Lawn Bowling", "url": "/ion-lawn-bowling", "icon": "ion-bocce" },
+        { "name": "ION Ricochet", "url": "/ion-ricochet", "icon": "ion-tennis" }
+      ]
+    },
+    {
+      "name": "Strength, Combat & Martial Arts",
+      "emoji": "🥋",
+      "sports": [
+        { "name": "ION Boxing", "url": "/ion-boxing", "icon": "ion-boxing" },
+        { "name": "ION MMA", "url": "/ion-mma", "icon": "ion-mma" },
+        { "name": "ION Judo", "url": "/ion-judo", "icon": "ion-judo" },
+        { "name": "ION Karate", "url": "/ion-karate", "icon": "ion-karate" },
+        { "name": "ION Taekwondo", "url": "/ion-taekwondo", "icon": "ion-taekwondo" },
+        { "name": "ION Kickboxing", "url": "/ion-kickboxing", "icon": "ion-boxing" },
+        { "name": "ION Muay Thai", "url": "/ion-muay-thai", "icon": "ion-boxing" },
+        { "name": "ION Brazilian Jiu-Jitsu", "url": "/ion-brazilian-jiu-jitsu", "icon": "ion-judo" },
+        { "name": "ION Wrestling", "url": "/ion-wrestling", "icon": "ion-wrestling" },
+        { "name": "ION Sumo Wrestling", "url": "/ion-sumo-wrestling", "icon": "ion-wrestling" },
+        { "name": "ION Hapkido", "url": "/ion-hapkido", "icon": "ion-karate" },
+        { "name": "ION Arm Wrestling", "url": "/ion-arm-wrestling", "icon": "ion-wrestling" },
+        { "name": "ION Arm Wrestlers", "url": "/ion-arm-wrestlers", "icon": "ion-wrestling" },
+        { "name": "ION Wushu", "url": "/ion-wushu", "icon": "ion-karate" },
+        { "name": "ION Weightlifting", "url": "/ion-weightlifting", "icon": "ion-wrestling" },
+        { "name": "ION Powerlifting", "url": "/ion-powerlifting", "icon": "ion-wrestling" },
+        { "name": "ION CrossFit", "url": "/ion-crossfit", "icon": "ion-running" }
+      ]
+    },
+    {
+      "name": "Athletics, Fitness & Endurance",
+      "emoji": "🏃",
+      "sports": [
+        { "name": "ION Track and Field", "url": "/ion-track-and-field", "icon": "ion-track-and-field" },
+        { "name": "ION Running", "url": "/ion-running", "icon": "ion-running" },
+        { "name": "ION Cross Country", "url": "/ion-cross-country", "icon": "ion-cross-country" },
+        { "name": "ION Triathlon", "url": "/ion-triathlon", "icon": "ion-triathlon" },
+        { "name": "ION Pentathlon", "url": "/ion-pentathlon", "icon": "ion-pentathlon" },
+        { "name": "ION Decathlon", "url": "/ion-decathlon", "icon": "ion-pentathlon" },
+        { "name": "ION Biathlon", "url": "/ion-biathlon", "icon": "ion-skiing" },
+        { "name": "ION Cycling", "url": "/ion-cycling", "icon": "ion-cycling" },
+        { "name": "ION Cyclocross", "url": "/ion-cyclocross", "icon": "ion-cycling" },
+        { "name": "ION Mountain Biking", "url": "/ion-mountain-biking", "icon": "ion-mountain-biking" },
+        { "name": "ION Trail Running", "url": "/ion-trail-running", "icon": "ion-running" },
+        { "name": "ION Hiking", "url": "/ion-hiking", "icon": "ion-running" },
+        { "name": "ION Orienteering", "url": "/ion-orienteering", "icon": "ion-running" },
+        { "name": "ION Cheerleading", "url": "/ion-cheerleading", "icon": "ion-cheerleading" },
+        { "name": "ION Gymnastics", "url": "/ion-gymnastics", "icon": "ion-gymnastics" },
+        { "name": "ION Ballet", "url": "/ion-ballet", "icon": "ion-ballet" },
+        { "name": "ION Yoga", "url": "/ion-yoga", "icon": "ion-gymnastics" },
+        { "name": "ION Pilates", "url": "/ion-pilates", "icon": "ion-gymnastics" },
+        { "name": "ION Camping", "url": "/ion-camping", "icon": "ion-running" },
+        { "name": "ION Outdoors", "url": "/ion-outdoors", "icon": "ion-running" }
+      ]
+    },
+    {
+      "name": "Water & Aquatic Sports",
+      "emoji": "🌊",
+      "sports": [
+        { "name": "ION Swimming", "url": "/ion-swimming", "icon": "ion-swimming" },
+        { "name": "ION Diving", "url": "/ion-diving", "icon": "ion-diving" },
+        { "name": "ION Surfing", "url": "/ion-surfing", "icon": "ion-surfing" },
+        { "name": "ION Sailing", "url": "/ion-sailing", "icon": "ion-sailing" },
+        { "name": "ION Rowing", "url": "/ion-rowing", "icon": "ion-rowing" },
+        { "name": "ION Canoeing", "url": "/ion-canoeing", "icon": "ion-rowing" },
+        { "name": "ION Kayaking", "url": "/ion-kayaking", "icon": "ion-rowing" },
+        { "name": "ION Dragon Boating", "url": "/ion-dragon-boating", "icon": "ion-dragon-boating" },
+        { "name": "ION Wakeboarding", "url": "/ion-wakeboarding", "icon": "ion-wakeboarding" },
+        { "name": "ION Windsurfing", "url": "/ion-windsurfing", "icon": "ion-windsurfing" },
+        { "name": "ION Kitesurfing", "url": "/ion-kitesurfing", "icon": "ion-surfing" },
+        { "name": "ION Freediving", "url": "/ion-freediving", "icon": "ion-diving" },
+        { "name": "ION Scuba Diving", "url": "/ion-scuba-diving", "icon": "ion-diving" },
+        { "name": "ION Synchronized Swimming", "url": "/ion-synchronized-swimming", "icon": "ion-swimming" },
+        { "name": "ION Whitewater Rafting", "url": "/ion-whitewater-rafting", "icon": "ion-rowing" },
+        { "name": "ION Fishing", "url": "/ion-fishing", "icon": "ion-sailing" },
+        { "name": "ION Beach Bocce", "url": "/ion-beach-bocce", "icon": "ion-bocce" }
+      ]
+    },
+    {
+      "name": "Winter & Ice Sports",
+      "emoji": "⛷️",
+      "sports": [
+        { "name": "ION Skiing", "url": "/ion-skiing", "icon": "ion-skiing" },
+        { "name": "ION Snowboarding", "url": "/ion-snowboarding", "icon": "ion-skiing" },
+        { "name": "ION Figure Skating", "url": "/ion-figure-skating", "icon": "ion-hockey" },
+        { "name": "ION Speed Skating", "url": "/ion-speed-skating", "icon": "ion-hockey" },
+        { "name": "ION Curling", "url": "/ion-curling", "icon": "ion-hockey" },
+        { "name": "ION Bobsledding", "url": "/ion-bobsledding", "icon": "ion-skiing" },
+        { "name": "ION Skeleton", "url": "/ion-skeleton", "icon": "ion-skiing" },
+        { "name": "ION Ice Hockey", "url": "/ion-ice-hockey", "icon": "ion-hockey" }
+      ]
+    },
+    {
+      "name": "Equestrian & Polo",
+      "emoji": "🐎",
+      "sports": [
+        { "name": "ION Equestrian", "url": "/ion-equestrian", "icon": "ion-equestrian" },
+        { "name": "ION Dressage", "url": "/ion-dressage", "icon": "ion-dressage" },
+        { "name": "ION Show Jumping", "url": "/ion-show-jumping", "icon": "ion-jumping" },
+        { "name": "ION Jumping", "url": "/ion-jumping", "icon": "ion-jumping" },
+        { "name": "ION Equitation", "url": "/ion-equitation", "icon": "ion-equestrian" },
+        { "name": "ION Eventing", "url": "/ion-eventing", "icon": "ion-equestrian" },
+        { "name": "ION Polo", "url": "/ion-polo", "icon": "ion-equestrian" }
+      ]
+    },
+    {
+      "name": "Precision, Target & Indoor",
+      "emoji": "🎯",
+      "sports": [
+        { "name": "ION Fencing", "url": "/ion-fencing", "icon": "ion-fencing" },
+        { "name": "ION Archery", "url": "/ion-archery", "icon": "ion-archery" },
+        { "name": "ION Shooting", "url": "/ion-shooting", "icon": "ion-archery" },
+        { "name": "ION Darts", "url": "/ion-darts", "icon": "ion-archery" },
+        { "name": "ION Bowling", "url": "/ion-bowling", "icon": "ion-bocce" },
+        { "name": "ION Billiards", "url": "/ion-billiards", "icon": "ion-bocce" },
+        { "name": "ION Snooker", "url": "/ion-snooker", "icon": "ion-bocce" },
+        { "name": "ION Pool", "url": "/ion-pool", "icon": "ion-bocce" },
+        { "name": "ION Bocce", "url": "/ion-bocce", "icon": "ion-bocce" },
+        { "name": "ION Golf", "url": "/ion-golf", "icon": "ion-golf" },
+        { "name": "ION Croquet", "url": "/ion-croquet", "icon": "ion-golf" },
+        { "name": "ION Chess", "url": "/ion-chess", "icon": "ion-bocce" },
+        { "name": "ION Poker", "url": "/ion-poker", "icon": "ion-bocce" },
+        { "name": "ION Hurling", "url": "/ion-hurling", "icon": "ion-hockey" }
+      ]
+    },
+    {
+      "name": "Motorsports & Extreme",
+      "emoji": "🚗",
+      "sports": [
+        { "name": "ION Auto Racing", "url": "/ion-auto-racing", "icon": "ion-cycling" },
+        { "name": "ION Formula 1", "url": "/ion-formula-1", "icon": "ion-cycling" },
+        { "name": "ION Motorcycle Racing", "url": "/ion-motorcycle-racing", "icon": "ion-cycling" },
+        { "name": "ION Karting", "url": "/ion-karting", "icon": "ion-cycling" },
+        { "name": "ION Rally Racing", "url": "/ion-rally-racing", "icon": "ion-cycling" },
+        { "name": "ION Motocross", "url": "/ion-motocross", "icon": "ion-mountain-biking" },
+        { "name": "ION Skateboarding", "url": "/ion-skateboarding", "icon": "ion-skateboarding" },
+        { "name": "ION BMX", "url": "/ion-bmx", "icon": "ion-cycling" },
+        { "name": "ION Paragliding", "url": "/ion-paragliding", "icon": "ion-surfing" },
+        { "name": "ION Skydiving", "url": "/ion-skydiving", "icon": "ion-surfing" },
+        { "name": "ION Climbing", "url": "/ion-climbing", "icon": "ion-running" }
+      ]
+    },
+    {
+      "name": "LEAGUES on ION",
+      "emoji": "🚗",
+      "sports": [
+        { "name": "ION AVL Legends of Pro Beach Volleyball", "url": "/ion-avl-legends-of-pro-beach-volleyball", "icon": "ion-beach-volleyball" }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, ChevronRight, ChevronLeft, Sun, Moon } from "lucide-react";
+import { Search, ChevronRight, ChevronLeft, Sun, Moon, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,7 +20,11 @@ interface FlatItem {
   level: number;
 }
 
-const IONNetworksMenu = () => {
+interface IONNetworksMenuProps {
+  onClose?: () => void;
+}
+
+const IONNetworksMenu = ({ onClose }: IONNetworksMenuProps = {}) => {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -273,6 +277,17 @@ const IONNetworksMenu = () => {
                 <Moon className="h-4 w-4" />
               )}
             </Button>
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            )}
           </div>
         </div>
 

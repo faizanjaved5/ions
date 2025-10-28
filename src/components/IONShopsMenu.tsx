@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, ChevronRight, ChevronLeft, Sun, Moon, ShoppingBag } from "lucide-react";
+import { Search, ChevronRight, ChevronLeft, Sun, Moon, ShoppingBag, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -74,7 +74,11 @@ interface ShopCategory {
   items: ShopItem[];
 }
 
-const IONShopsMenu = () => {
+interface IONShopsMenuProps {
+  onClose?: () => void;
+}
+
+const IONShopsMenu = ({ onClose }: IONShopsMenuProps = {}) => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(shopsData.categories?.[0]?.id ?? null);
   const [searchQuery, setSearchQuery] = useState("");
   const [useBebasFont, setUseBebasFont] = useState(false);
@@ -212,8 +216,8 @@ const IONShopsMenu = () => {
               </Button>
             )}
             <h2 className="text-base md:text-lg font-bold whitespace-nowrap truncate">
-              <span className="text-primary">ION</span>{" "}
-              <span className="text-foreground">MALL</span>
+              <span className="text-foreground">MALL OF </span>
+              <span className="text-primary">CHAMPIONS</span>
             </h2>
           </div>
 
@@ -250,6 +254,17 @@ const IONShopsMenu = () => {
                 <Moon className="h-4 w-4" />
               )}
             </Button>
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            )}
           </div>
         </div>
 

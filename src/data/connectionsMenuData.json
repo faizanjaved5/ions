@@ -2,11 +2,11 @@
   "connections": [
     {
       "title": "About",
-      "url": "https://ions.com/about/",
+      "url": null,
       "children": [
         {
           "title": "Dave Behar, Founder",
-          "url": "https://ions.com/dave-behar-founder/",
+          "url": null,
           "children": [
             {
               "title": "The Dave Behar Story",

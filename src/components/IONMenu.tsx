@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, MapPin, ChevronRight, ExternalLink, Sun, Moon, ChevronLeft, Menu } from "lucide-react";
+import { Search, MapPin, ChevronRight, ExternalLink, Sun, Moon, ChevronLeft, Menu, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import menuData from "../data/menuData.json";
 import { Button } from "./ui/button";
@@ -170,7 +170,11 @@ const countryCodeMap: Record<string, string> = {
   "lebanon": "lb"
 };
 
-export const IONMenu = () => {
+interface IONMenuProps {
+  onClose?: () => void;
+}
+
+export const IONMenu = ({ onClose }: IONMenuProps = {}) => {
   const { theme, setTheme } = useTheme();
   const [selectedRegion, setSelectedRegion] = useState<string | null>("featured");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -356,6 +360,17 @@ export const IONMenu = () => {
             >
               {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            )}
           </div>
         </div>
         {isMobile && (

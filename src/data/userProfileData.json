@@ -1,0 +1,72 @@
+{
+  "isLoggedIn": true,
+  "user": {
+    "name": "John Smith",
+    "email": "john@demo.com",
+    "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop",
+    "notifications": [
+      {
+        "id": 1,
+        "message": "Your video 'Introduction to ION' has reached 1,000 views",
+        "time": "2 hours ago",
+        "read": false
+      },
+      {
+        "id": 2,
+        "message": "New comment on your post",
+        "time": "5 hours ago",
+        "read": false
+      },
+      {
+        "id": 3,
+        "message": "Your profile was viewed 25 times today",
+        "time": "1 day ago",
+        "read": true
+      }
+    ],
+    "menuItems": [
+      {
+        "label": "View Profile",
+        "link": "/profile",
+        "icon": "User"
+      },
+      {
+        "label": "Update Profile",
+        "link": "/profile/edit",
+        "icon": "UserCog"
+      },
+      {
+        "label": "Creator Dashboard",
+        "link": "/dashboard",
+        "icon": "LayoutDashboard"
+      },
+      {
+        "label": "My Videos",
+        "link": "/my-videos",
+        "icon": "Video"
+      },
+      {
+        "label": "Preferences",
+        "link": "/preferences",
+        "icon": "Settings"
+      },
+      {
+        "label": "Log Out",
+        "link": "/logout",
+        "icon": "LogOut"
+      }
+    ]
+  },
+  "headerButtons": {
+    "upload": {
+      "label": "Upload",
+      "link": "/upload",
+      "visible": true
+    },
+    "signIn": {
+      "label": "Sign In",
+      "link": "/signin",
+      "visible": true
+    }
+  }
+}

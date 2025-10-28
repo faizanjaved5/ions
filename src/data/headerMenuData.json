@@ -1,0 +1,84 @@
+{
+  "menuItems": [
+    {
+      "id": "ionNetworks",
+      "label": "ION Networks",
+      "labelParts": {
+        "primary": "ION",
+        "secondary": " Networks"
+      },
+      "component": "IONNetworksMenu",
+      "order": 1,
+      "visible": true
+    },
+    {
+      "id": "ionSports",
+      "label": "IONSPORTS",
+      "labelParts": {
+        "primary": "ION",
+        "secondary": "SPORTS"
+      },
+      "component": "IONSportsMenu",
+      "order": 2,
+      "visible": true
+    },
+    {
+      "id": "ionLocal",
+      "label": "ION Local",
+      "labelParts": {
+        "primary": "ION",
+        "secondary": " Local"
+      },
+      "component": "IONMenu",
+      "order": 3,
+      "visible": true
+    },
+    {
+      "id": "ionInitiatives",
+      "label": "IONITIATIVES",
+      "labelParts": {
+        "primary": "ION",
+        "secondary": "ITIATIVES"
+      },
+      "component": "IONInitiativesMenu",
+      "order": 4,
+      "visible": true
+    },
+    {
+      "id": "shopIon",
+      "label": "SHOP ION",
+      "labelParts": {
+        "primary": "ION",
+        "secondary": "SHOP ",
+        "reverseOrder": true
+      },
+      "component": "IONShopsMenu",
+      "order": 5,
+      "visible": true
+    },
+    {
+      "id": "connections",
+      "label": "CONNECT.IONS",
+      "labelParts": {
+        "primary": "IONS",
+        "secondary": "CONNECT.",
+        "reverseOrder": true
+      },
+      "component": "IONConnectionsMenu",
+      "order": 6,
+      "visible": true
+    },
+    {
+      "id": "pressPass",
+      "label": "PressPass.ION",
+      "labelParts": {
+        "primary": ".ION",
+        "secondary": "PressPass",
+        "reverseOrder": true
+      },
+      "component": null,
+      "order": 7,
+      "visible": true
+    }
+  ]
+}
