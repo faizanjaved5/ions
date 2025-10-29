@@ -3,12 +3,16 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { usePortalContainer } from "@/components/ui/portal-provider";
 
 const Dialog = DialogPrimitive.Root;
 
 const DialogTrigger = DialogPrimitive.Trigger;
 
-const DialogPortal = DialogPrimitive.Portal;
+const DialogPortalImpl = ({ children }: { children: React.ReactNode }) => {
+  const container = usePortalContainer() ?? undefined;
+  return <DialogPrimitive.Portal container={container as any}>{children}</DialogPrimitive.Portal>;
+};
 
 const DialogClose = DialogPrimitive.Close;
 
@@ -31,7 +35,7 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
-  <DialogPortal>
+  <DialogPortalImpl>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
@@ -47,7 +51,7 @@ const DialogContent = React.forwardRef<
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
-  </DialogPortal>
+  </DialogPortalImpl>
 ));
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
@@ -83,7 +87,7 @@ DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
   Dialog,
-  DialogPortal,
+  DialogPortalImpl as DialogPortal,
   DialogOverlay,
   DialogClose,
   DialogTrigger,

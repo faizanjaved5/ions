@@ -1,5 +1,39 @@
 # PHP Integration Guide
 
+## Embed Build (Shadow DOM)
+
+Use the standalone embed bundle when integrating the navbar into PHP/Apache apps without React/Router. It mounts inside a Shadow DOM and reads user state from a JSON URL.
+
+### Build
+
+```bash
+npm run build:navbar
+```
+
+This outputs `dist-navbar/ion-navbar.js` and `dist-navbar/ion-navbar.css`.
+
+### PHP usage
+
+```html
+<link rel="preload" as="style" href="/assets/ion-navbar.css">
+<div id="ion-navbar"></div>
+<script src="/assets/ion-navbar.js"></script>
+<script>
+  IonNavbar.init({
+    target: '#ion-navbar',
+    cssUrl: '/assets/ion-navbar.css',
+    userDataUrl: '/userProfileData.json',
+    signInUrl: '/signin.php',
+    signOutUrl: '/logout.php',
+    uploadUrl: '/uploader.php',
+    onSearch: (q) => location.href = '/search.php?q=' + encodeURIComponent(q),
+    theme: 'dark',
+  });
+  // Optional: refresh after login/logout JSON updates
+  // if (window.refreshUserState) window.refreshUserState();
+</script>
+```
+
 This guide explains how to integrate the ION navbar with your PHP-based authentication system.
 
 ## How It Works

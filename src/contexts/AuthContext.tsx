@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 interface Notification {
   id: number;
@@ -41,19 +41,29 @@ export const useAuth = () => {
 
 interface AuthProviderProps {
   children: ReactNode;
+  userDataUrl?: string;
+  initialUserData?: { isLoggedIn: boolean; user?: User | null };
 }
 
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+export const AuthProvider = ({ children, userDataUrl, initialUserData }: AuthProviderProps) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch user data from JSON
-  const refreshUserState = async () => {
+  const refreshUserState = useCallback(async () => {
     try {
+      // If no URL is provided, but initial data exists, just re-apply it
+      if (!userDataUrl && initialUserData) {
+        setIsLoggedIn(!!initialUserData.isLoggedIn);
+        setUser(initialUserData.isLoggedIn ? (initialUserData.user || null) : null);
+        setLoading(false);
+        return;
+      }
       // Add cache busting to ensure we get fresh data
       const timestamp = new Date().getTime();
-      const response = await fetch(`/userProfileData.json?t=${timestamp}`);
+      const url = (userDataUrl && userDataUrl.length > 0) ? userDataUrl : '/userProfileData.json';
+      const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}t=${timestamp}`);
       const data = await response.json();
       
       setIsLoggedIn(data.isLoggedIn);
@@ -63,23 +73,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.error('Failed to refresh user state:', error);
       setLoading(false);
     }
-  };
+  }, [userDataUrl, initialUserData]);
 
   // Initial load
   useEffect(() => {
+    if (initialUserData) {
+      setIsLoggedIn(!!initialUserData.isLoggedIn);
+      setUser(initialUserData.isLoggedIn ? (initialUserData.user || null) : null);
+      setLoading(false);
+      return;
+    }
     refreshUserState();
-  }, []);
+  }, [initialUserData, refreshUserState]);
 
   // Expose refresh function globally so PHP can call it
   useEffect(() => {
-    // @ts-ignore - Adding to window object
     window.refreshUserState = refreshUserState;
     
     return () => {
-      // @ts-ignore - Cleanup
       delete window.refreshUserState;
     };
-  }, []);
+  }, [refreshUserState]);
 
   const logout = () => {
     setIsLoggedIn(false);

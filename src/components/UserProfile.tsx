@@ -13,9 +13,10 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface UserProfileProps {
   onLogout: () => void;
+  linkType?: "router" | "anchor";
 }
 
-const UserProfile = ({ onLogout }: UserProfileProps) => {
+const UserProfile = ({ onLogout, linkType = "router" }: UserProfileProps) => {
   const { isLoggedIn, user } = useAuth();
   
   // Don't render if not logged in or no user data
@@ -74,6 +75,17 @@ const UserProfile = ({ onLogout }: UserProfileProps) => {
             );
           }
           
+          if (linkType === "anchor") {
+            return (
+              <DropdownMenuItem key={index} asChild>
+                <a href={item.link} className="cursor-pointer text-gray-300 hover:text-white hover:bg-gray-800 focus:text-white focus:bg-gray-800 flex items-center px-3 py-2.5">
+                  {IconComponent && <IconComponent className="mr-3 h-4 w-4" />}
+                  <span>{item.label}</span>
+                </a>
+              </DropdownMenuItem>
+            );
+          }
+
           return (
             <DropdownMenuItem key={index} asChild>
               <Link to={item.link} className="cursor-pointer text-gray-300 hover:text-white hover:bg-gray-800 focus:text-white focus:bg-gray-800 flex items-center px-3 py-2.5">

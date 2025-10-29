@@ -172,9 +172,11 @@ const countryCodeMap: Record<string, string> = {
 
 interface IONMenuProps {
   onClose?: () => void;
+  externalTheme?: "dark" | "light";
+  onExternalThemeToggle?: () => void;
 }
 
-export const IONMenu = ({ onClose }: IONMenuProps = {}) => {
+export const IONMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONMenuProps = {}) => {
   const { theme, setTheme } = useTheme();
   const [selectedRegion, setSelectedRegion] = useState<string | null>("featured");
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -183,7 +185,12 @@ export const IONMenu = ({ onClose }: IONMenuProps = {}) => {
   const [mobileView, setMobileView] = useState<"regions" | "countries" | "states">("regions");
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
-  const isDarkMode = theme === "dark";
+  const activeTheme = externalTheme || theme;
+  const isDarkMode = activeTheme === "dark";
+  const handleThemeToggle = () => {
+    if (onExternalThemeToggle) onExternalThemeToggle();
+    else setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   const currentRegion = useMemo(() => {
     return menuData.regions.find(r => r.id === selectedRegion);
@@ -355,7 +362,7 @@ export const IONMenu = ({ onClose }: IONMenuProps = {}) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={handleThemeToggle}
               className="h-8 w-8 p-0"
             >
               {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

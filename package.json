@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:navbar": "vite build --config vite.config.embed.ts && node scripts/postbuild-navbar.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

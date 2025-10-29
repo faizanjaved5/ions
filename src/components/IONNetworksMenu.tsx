@@ -22,14 +22,21 @@ interface FlatItem {
 
 interface IONNetworksMenuProps {
   onClose?: () => void;
+  externalTheme?: "dark" | "light";
+  onExternalThemeToggle?: () => void;
 }
 
-const IONNetworksMenu = ({ onClose }: IONNetworksMenuProps = {}) => {
+const IONNetworksMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONNetworksMenuProps = {}) => {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [useBebasFont, setUseBebasFont] = useState(false);
   const { theme, setTheme } = useTheme();
+  const activeTheme = externalTheme || theme;
+  const handleThemeToggle = () => {
+    if (onExternalThemeToggle) onExternalThemeToggle();
+    else setTheme(theme === "dark" ? "light" : "dark");
+  };
   const isMobile = useIsMobile();
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
@@ -268,10 +275,10 @@ const IONNetworksMenu = ({ onClose }: IONNetworksMenuProps = {}) => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={handleThemeToggle}
               className="h-8 w-8"
             >
-              {theme === "dark" ? (
+              {activeTheme === "dark" ? (
                 <Sun className="h-4 w-4" />
               ) : (
                 <Moon className="h-4 w-4" />

@@ -20,13 +20,22 @@ interface Category {
 
 interface IONSportsMenuProps {
   onClose?: () => void;
+  linkType?: "router" | "anchor";
+  spriteUrl?: string;
+  externalTheme?: "dark" | "light";
+  onExternalThemeToggle?: () => void;
 }
 
-const IONSportsMenu = ({ onClose }: IONSportsMenuProps = {}) => {
+const IONSportsMenu = ({ onClose, linkType = "router", spriteUrl, externalTheme, onExternalThemeToggle }: IONSportsMenuProps = {}) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [useBebasFont, setUseBebasFont] = useState(false);
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const { theme, setTheme } = useTheme();
+  const activeTheme = externalTheme || theme;
+  const handleThemeToggle = () => {
+    if (onExternalThemeToggle) onExternalThemeToggle();
+    else setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   // Get all sports in a flat array for card view (deduplicated by URL)
   const allSports = useMemo(() => {
@@ -118,10 +127,10 @@ const IONSportsMenu = ({ onClose }: IONSportsMenuProps = {}) => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={handleThemeToggle}
               className="h-8 w-8"
             >
-              {theme === "dark" ? (
+              {activeTheme === "dark" ? (
                 <Sun className="h-4 w-4" />
               ) : (
                 <Moon className="h-4 w-4" />
@@ -150,6 +159,26 @@ const IONSportsMenu = ({ onClose }: IONSportsMenuProps = {}) => {
             filteredSports.length > 0 ? (
               <div className="grid grid-cols-6 gap-[0.35rem]">
                 {filteredSports.map((sport: SportItem) => (
+                  linkType === "anchor" ? (
+                  <a
+                    key={sport.url}
+                    href={sport.url}
+                    className="group flex flex-col items-center justify-center rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-primary hover:bg-primary/5 hover:shadow-lg hover:scale-105"
+                  >
+                    <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/30 transition-all duration-200">
+                      {sport.icon ? (
+                        <svg width="32" height="32" className="text-primary group-hover:scale-110 transition-transform" aria-label={sport.name}>
+                          <use href={`${spriteUrl ? `${spriteUrl}#${sport.icon}` : `#${sport.icon}`}`} />
+                        </svg>
+                      ) : (
+                        <ShoppingBag className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
+                      )}
+                    </div>
+                    <span className="text-xs text-center font-medium text-card-foreground group-hover:text-primary transition-colors leading-tight break-words whitespace-normal">
+                      {sport.name}
+                    </span>
+                  </a>
+                  ) : (
                   <Link
                     key={sport.url}
                     to={sport.url}
@@ -168,6 +197,7 @@ const IONSportsMenu = ({ onClose }: IONSportsMenuProps = {}) => {
                       {sport.name}
                     </span>
                   </Link>
+                  )
                 ))}
               </div>
             ) : (
@@ -187,6 +217,26 @@ const IONSportsMenu = ({ onClose }: IONSportsMenuProps = {}) => {
                     </h3>
                     <div className="space-y-1">
                       {category.sports.map((sport: SportItem) => (
+                        linkType === "anchor" ? (
+                        <a
+                          key={sport.url}
+                          href={sport.url}
+                          className="group flex items-center gap-3 rounded-lg border border-border/30 bg-card px-4 py-2.5 transition-all hover:border-primary hover:bg-primary/5 hover:shadow-md"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 group-hover:bg-primary/30 transition-all duration-200 flex-shrink-0">
+                            {sport.icon ? (
+                              <svg width="20" height="20" className="text-primary group-hover:scale-110 transition-transform" aria-label={sport.name}>
+                                <use href={`${spriteUrl ? `${spriteUrl}#${sport.icon}` : `#${sport.icon}`}`} />
+                              </svg>
+                            ) : (
+                              <ShoppingBag className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
+                            )}
+                          </div>
+                          <span className="text-sm font-medium text-card-foreground group-hover:text-primary transition-colors">
+                            {sport.name}
+                          </span>
+                        </a>
+                        ) : (
                         <Link
                           key={sport.url}
                           to={sport.url}
@@ -205,6 +255,7 @@ const IONSportsMenu = ({ onClose }: IONSportsMenuProps = {}) => {
                             {sport.name}
                           </span>
                         </Link>
+                        )
                       ))}
                     </div>
                   </div>

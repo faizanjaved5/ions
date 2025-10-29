@@ -1,7 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, Upload, Moon, Sun, Menu, Bell, X } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +31,15 @@ import { useState } from "react";
 import { useBreakpoint } from "@/hooks/use-breakpoint";
 import headerMenuData from "@/data/headerMenuData.json";
 
-// Component mapping for menu items
-const componentMap: Record<string, React.ComponentType<{ onClose?: () => void }>> = {
+// Component mapping for menu items (allow extra props like linkType)
+type MenuComponentProps = {
+  onClose?: () => void;
+  linkType?: "router" | "anchor";
+  spriteUrl?: string;
+  externalTheme?: "dark" | "light";
+  onExternalThemeToggle?: () => void;
+};
+const componentMap: Record<string, React.ComponentType<MenuComponentProps>> = {
   IONNetworksMenu,
   IONInitiativesMenu,
   IONShopsMenu,
@@ -42,9 +48,20 @@ const componentMap: Record<string, React.ComponentType<{ onClose?: () => void }>
   IONConnectionsMenu,
 };
 
-const Header = () => {
+interface HeaderProps {
+  onSearch?: (query: string) => void;
+  uploadUrl?: string;
+  signInUrl?: string;
+  signOutUrl?: string;
+  linkType?: "router" | "anchor";
+  disableThemeToggle?: boolean;
+  spriteUrl?: string;
+  externalTheme?: "dark" | "light";
+  onExternalThemeToggle?: () => void;
+}
+
+const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router", disableThemeToggle = false, spriteUrl, externalTheme, onExternalThemeToggle }: HeaderProps = {}) => {
   const { isLoggedIn, user, logout, login } = useAuth();
-  const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +75,14 @@ const Header = () => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   const { theme, setTheme } = useTheme();
+  const activeTheme = externalTheme || theme;
+  const handleThemeToggle = () => {
+    if (onExternalThemeToggle) {
+      onExternalThemeToggle();
+    } else {
+      setTheme(theme === "dark" ? "light" : "dark");
+    }
+  };
   const { isMd, isLg, isXl } = useBreakpoint();
   
   // Default header buttons (these could also come from your JSON)
@@ -70,10 +95,18 @@ const Header = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleLogout = () => {
+    // Update local state then redirect if provided
     logout();
+    if (signOutUrl) {
+      window.location.href = signOutUrl;
+    }
   };
 
   const handleSignIn = () => {
+    if (signInUrl) {
+      window.location.href = signInUrl;
+      return;
+    }
     login();
   };
 
@@ -141,7 +174,13 @@ const Header = () => {
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <MenuComponent onClose={() => setPopoverStates(prev => ({ ...prev, [item.id]: false }))} />
+          <MenuComponent
+            onClose={() => setPopoverStates(prev => ({ ...prev, [item.id]: false }))}
+            linkType={linkType}
+            spriteUrl={spriteUrl}
+            externalTheme={activeTheme as "dark" | "light"}
+            onExternalThemeToggle={handleThemeToggle}
+          />
         </PopoverContent>
       </Popover>
     );
@@ -230,7 +269,10 @@ const Header = () => {
                   size="icon"
                   className="xl:hidden h-9 w-9 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
                   title={headerButtons.upload.label}
-                  onClick={() => window.location.href = isLoggedIn ? 'https://ions.com/app/creators.php' : 'https://ions.com/uploader/'}
+                  onClick={() => {
+                    const url = uploadUrl || (isLoggedIn ? 'app/creators.php' : 'uploader/');
+                    window.location.href = url;
+                  }}
                 >
                   <Upload className="h-4 w-4" />
                   <span className="sr-only">{headerButtons.upload.label}</span>
@@ -238,7 +280,10 @@ const Header = () => {
                 <Button
                   variant="default"
                   className="hidden xl:flex items-center gap-2 font-bebas text-xl uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
-                  onClick={() => window.location.href = isLoggedIn ? 'https://ions.com/app/creators.php' : 'https://ions.com/uploader/'}
+                  onClick={() => {
+                    const url = uploadUrl || (isLoggedIn ? 'app/creators.php' : 'uploader/');
+                    window.location.href = url;
+                  }}
                 >
                   <Upload className="h-5 w-5" />
                   {headerButtons.upload.label}
@@ -278,23 +323,25 @@ const Header = () => {
             )}
 
             {/* User Profile - Only visible when logged in */}
-            <UserProfile onLogout={handleLogout} />
+            <UserProfile onLogout={handleLogout} linkType={linkType} />
 
             {/* Theme Toggle - Only visible on xl+ (replaces hamburger menu) */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="hidden xl:flex h-9 w-9 text-gray-400 hover:text-white"
-              title="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-              <span className="sr-only">Toggle theme</span>
-            </Button>
+            {!disableThemeToggle && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleThemeToggle}
+                className="hidden xl:flex h-9 w-9 text-gray-400 hover:text-white"
+                title="Toggle theme"
+              >
+                {activeTheme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+                <span className="sr-only">Toggle theme</span>
+              </Button>
+            )}
 
             {/* Hamburger Menu - Visible on md and below (hidden on xl+) */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -314,7 +361,8 @@ const Header = () => {
                         size="sm"
                         className="flex-1 justify-center font-bebas uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md" 
                         onClick={() => {
-                          window.location.href = isLoggedIn ? 'https://ions.com/app/creators.php' : 'https://ions.com/uploader/';
+                          const url = uploadUrl || (isLoggedIn ? 'app/creators.php' : 'uploader/');
+                          window.location.href = url;
                           setMobileMenuOpen(false);
                         }}
                       >
@@ -385,16 +433,18 @@ const Header = () => {
                   <div className="my-1 border-t" />
 
                   {/* Theme Toggle */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                    className="justify-start text-gray-400 hover:text-white h-9"
-                  >
-                    <Sun className="mr-2 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute ml-2 h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                    <span className="ml-6">Toggle theme</span>
-                  </Button>
+                  {!disableThemeToggle && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleThemeToggle}
+                      className="justify-start text-gray-400 hover:text-white h-9"
+                    >
+                      <Sun className="mr-2 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                      <Moon className="absolute ml-2 h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                      <span className="ml-6">Toggle theme</span>
+                    </Button>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
@@ -424,7 +474,11 @@ const Header = () => {
                 if (e.key === 'Enter') {
                   const query = encodeURIComponent(searchQuery.trim());
                   if (query) {
-                    navigate(`/search/?q=${query}`);
+                    if (onSearch) {
+                      onSearch(query);
+                    } else {
+                      window.location.href = `/search/?q=${query}`;
+                    }
                     setSearchOpen(false);
                   }
                 }
@@ -434,7 +488,11 @@ const Header = () => {
               onClick={() => {
                 const query = encodeURIComponent(searchQuery.trim());
                 if (query) {
-                  navigate(`/search/?q=${query}`);
+                  if (onSearch) {
+                    onSearch(query);
+                  } else {
+                    window.location.href = `/search/?q=${query}`;
+                  }
                   setSearchOpen(false);
                 }
               }}
@@ -458,7 +516,12 @@ const Header = () => {
             onOpenChange={(open) => setDialogStates(prev => ({ ...prev, [item.id]: open }))}
           >
             <DialogContent className="max-w-[960px] p-0">
-              <MenuComponent />
+              <MenuComponent
+                linkType={linkType}
+                spriteUrl={spriteUrl}
+                externalTheme={activeTheme as "dark" | "light"}
+                onExternalThemeToggle={handleThemeToggle}
+              />
             </DialogContent>
           </Dialog>
         );
