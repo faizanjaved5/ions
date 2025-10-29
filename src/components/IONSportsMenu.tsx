@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useTheme } from "next-themes";
 import { Link } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 import sportsData from "@/data/sportsMenuData.json";
 
 interface SportItem {
@@ -31,6 +32,7 @@ const IONSportsMenu = ({ onClose, linkType = "router", spriteUrl, externalTheme,
   const [useBebasFont, setUseBebasFont] = useState(false);
   const [viewMode, setViewMode] = useState<"card" | "list">("card");
   const { theme, setTheme } = useTheme();
+  const isMobile = useIsMobile();
   const activeTheme = externalTheme || theme;
   const handleThemeToggle = () => {
     if (onExternalThemeToggle) onExternalThemeToggle();
@@ -82,7 +84,7 @@ const IONSportsMenu = ({ onClose, linkType = "router", spriteUrl, externalTheme,
     >
       {/* Header */}
       <div className="px-3 md:px-6 py-3 md:py-4 border-b border-border">
-        <div className="flex items-center justify-between gap-2 md:gap-4 mb-3">
+        <div className="flex items-center justify-between gap-2 md:gap-4 mb-0">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <h2 className="text-base md:text-lg font-bold whitespace-nowrap truncate">
               <span className="text-primary">ION</span>
@@ -90,7 +92,7 @@ const IONSportsMenu = ({ onClose, linkType = "router", spriteUrl, externalTheme,
             </h2>
           </div>
 
-          <div className="flex-1 max-w-md relative mx-4 md:mx-[30px]">
+          <div className={`${isMobile ? 'hidden' : 'flex-1 max-w-md relative mx-4 md:mx-[30px]'}`}>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -149,6 +151,20 @@ const IONSportsMenu = ({ onClose, linkType = "router", spriteUrl, externalTheme,
             )}
           </div>
         </div>
+
+        {isMobile && (
+          <div className="relative w-full mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search ION Sports"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              autoFocus
+              className="w-full pl-10 pr-4 py-2 text-sm uppercase tracking-wide rounded-sm focus:outline-none focus:ring-1 focus:ring-ring bg-input text-foreground placeholder:text-muted-foreground"
+            />
+          </div>
+        )}
       </div>
 
       {/* Sports Content */}
@@ -157,7 +173,7 @@ const IONSportsMenu = ({ onClose, linkType = "router", spriteUrl, externalTheme,
           {viewMode === "card" ? (
             // Card View - Alphabetical grid
             filteredSports.length > 0 ? (
-              <div className="grid grid-cols-6 gap-[0.35rem]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-[0.35rem]">
                 {filteredSports.map((sport: SportItem) => (
                   linkType === "anchor" ? (
                   <a

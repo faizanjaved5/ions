@@ -182,7 +182,7 @@ export const IONMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONMe
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [useBebasFont, setUseBebasFont] = useState(false);
-  const [mobileView, setMobileView] = useState<"regions" | "countries" | "states">("regions");
+  const [mobileView, setMobileView] = useState<"regions" | "countries" | "states">("countries");
   const [isOpen, setIsOpen] = useState(false);
   const isMobile = useIsMobile();
   const activeTheme = externalTheme || theme;
@@ -322,7 +322,7 @@ export const IONMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONMe
     >
       {/* Header */}
       <div className="px-3 md:px-4 py-3 border-b border-menu-border">
-        <div className="flex items-center justify-between gap-2 md:gap-4 mb-3 md:mb-0">
+        <div className="flex items-center justify-between gap-2 md:gap-4 mb-0">
           <div className="flex items-center gap-2 md:gap-3 min-w-0">
             {isMobile && mobileView !== "regions" && (
               <Button
@@ -381,7 +381,7 @@ export const IONMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONMe
           </div>
         </div>
         {isMobile && (
-          <div className="relative w-full">
+          <div className="relative w-full mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"

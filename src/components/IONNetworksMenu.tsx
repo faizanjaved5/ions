@@ -352,20 +352,47 @@ const IONNetworksMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONN
                   const hasChildren = findItemHasChildren(item.id);
 
                   if (isTopLevel) {
+                    if (hasChildren) {
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            handleNetworkClick(item);
+                            setSearchQuery("");
+                          }}
+                          className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                        >
+                          <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
+                            {formatTextWithHighlights(item.title)}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      );
+                    }
+                    if (item.url) {
+                      return (
+                        <a
+                          key={item.id}
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                        >
+                          <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
+                            {formatTextWithHighlights(item.title)}
+                          </span>
+                        </a>
+                      );
+                    }
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => {
-                          handleNetworkClick(item);
-                          setSearchQuery("");
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                        className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} ${bebasStyles} opacity-60`}
                       >
                         <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                      </button>
+                      </div>
                     );
                   }
 
@@ -411,8 +438,27 @@ const IONNetworksMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONN
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[0px]">
               {networksData.networks.map((network) => {
                 const hasChildren = network.children && network.children.length > 0;
+                
+                // If no children and has URL, render as link
+                if (!hasChildren && network.url) {
+                  return (
+                    <a
+                      key={network.title}
+                      href={network.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                    >
+                      <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'uppercase' : ''}`}>
+                        {formatTextWithHighlights(network.title)}
+                      </span>
+                    </a>
+                  );
+                }
+                
+                // Otherwise render as button to navigate to submenu
                 return (
-                   <button
+                  <button
                     key={network.title}
                     onClick={() => handleNetworkClick(network)}
                     className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}

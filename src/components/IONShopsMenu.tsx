@@ -91,7 +91,7 @@ const IONShopsMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONShop
     else setTheme(theme === "dark" ? "light" : "dark");
   };
   const isMobile = useIsMobile();
-  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+  const [mobileView, setMobileView] = useState<"list" | "detail">("detail");
 
   const currentCategory = useMemo(
     () => shopsData.categories.find((c) => c.id === selectedCategory),
@@ -276,7 +276,7 @@ const IONShopsMenu = ({ onClose, externalTheme, onExternalThemeToggle }: IONShop
         </div>
 
         {isMobile && (
-          <div className="relative w-full">
+          <div className="relative w-full mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"

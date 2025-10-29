@@ -84,6 +84,7 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
     }
   };
   const { isMd, isLg, isXl } = useBreakpoint();
+  const searchPlaceholder = isMd ? "Search videos, channels, content..." : "Type to search ION";
   
   // Default header buttons (these could also come from your JSON)
   const headerButtons = {
@@ -210,78 +211,81 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-[#3a3f47] backdrop-blur">
-        <div className="mx-auto flex h-20 max-w-[1920px] items-center px-4 gap-4">
+        <div className="mx-auto flex h-20 max-w-[1920px] items-center px-4 gap-2 md:gap-4">
           {/* Logo */}
           <div className="flex-shrink-0">
             <a href="https://ions.com" className="cursor-pointer block">
-              <img src={ionLogo} alt="ION Logo" className="h-14 w-auto md:h-20 mt-[5px]" />
+              <img src={ionLogo} alt="ION Logo" className="h-20 w-auto md:h-20 mt-[5px]" />
             </a>
           </div>
 
-          {/* Desktop Navigation XL - Show all items */}
+          {/* Mobile Search Button - Centered */}
+          <Button
+            variant="ghost"
+            onClick={() => setSearchOpen(true)}
+            className="md:hidden flex items-center gap-2 mx-auto flex-shrink-0 text-primary hover:text-white hover:bg-primary/20 rounded-md px-3 py-2"
+            title="Search ION"
+          >
+            <Search className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-wider">Search</span>
+          </Button>
+
+          {/* Desktop Search Button */}
+          <Button
+            variant="ghost"
+            onClick={() => setSearchOpen(true)}
+            className="hidden md:flex items-center gap-2 font-bebas text-xl uppercase tracking-wider group flex-shrink-0 border border-primary/30 hover:border-primary rounded-md px-4 py-2 ml-12"
+          >
+            <Search className="h-5 w-5 text-primary group-hover:text-white" />
+            <span className="text-gray-400 group-hover:text-white">Search</span>
+            <span className="text-primary group-hover:text-white">ION</span>
+          </Button>
+
+          {/* Desktop Navigation - Progressive display based on available width */}
+          {/* XL: Show all 7 items */}
           {isXl && (
             <nav className="flex relative items-center gap-2 flex-1 justify-center">
               {visibleMenuItems.map(item => renderDesktopMenuItem(item))}
             </nav>
           )}
-
-          {/* Desktop Navigation LG - Show first 6 items */}
+          
+          {/* LG: Show first 5 items */}
           {isLg && (
             <nav className="flex relative items-center gap-2 flex-1 justify-center">
-              {visibleMenuItems.slice(0, 6).map(item => renderDesktopMenuItem(item))}
+              {visibleMenuItems.slice(0, 5).map(item => renderDesktopMenuItem(item))}
             </nav>
           )}
-
-          {/* Desktop Navigation MD - Show first 5 items */}
+          
+          {/* MD: Show first 3 items */}
           {isMd && (
             <nav className="flex relative items-center gap-2 flex-1 justify-center">
-              {visibleMenuItems.slice(0, 5).map(item => renderDesktopMenuItem(item))}
+              {visibleMenuItems.slice(0, 3).map(item => renderDesktopMenuItem(item))}
             </nav>
           )}
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0 ml-auto">
-            {/* Search - Icon on mobile/tablet, full button on desktop xl+ */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSearchOpen(true)}
-              className="xl:hidden h-9 w-9 text-gray-400 hover:text-white"
-              title="Search ION"
-            >
-              <Search className="h-4 w-4" />
-              <span className="sr-only">Search ION</span>
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setSearchOpen(true)}
-              className="hidden xl:flex items-center gap-2 font-bebas text-xl uppercase tracking-wider text-gray-400 hover:text-white"
-            >
-              <Search className="h-5 w-5" />
-              Search ION
-            </Button>
-
             {/* Upload - Icon on mobile/tablet, full button on desktop xl+ */}
             {headerButtons.upload.visible && (
               <>
                 <Button
                   variant="default"
                   size="icon"
-                  className="xl:hidden h-9 w-9 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
+                  className="xl:hidden h-10 w-10 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md flex-shrink-0"
                   title={headerButtons.upload.label}
                   onClick={() => {
-                    const url = uploadUrl || (isLoggedIn ? 'app/creators.php' : 'uploader/');
+                    const url = uploadUrl || (isLoggedIn ? '/app/creators.php' : 'uploader/');
                     window.location.href = url;
                   }}
                 >
-                  <Upload className="h-4 w-4" />
+                  <Upload className="h-5 w-5" />
                   <span className="sr-only">{headerButtons.upload.label}</span>
                 </Button>
                 <Button
                   variant="default"
                   className="hidden xl:flex items-center gap-2 font-bebas text-xl uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
                   onClick={() => {
-                    const url = uploadUrl || (isLoggedIn ? 'app/creators.php' : 'uploader/');
+                    const url = uploadUrl || (isLoggedIn ? '/app/creators.php' : 'uploader/');
                     window.location.href = url;
                   }}
                 >
@@ -303,16 +307,16 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
               </Button>
             )}
 
-            {/* Notifications - Only visible when logged in and has notifications */}
+            {/* Notifications - Only visible on md+ in header; on mobile it's in the drawer */}
             {isLoggedIn && unreadCount > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative h-9 w-9 text-gray-400 hover:text-white"
+                className="hidden md:inline-flex relative h-10 w-10 text-primary hover:text-white hover:bg-primary/20 flex-shrink-0"
                 title="Notifications"
                 onClick={() => setNotificationsOpen(true)}
               >
-                <Bell className="h-4 w-4" />
+                <Bell className="h-5 w-5" />
                 <Badge 
                   className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground rounded-full"
                 >
@@ -331,23 +335,23 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
                 variant="ghost"
                 size="icon"
                 onClick={handleThemeToggle}
-                className="hidden xl:flex h-9 w-9 text-gray-400 hover:text-white"
+                className="hidden xl:flex h-10 w-10 text-primary hover:text-white hover:bg-primary/20"
                 title="Toggle theme"
               >
                 {activeTheme === "dark" ? (
-                  <Sun className="h-4 w-4" />
+                  <Sun className="h-5 w-5" />
                 ) : (
-                  <Moon className="h-4 w-4" />
+                  <Moon className="h-5 w-5" />
                 )}
                 <span className="sr-only">Toggle theme</span>
               </Button>
             )}
 
-            {/* Hamburger Menu - Visible on md and below (hidden on xl+) */}
+            {/* Hamburger Menu - Always visible on mobile/tablet (hidden only on xl+) */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild className="xl:hidden">
-                <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-400 hover:text-white">
-                  <Menu className="h-5 w-5" />
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="xl:hidden h-10 w-10 text-primary hover:text-white hover:bg-primary/20 flex-shrink-0">
+                  <Menu className="h-6 w-6" />
                   <span className="sr-only">Menu</span>
                 </Button>
               </SheetTrigger>
@@ -361,7 +365,7 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
                         size="sm"
                         className="flex-1 justify-center font-bebas uppercase tracking-wider bg-primary text-primary-foreground hover:bg-primary/90 rounded-md" 
                         onClick={() => {
-                          const url = uploadUrl || (isLoggedIn ? 'app/creators.php' : 'uploader/');
+                          const url = uploadUrl || (isLoggedIn ? '/app/creators.php' : 'uploader/');
                           window.location.href = url;
                           setMobileMenuOpen(false);
                         }}
@@ -410,20 +414,18 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
                   </div>
 
                   {/* Search Bar */}
-                  <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background/50 mx-3">
-                    <Search className="h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="SEARCH ION"
-                      className="border-0 bg-transparent p-0 h-auto font-bebas uppercase placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
-                      onClick={() => {
-                        setSearchOpen(true);
-                        setMobileMenuOpen(false);
-                      }}
-                      readOnly
-                    />
-                  </div>
-
-                  <div className="my-1 border-t" />
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setSearchOpen(true);
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2 font-bebas text-xl uppercase tracking-wider group mx-3 justify-start border border-primary/30 hover:border-primary rounded-md px-4 py-2 h-auto"
+                  >
+                    <Search className="h-5 w-5 text-primary group-hover:text-white flex-shrink-0" />
+                    <span className="text-gray-400 group-hover:text-white">Search</span>
+                    <span className="text-primary group-hover:text-white">ION</span>
+                  </Button>
 
                   {/* Navigation Links */}
                   <div className="flex flex-col">
@@ -457,16 +459,25 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
         setSearchOpen(open);
         if (!open) setSearchQuery("");
       }}>
-        <DialogContent className="sm:max-w-[900px] max-w-[95vw] w-full p-6 sm:p-8 md:p-12 bg-background fixed left-[50%] top-[20%] translate-x-[-50%] translate-y-0 data-[state=open]:slide-in-from-top-[100px] data-[state=closed]:slide-out-to-top-[100px]">
-          <DialogHeader className="mb-6 sm:mb-8">
-            <DialogTitle className="font-bebas text-3xl sm:text-4xl md:text-5xl uppercase tracking-wider text-center text-foreground">
-              Search <span className="text-primary">ION</span> Network
-            </DialogTitle>
+        <DialogContent className="sm:max-w-[900px] max-w-[90vw] w-full p-4 sm:p-8 md:p-12 bg-background fixed left-[50%] top-[18%] translate-x-[-50%] translate-y-0 overflow-y-auto rounded-md sm:rounded-lg max-h-[85vh] data-[state=open]:slide-in-from-top-[100px] data-[state=closed]:slide-out-to-top-[100px]"> 
+          <DialogHeader className="mb-4 sm:mb-8"> 
+            <DialogTitle className="text-center text-foreground"> 
+              {/* Mobile: Simple text "Search ION Network" */}
+              <span className="font-bebas text-2xl uppercase tracking-wider block sm:hidden">
+                Search <span className="text-primary">ION</span> Network
+              </span>
+              {/* Desktop: Logo version */}
+              <span className="hidden sm:flex font-bebas text-3xl sm:text-4xl md:text-5xl uppercase tracking-wider items-center justify-center gap-3"> 
+                Search 
+                <img src={ionLogo} alt="ION" className="h-12 sm:h-16 md:h-20 inline-block" /> 
+                Network 
+              </span> 
+            </DialogTitle> 
           </DialogHeader>
-          <div className="relative w-full">
+          <div className="flex flex-col sm:relative gap-3 sm:gap-0 w-full">
             <Input
-              placeholder="Search videos, channels, content..."
-              className="w-full h-12 sm:h-14 md:h-16 pr-28 sm:pr-32 md:pr-36 text-sm sm:text-base md:text-lg rounded-lg border-2 border-primary/50 bg-card/50 text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary"
+              placeholder={searchPlaceholder}
+              className="w-full h-14 md:h-16 sm:pr-28 md:pr-32 lg:pr-36 text-base md:text-xl lg:text-2xl rounded-lg border-2 border-primary bg-card/50 text-foreground placeholder:text-muted-foreground focus:bg-card focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary focus-visible:outline-none transition-colors"
               autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -496,7 +507,7 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
                   setSearchOpen(false);
                 }
               }}
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-10 sm:h-12 md:h-14 px-4 sm:px-6 md:px-8 font-bebas text-sm sm:text-base md:text-lg uppercase tracking-wider rounded-md bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="w-full h-12 sm:w-auto sm:absolute sm:right-1 sm:top-1/2 sm:-translate-y-1/2 sm:h-12 md:h-14 px-4 sm:px-6 md:px-8 font-bebas text-base md:text-lg uppercase tracking-wider rounded-lg sm:rounded-md bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               Search
             </Button>
@@ -515,8 +526,9 @@ const Header = ({ onSearch, uploadUrl, signInUrl, signOutUrl, linkType = "router
             open={dialogStates[item.id] || false} 
             onOpenChange={(open) => setDialogStates(prev => ({ ...prev, [item.id]: open }))}
           >
-            <DialogContent className="max-w-[960px] p-0">
+            <DialogContent className="max-w-[95vw] sm:max-w-[960px] p-0 h-[95vh] sm:h-auto sm:max-h-[90vh] overflow-hidden [&>button]:hidden top-[2.5vh] sm:top-[50%] translate-y-0 sm:-translate-y-1/2">
               <MenuComponent
+                onClose={() => setDialogStates(prev => ({ ...prev, [item.id]: false }))}
                 linkType={linkType}
                 spriteUrl={spriteUrl}
                 externalTheme={activeTheme as "dark" | "light"}

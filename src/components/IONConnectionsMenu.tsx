@@ -311,20 +311,47 @@ const IONConnectionsMenu = ({ onClose, externalTheme, onExternalThemeToggle }: I
                   const hasChildren = findItemHasChildren(item.id);
 
                   if (isTopLevel) {
+                    if (hasChildren) {
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            handleConnectionClick(item);
+                            setSearchQuery("");
+                          }}
+                          className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                        >
+                          <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
+                            {formatTextWithHighlights(item.title)}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      );
+                    }
+                    if (item.url) {
+                      return (
+                        <a
+                          key={item.id}
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                        >
+                          <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
+                            {formatTextWithHighlights(item.title)}
+                          </span>
+                        </a>
+                      );
+                    }
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={() => {
-                          handleConnectionClick(item);
-                          setSearchQuery("");
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                        className={`flex w-full items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} ${bebasStyles} opacity-60`}
                       >
                         <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
                           {formatTextWithHighlights(item.title)}
                         </span>
-                        {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                      </button>
+                      </div>
                     );
                   }
 
@@ -376,17 +403,44 @@ const IONConnectionsMenu = ({ onClose, externalTheme, onExternalThemeToggle }: I
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-[0px]">
               {connectionsData.connections.map((connection) => {
                 const hasChildren = connection.children && connection.children.length > 0;
+                if (hasChildren) {
+                  return (
+                    <button
+                      key={connection.title}
+                      onClick={() => handleConnectionClick(connection)}
+                      className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                    >
+                      <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'uppercase' : ''}`}>
+                        {formatTextWithHighlights(connection.title)}
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+                    </button>
+                  );
+                }
+                if (connection.url) {
+                  return (
+                    <a
+                      key={connection.title}
+                      href={connection.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                    >
+                      <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'uppercase' : ''}`}>
+                        {formatTextWithHighlights(connection.title)}
+                      </span>
+                    </a>
+                  );
+                }
                 return (
-                   <button
+                  <div
                     key={connection.title}
-                    onClick={() => handleConnectionClick(connection)}
-                    className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} text-left transition-all hover:border-primary/50 hover:bg-accent/50 ${bebasStyles}`}
+                    className={`group flex items-center justify-between rounded-lg border border-border/50 bg-card px-3 ${menuItemPadding} ${bebasStyles} opacity-60`}
                   >
-                    <span className={`text-sm font-medium text-card-foreground group-hover:text-primary ${!useBebasFont ? 'uppercase' : ''}`}>
+                    <span className={`text-sm font-medium text-card-foreground ${!useBebasFont ? 'uppercase' : ''}`}>
                       {formatTextWithHighlights(connection.title)}
                     </span>
-                    {hasChildren && <ChevronRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />}
-                  </button>
+                  </div>
                 );
               })}
             </div>

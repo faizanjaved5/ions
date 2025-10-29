@@ -13,8 +13,8 @@ if (isset($ION_NAVBAR_BASE_URL)) {
     $ION_NAVBAR_BASE_URL = '/';
 }
 
-$cssVer = 1;//time();
-$jsVer = 1;//time();
+$cssVer = time();
+$jsVer = time();
 $cssHref = $cssPath . '?v=' . $cssVer;
 $jsSrc = $jsPath . '?v=' . $jsVer;
 

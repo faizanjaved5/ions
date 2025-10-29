@@ -294,16 +294,16 @@
       "title": "ION Business™ Network",
       "url": null,
       "children": [
-        {"title": "The Chamber Show™", "url": "https://ions.com/chamber-show/", "children": []},
-        {"title": "Student Entrepreneur Academy", "url": "https://ions.com/student-entrepreneur-academy-2/", "children": []},
-        {"title": "Dave Behar Show", "url": "https://ions.com/dave-behar-show/", "children": []},
+        {"title": "The Chamber Show™", "url": "/chamber-show/", "children": []},
+        {"title": "Student Entrepreneur Academy", "url": "/student-entrepreneur-academy-2/", "children": []},
+        {"title": "Dave Behar Show", "url": "/dave-behar-show/", "children": []},
         {"title": "Professional Services", "url": null, "children": []},
-        {"title": "ION Publishing™", "url": "https://ions.com/ion-publishing/", "children": []}
+        {"title": "ION Publishing™", "url": "/ion-publishing/", "children": []}
       ]
     },
     {
       "title": "ION Beauty™ Network",
-      "url": null,
+      "url": "https://google.com/",
       "children": []
     },
     {
