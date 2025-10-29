@@ -205,7 +205,7 @@ function renderFeaturedVideosCarousel($pdo, $filterType, $filterValue) {
                             $creatorHandle = h($video['creator_handle'] ?? 'Unknown');
                             $creatorName = h($video['creator_name'] ?? 'Unknown');
                             $creatorPhoto = h($video['creator_photo'] ?? '/default-avatar.png');
-                            $publishedDate = date('M j, Y', strtotime($video['published_at']));
+                            $publishedDate = !empty($video['published_at']) ? date('M j, Y', strtotime($video['published_at'])) : 'N/A';
                             
                             // Handle user reaction properly
                             $userReaction = '';
@@ -376,6 +376,7 @@ function renderFeaturedVideosCarousel($pdo, $filterType, $filterValue) {
             border-top: 2px solid rgba(178, 130, 84, 0.2);
             border-bottom: 2px solid rgba(178, 130, 84, 0.2);
             overflow: hidden;
+            margin-top: 20px;
         }
         
         .featured-header {

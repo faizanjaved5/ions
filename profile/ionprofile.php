@@ -1565,6 +1565,47 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+
+<script>
+localStorage.setItem('profile-layout', 'stacked');
+function toggleLayout() {
+    let currentLayout = localStorage.getItem('profile-layout') || 'stacked';
+        // Toggle between stacked and three-column
+        currentLayout = currentLayout === 'stacked' ? 'three-column' : 'stacked';
+        
+        // Update body data-layout attribute
+        document.body.setAttribute('data-layout', currentLayout);
+        
+        // Move about card to appropriate position
+        const aboutCard = document.querySelector('.about');
+        const header = document.querySelector('.header');
+        const leftColumn = document.querySelector('.left-column');
+        
+        if (currentLayout === 'three-column') {
+            // Move about card to be direct child of header (third column)
+            if (aboutCard && header && aboutCard.parentElement !== header) {
+                header.appendChild(aboutCard);
+            }
+        } else {
+            // Move about card back to left column
+            if (aboutCard && leftColumn && aboutCard.parentElement !== leftColumn) {
+                leftColumn.appendChild(aboutCard);
+            }
+        }
+        
+        // Save preference to localStorage
+        localStorage.setItem('profile-layout', currentLayout);
+        
+        console.log('Layout switched to:', currentLayout);
+    }
+
+
+    const bioElement = document.querySelector('.bio');
+    if (bioElement && bioElement.textContent.trim().length < 875) {
+        toggleLayout();
+    }
+</script>
+
 <?php
 // Include the ION Footer
 $footer_path = $root . '/includes/ionfooter.php';
