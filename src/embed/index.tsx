@@ -140,6 +140,24 @@ export function init(options: InitOptions) {
   fontLink.href = "https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap";
   shadow.appendChild(fontLink);
 
+  // Minimal runtime fallback for critical responsive utilities in case of purge
+  const fallback = document.createElement("style");
+  fallback.textContent = `
+    @media (min-width:768px){
+      .md\\:hidden{display:none}
+      .md\\:flex{display:flex}
+    }
+    @media (min-width:640px){
+      .sm\\:relative{position:relative}
+      .sm\\:absolute{position:absolute}
+      .sm\\:right-1{right:0.25rem}
+      .sm\\:top-1\\2f 2{top:50%}
+      .sm\\:-translate-y-1\\2f 2{--tw-translate-y:-50%; transform:translate(var(--tw-translate-x,0), var(--tw-translate-y))}
+      .sm\\:w-auto{width:auto}
+    }
+  `;
+  shadow.appendChild(fallback);
+
   // Also ensure CSS is available globally for Radix portals rendered to document.body
   ensureGlobalCss(options.cssUrl);
 

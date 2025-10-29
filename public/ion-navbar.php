@@ -109,7 +109,7 @@ $userDataJson = isset($ION_USER_MENU)
     // Optional: external SVG sprite file containing symbols like #ion-archery
     // Put the sprite file next to this PHP (e.g., ion-sprite.svg) or host centrally
     spriteUrl: '<?= $ION_NAVBAR_BASE_URL ?>ion-sprite.svg',
-    signInUrl: 'login/index.php',
+    signInUrl: '/login/index.php',
     signOutUrl: '/login/logout.php',
     onSearch: (q) => location.href = '/search?q=' + encodeURIComponent(q),
     theme: 'dark'

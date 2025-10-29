@@ -6,6 +6,7 @@ const root = process.cwd();
 const outDir = path.join(root, 'dist-navbar');
 const filesToCopy = [
     { src: path.join(root, 'public', 'ion-navbar.php'), dest: path.join(outDir, 'index.php') },
+    { src: path.join(root, 'public', 'ion-navbar-embed.php'), dest: path.join(outDir, 'ion-navbar-embed.php') },
     { src: path.join(root, 'public', 'ion-sprite.svg'), dest: path.join(outDir, 'ion-sprite.svg') },
 ];
 

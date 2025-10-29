@@ -3,6 +3,13 @@ import type { Config } from "tailwindcss";
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  safelist: [
+    // visibility for the two search buttons
+    'hidden', 'flex', 'md:hidden', 'md:flex',
+    // search dialog layout utilities
+    'sm:relative', 'sm:w-auto', 'sm:absolute', 'sm:right-1', 'sm:top-1/2', 'sm:-translate-y-1/2',
+    'sm:h-12', 'md:h-14', 'sm:max-w-[900px]', 'sm:pr-28', 'md:pr-32', 'lg:pr-36',
+  ],
   prefix: "",
   theme: {
     container: {
